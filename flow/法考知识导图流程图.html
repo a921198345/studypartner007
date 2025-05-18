@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>法考知识导图流程图 - 学习搭子</title>
+    <style>
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        h1, h2 {
+            color: #333;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .rule {
+            border: 1px dashed #ccc;
+            padding: 15px;
+            margin-top: 20px;
+            background-color: #f0f8ff;
+        }
+        .rule-title {
+            font-weight: bold;
+            color: #337ab7;
+        }
+        .member-feature {
+            background-color: #f0fff0;
+            border-left: 5px solid #4caf50;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .partial-access {
+            background-color: #fff8e1;
+            border-left: 5px solid #ffc107;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .note {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #fffde7;
+            border-left: 4px solid #ffeb3b;
+            font-size: 0.9em;
+        }
+        
+        /* 流程图样式 */
+        .flowchart {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+        .flowchart-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .node {
+            position: relative;
+            margin: 15px 0;
+            text-align: center;
+        }
+        .process-node {
+            background-color: white;
+            border: 2px solid #007bff;
+            border-radius: 5px;
+            padding: 10px 15px;
+            min-width: 200px;
+            display: inline-block;
+        }
+        .decision-node {
+            background-color: #f0f8ff;
+            border: 2px solid #007bff;
+            border-radius: 5px;
+            padding: 10px 15px;
+            min-width: 200px;
+            display: inline-block;
+            transform: rotate(0deg);
+        }
+        .start-end-node {
+            background-color: #e6e6fa;
+            border: 2px solid #9370db;
+            border-radius: 25px;
+            padding: 10px 15px;
+            min-width: 200px;
+            display: inline-block;
+        }
+        .highlight-node {
+            background-color: #fff8e1;
+            border: 2px solid #ffc107;
+        }
+        .arrow {
+            height: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        .arrow::after {
+            content: "";
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 10px solid #007bff;
+            position: absolute;
+            bottom: 0;
+        }
+        .arrow-line {
+            height: 20px;
+            width: 2px;
+            background-color: #007bff;
+        }
+        .branches {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+        }
+        .branch {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0 10px;
+            position: relative;
+        }
+        .branch-label {
+            position: absolute;
+            top: -25px;
+            background-color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.8em;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>法考知识导图流程图 - 学习搭子</h1>
+        <p>文档依据：<a href="javascript:void(0);" title="产品需求文档.md">产品需求文档.md</a></p>
+        
+        <h2>1. 知识导图内容管理流程</h2>
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="start-end-node">开始: 系统管理员上传内容</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">准备各学科OPML格式文档</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">上传OPML文件至系统</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">系统处理与解析OPML文档</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">将处理后的数据存储到数据库</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">记录知识点唯一标识符</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="start-end-node">结束: 知识导图准备完成</div>
+                </div>
+            </div>
+        </div>
+
+        <h2>2. 用户访问知识导图流程</h2>
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="start-end-node">开始: 用户访问知识导图</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="decision-node">是否有会员权限?</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">是</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">显示所有学科选项</div>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">否</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">仅显示"民法"学科选项</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="node" style="margin-top: 20px;">
+                    <div class="process-node">用户选择学科</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">加载并渲染选定学科的知识导图</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">默认展开至第三级知识点</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户与知识导图交互</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="start-end-node">结束: 完成知识导图查看</div>
+                </div>
+            </div>
+        </div>
+
+        <h2>3. 知识导图与AI问答智能联动流程</h2>
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="start-end-node">开始: 用户完成AI问答</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">显示"查看相关知识导图"按钮</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="decision-node">是会员用户或非会员且<br>今日使用次数≤2?</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">是</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">用户点击按钮</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        
+                        <div class="node">
+                            <div class="process-node">分析AI回答内容</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        
+                        <div class="node">
+                            <div class="process-node">提取关键法律概念和知识点</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        
+                        <div class="node">
+                            <div class="process-node">跳转至知识导图页面</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        
+                        <div class="node">
+                            <div class="process-node">定位并高亮相关知识点</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        
+                        <div class="node">
+                            <div class="process-node highlight-node">更新非会员用户使用次数</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        
+                        <div class="node">
+                            <div class="start-end-node">结束: 用户查看关联知识点</div>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">否</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">提示升级会员</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        
+                        <div class="node">
+                            <div class="start-end-node">结束</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="note">
+            <p><strong>注意:</strong> 非会员用户每日可使用两次AI问答的智能联动功能，系统会自动记录使用次数。</p>
+        </div>
+
+        <h2>4. 知识导图与法考真题库智能联动流程</h2>
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="start-end-node">开始: 用户完成题目作答</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">显示"查看相关知识导图"按钮</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="decision-node">是会员用户或<br>题目属于民法学科?</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">是</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">用户点击按钮</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        
+                        <div class="node">
+                            <div class="process-node">分析题目内容和解析</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        
+                        <div class="node">
+                            <div class="process-node">识别相关法律概念和知识点</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        
+                        <div class="node">
+                            <div class="process-node">跳转至知识导图页面</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        
+                        <div class="node">
+                            <div class="process-node">定位并高亮相关知识点</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        
+                        <div class="node">
+                            <div class="start-end-node">结束: 用户查看关联知识点</div>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">否</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">提示升级会员</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        
+                        <div class="node">
+                            <div class="start-end-node">结束</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="note">
+            <p><strong>注意:</strong> 非会员用户可以使用民法学科题目的智能联动功能，其他学科题目需升级会员。</p>
+        </div>
+
+        <h2>5. 知识导图数据更新流程</h2>
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="start-end-node">开始: 管理员内容更新</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="decision-node">是否需要更新?</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">是</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">准备新版OPML文档</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        
+                        <div class="node">
+                            <div class="process-node">上传新版OPML替换旧数据</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        
+                        <div class="node">
+                            <div class="process-node">进行知识点ID映射</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        
+                        <div class="node">
+                            <div class="process-node">版本控制与更新记录</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        
+                        <div class="node">
+                            <div class="process-node">向用户通知重要更新</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        
+                        <div class="node">
+                            <div class="start-end-node">结束: 知识导图更新完成</div>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">否</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="start-end-node">结束</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="rule">
+            <p class="rule-title">相关业务规则摘要：</p>
+            <p><strong>知识导图内容规则：</strong></p>
+            <ul>
+                <li>知识导图以OPML格式导入，支持1MB以上大文件。</li>
+                <li>按学科分类独立展示（共8个主要学科）。</li>
+                <li>采用树状结构展示知识点层级关系。</li>
+            </ul>
+            <p><strong>用户交互规则：</strong></p>
+            <ul>
+                <li>用户首次查看导图时，默认仅展开至第三级知识点。</li>
+                <li>用户可手动点击节点，自由展开或折叠任意层级的知识点。</li>
+                <li>支持导图拖拽和缩放操作。</li>
+            </ul>
+            
+            <p><strong>智能联动规则：</strong></p>
+            <ul>
+                <li class="partial-access">非会员用户每日可使用2次AI问答智能联动功能。</li>
+                <li class="partial-access">非会员用户可对民法学科相关题目使用智能联动功能。</li>
+                <li>高亮知识点所在的导图分支自动完全展开，其他分支保持折叠状态。</li>
+                <li class="member-feature">其他学科的题目智能联动功能和超出免费次数的AI问答智能联动为会员专享。</li>
+            </ul>
+            
+            <p><strong>会员权限规则：</strong></p>
+            <ul>
+                <li>免费用户仅可查看"民法"学科的知识导图。</li>
+                <li>会员用户可查看所有学科导图。</li>
+                <li class="partial-access">智能联动功能部分对免费用户开放（AI问答每日2次，民法学科题目无限制）。</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html> 

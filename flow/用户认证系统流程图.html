@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户认证系统流程图 - 学习搭子</title>
+    <style>
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        h1, h2 {
+            color: #333;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .rule {
+            border: 1px dashed #ccc;
+            padding: 15px;
+            margin-top: 20px;
+            background-color: #f0f8ff;
+        }
+        .rule-title {
+            font-weight: bold;
+            color: #337ab7;
+        }
+        .info-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #6c757d;
+            padding: 10px 15px;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+        .new-feature {
+            background-color: #fffcf0;
+            border-left: 5px solid #ffc107;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        
+        /* 流程图样式 */
+        .flowchart {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+        .flowchart-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .node {
+            position: relative;
+            margin: 15px 0;
+            text-align: center;
+        }
+        .process-node {
+            background-color: white;
+            border: 2px solid #007bff;
+            border-radius: 5px;
+            padding: 10px 15px;
+            min-width: 200px;
+            display: inline-block;
+        }
+        .decision-node {
+            background-color: #f0f8ff;
+            border: 2px solid #007bff;
+            border-radius: 5px;
+            padding: 10px 15px;
+            min-width: 200px;
+            display: inline-block;
+        }
+        .start-end-node {
+            background-color: #e6e6fa;
+            border: 2px solid #9370db;
+            border-radius: 25px;
+            padding: 10px 15px;
+            min-width: 200px;
+            display: inline-block;
+        }
+        .highlight-node {
+            background-color: #fff8e1;
+            border: 2px solid #ffc107;
+        }
+        .yellow-node {
+            background-color: #fffcf0;
+            border: 2px solid #ffc107;
+        }
+        .arrow {
+            height: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        .arrow::after {
+            content: "";
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 10px solid #007bff;
+            position: absolute;
+            bottom: 0;
+        }
+        .arrow-line {
+            height: 20px;
+            width: 2px;
+            background-color: #007bff;
+        }
+        .branches {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+        }
+        .branch {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0 10px;
+            position: relative;
+        }
+        .branch-label {
+            position: absolute;
+            top: -25px;
+            background-color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.8em;
+            color: #007bff;
+        }
+        .note {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #fffde7;
+            border-left: 4px solid #ffeb3b;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>用户认证系统流程图 - 学习搭子</h1>
+        <p>文档依据：<a href="javascript:void(0);" title="用户认证功能.md">用户认证功能.md</a>, <a href="javascript:void(0);" title="产品需求文档.md">产品需求文档.md</a></p>
+
+        <h2>0. 登录/注册触发时机 (用户体验优化)</h2>
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="process-node new-feature-node"><strong>延迟登录模式：</strong>让用户先体验产品</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">
+                        关键节点触发登录/注册
+                    </div>
+                </div>
+                <div class="note">
+                    <p><strong>触发场景:</strong></p>
+                    <ul>
+                        <li>访问会员专属内容时</li>
+                        <li>需要保存个人学习进度时</li>
+                        <li>创建或保存个性化内容时</li>
+                        <li>使用AI问答功能时</li>
+                        <li>查看超过免费用户限额的内容时</li>
+                    </ul>
+                </div>
+                
+                <div class="node">
+                    <div class="process-node new-feature-node"><strong>内容预览机制：</strong>渐进式体验</div>
+                </div>
+                <div class="note">
+                    <ul>
+                        <li>搜索结果展示部分内容，查看完整内容需登录</li>
+                        <li>允许用户浏览2-3道试题后，提示登录查看更多</li>
+                        <li>部分学习资料免费查看，继续深入学习需登录</li>
+                    </ul>
+                </div>
+                
+                <div class="node">
+                    <div class="process-node new-feature-node"><strong>用户友好的登录提示：</strong>减少摩擦</div>
+                </div>
+                <div class="note">
+                    <ul>
+                        <li>使用非侵入式浮窗而非强制跳转页面</li>
+                        <li>清晰说明登录/注册的价值和好处</li>
+                        <li>提供"稍后再说"选项，让用户可以继续体验</li>
+                        <li>登录/注册界面简洁，提供多种登录方式选择</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <h2>1. 用户注册/登录流程 (手机号 + 短信验证码)</h2>
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="start-end-node">开始: 用户访问平台</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户在登录界面输入手机号</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="decision-node">格式是否合法？</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">是</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">继续流程</div>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">否</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">提示手机号格式错误</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">用户重新输入</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="node" style="margin-top: 20px;">
+                    <div class="process-node">用户点击"获取验证码"按钮</div>
+                </div>
+                <div class="info-box">
+                    <p><strong>短信验证码规则：</strong></p>
+                        <ul>
+                            <li>6位数字</li>
+                            <li>有效期5分钟</li>
+                            <li>同一手机号60秒内不可重复发送</li>
+                            <li>同一手机号24小时内最多发送10条</li>
+                            <li>同一IP地址24小时内最多发送20条</li>
+                        </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户输入收到的短信验证码，点击"登录/注册"</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="decision-node">验证码是否正确且有效？</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">是</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">继续流程</div>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">否</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">提示验证码错误或失效</div>
+                        </div>
+                        <div class="note">
+                            连续5次验证码错误，账号锁定30分钟
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="node" style="margin-top: 20px;">
+                    <div class="decision-node">手机号是否已注册？</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">否 (新用户)</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">系统自动创建新用户</div>
+                        </div>
+                        <div class="info-box">
+                            <ul>
+                                <li>自动生成默认昵称 (如"用户xxxx"，使用手机号后四位)</li>
+                                <li>分配默认头像</li>
+                                <li>默认会员状态为"free_user"</li>
+                        </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">是 (已注册)</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">用户直接登录成功</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="node" style="margin-top: 20px;">
+                    <div class="process-node">登录成功处理</div>
+                </div>
+                <div class="info-box">
+                    <ul>
+                    <li>生成用户访问令牌 (JWT) 并返回给客户端</li>
+                        <li>令牌包含用户ID、角色、过期时间 (如7天)</li>
+                    <li>更新用户最后登录时间 (last_login_date)</li>
+                    <li>跳转至用户之前访问的页面或平台首页</li>
+                </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="start-end-node">结束: 用户完成登录/注册</div>
+                </div>
+            </div>
+        </div>
+
+        <h2>2. 微信优先登录流程</h2>
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="start-end-node new-feature-node">开始: 用户选择"微信登录"按钮</div>
+                </div>
+                <div class="note">
+                    登录界面同时提供"手机号登录"和"微信登录"两个选项
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node new-feature-node">弹出微信扫码窗口或跳转至微信授权页面</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node new-feature-node">用户在微信中确认授权</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node new-feature-node">系统接收微信返回的授权码，获取用户微信OpenID</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="decision-node">微信OpenID是否已关联账号？</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">是 (已关联账号)</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">直接用关联账号登录成功</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">生成用户访问令牌 (JWT) 并返回给客户端</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">跳转至用户之前访问的页面或平台首页</div>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">否 (未关联账号)</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">引导用户绑定手机号以完成注册</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">用户输入手机号并获取验证码</div>
+                        </div>
+                        <div class="info-box">
+                            <ul>
+                                <li>系统进行手机号格式验证</li>
+                                <li>发送短信验证码</li>
+                                <li>用户输入收到的验证码</li>
+        </ul>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        
+                        <div class="node">
+                            <div class="decision-node">手机号是否已注册？</div>
+                        </div>
+                        
+                        <div class="branches">
+                            <div class="branch">
+                                <div class="branch-label">是 (已注册)</div>
+                                <div class="arrow"><div class="arrow-line"></div></div>
+                                <div class="node">
+                                    <div class="process-node">提示用户该手机号已存在账号</div>
+                                </div>
+                                <div class="arrow"><div class="arrow-line"></div></div>
+                                <div class="node">
+                                    <div class="process-node">用户确认关联，将微信OpenID关联至已有账号</div>
+                                </div>
+                            </div>
+                            
+                            <div class="branch">
+                                <div class="branch-label">否 (新用户)</div>
+                                <div class="arrow"><div class="arrow-line"></div></div>
+                                <div class="node">
+                                    <div class="process-node">创建新用户账号</div>
+                                </div>
+                                <div class="arrow"><div class="arrow-line"></div></div>
+                                <div class="node">
+                                    <div class="process-node">将微信OpenID与新账号关联</div>
+                                </div>
+                                <div class="arrow"><div class="arrow-line"></div></div>
+                                <div class="node">
+                                    <div class="process-node">可选择导入微信头像与昵称</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="node" style="margin-top: 40px;">
+                    <div class="process-node new-feature-node">登录成功处理</div>
+                </div>
+                <div class="info-box">
+                    <ul>
+                        <li>生成用户访问令牌 (JWT) 并返回给客户端</li>
+                        <li>更新用户最后登录时间</li>
+                        <li>跳转至用户之前访问的页面或平台首页</li>
+                                </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="start-end-node new-feature-node">结束: 用户完成微信登录及账号关联</div>
+                </div>
+            </div>
+        </div>
+
+        <h2>3. 微信账号绑定流程 (已登录用户)</h2>
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="start-end-node">开始: 用户已通过手机号登录，在个人中心点击"绑定微信"</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">弹出微信扫码窗口或跳转至微信授权页面</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户在微信中确认授权</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">系统接收微信返回的授权码，获取用户微信OpenID</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="decision-node">微信OpenID是否已被其他账号使用？</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">是</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">提示用户该微信已绑定其他账号，无法重复绑定</div>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">否</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">将OpenID与当前登录的用户账号关联</div>
+                        </div>
+                        <div class="info-box">
+                            更新数据库 Users 表的 wechat_openid<br>
+                            重要操作，可能需要短信验证二次确认
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        
+                        <div class="node">
+                            <div class="process-node">显示绑定成功提示，更新个人中心的绑定状态</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="node" style="margin-top: 20px;">
+                    <div class="start-end-node">结束: 完成微信绑定</div>
+                </div>
+            </div>
+        </div>
+
+        <h2>4. 学习计划功能流程</h2>
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="start-end-node">开始: 用户登录成功</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">前端存储JWT访问令牌</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户每次请求API时在Header中携带令牌</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">后端验证令牌有效性</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="decision-node">令牌是否有效？</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">是</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">允许访问API</div>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">否 (过期或无效)</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">要求用户重新登录</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="node" style="margin-top: 20px;">
+                    <div class="process-node">用户活跃使用时，系统可自动延长令牌有效期</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户主动登出时，前端清除本地令牌</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="start-end-node">结束: 会话管理完成</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="start-end-node">开始: 用户点击"学习计划"</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="decision-node">是否首次点击立即开始？</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">是</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">跳转到计划页面</div>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">否</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">跳转到AI问答页面</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="node" style="margin-top: 20px;">
+                    <div class="decision-node">是否已有学习计划？</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">无</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">显示"制定我的学习计划"入口</div>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">有</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">显示当前计划概览和"重新制定"选项</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="node" style="margin-top: 20px;">
+                    <div class="process-node">用户点击"制定我的学习计划"按钮</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">系统弹出信息采集表单</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户填写表单并提交</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">系统生成个性化学习计划</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">在侧边栏展示学习计划(列表视图)</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="decision-node">用户是否设置自行设定计划？</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">是</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">用户每日自行设定学习任务</div>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">否</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">使用AI生成的学习计划</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="node" style="margin-top: 20px;">
+                    <div class="process-node">用户可根据自身情况随时调整任务</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户完成学习后进行打卡</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">系统记录打卡数据，更新完成进度</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">进度可视化展示</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">所有任务打卡完成后显示恭喜信息</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">列出明日任务预览</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="start-end-node">结束: 学习计划功能流程</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="rule">
+            <p class="rule-title">相关业务规则摘要：</p>
+            <p><strong>用户注册规则：</strong></p>
+            <ul>
+                <li>手机号唯一，符合中国大陆格式。</li>
+                <li>新用户自动生成默认昵称和头像。</li>
+                <li>注册即视为同意用户协议和隐私政策。</li>
+                <li>支持通过微信授权+手机号绑定的方式完成注册。</li>
+            </ul>
+            <p><strong>账号安全规则：</strong></p>
+            <ul>
+                <li>用户可修改昵称和头像。</li>
+                <li>重要操作（如绑定微信）需短信二次确认。</li>
+                <li>疑似异常登录（如地理位置变化大）时，要求短信验证。</li>
+                <li>账号连续5次验证码错误将被锁定30分钟。</li>
+            </ul>
+            <p><strong>用户体验优化规则：</strong></p>
+            <ul>
+                <li>优先采用延迟登录模式，让用户先体验产品价值。</li>
+                <li>仅在用户需要访问高价值内容或个性化功能时触发登录。</li>
+                <li>登录/注册界面简洁，同时提供手机号和微信两种方式。</li>
+                <li>支持微信登录后再绑定手机号的流程，减少注册摩擦。</li>
+                <li>保留用户访问路径，登录后返回原页面，提升用户体验。</li>
+            </ul>
+            <p><strong>学习计划功能规则：</strong></p>
+            <ul>
+                <li>学习计划功能所有用户均可使用。</li>
+                <li>用户首次点击"立即开始"跳转到计划页面，之后点击跳转到AI问答页面。</li>
+                <li>侧边栏学习计划仅支持列表视图。</li>
+                <li>用户打卡只需标记完成情况，无需记录时长和笔记。</li>
+                <li>用户可以根据自身情况随时调整任务，增删任务选项。</li>
+                <li>单日学习科目只安排一个。</li>
+                <li>用户可以选择自行设定计划或使用AI制定的计划。</li>
+                <li>所有任务完成后，显示恭喜信息并列出明日任务。</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html> 

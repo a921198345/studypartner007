@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人中心流程图 - 学习搭子</title>
+    <style>
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        h1, h2 {
+            color: #333;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .rule {
+            border: 1px dashed #ccc;
+            padding: 15px;
+            margin-top: 20px;
+            background-color: #f0f8ff;
+        }
+        .rule-title {
+            font-weight: bold;
+            color: #337ab7;
+        }
+        .info-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #6c757d;
+            padding: 10px 15px;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+        .new-feature {
+            background-color: #fffcf0;
+            border-left: 5px solid #ffc107;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        
+        /* 流程图样式 */
+        .flowchart {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+        .flowchart-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .node {
+            position: relative;
+            margin: 15px 0;
+            text-align: center;
+        }
+        .process-node {
+            background-color: white;
+            border: 2px solid #007bff;
+            border-radius: 5px;
+            padding: 10px 15px;
+            min-width: 200px;
+            display: inline-block;
+        }
+        .decision-node {
+            background-color: #f0f8ff;
+            border: 2px solid #007bff;
+            border-radius: 5px;
+            padding: 10px 15px;
+            min-width: 200px;
+            display: inline-block;
+        }
+        .start-end-node {
+            background-color: #e6e6fa;
+            border: 2px solid #9370db;
+            border-radius: 25px;
+            padding: 10px 15px;
+            min-width: 200px;
+            display: inline-block;
+        }
+        .highlight-node {
+            background-color: #fff8e1;
+            border: 2px solid #ffc107;
+        }
+        .new-feature-node {
+            background-color: #fffcf0;
+            border: 2px solid #ffc107;
+        }
+        .arrow {
+            height: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        .arrow::after {
+            content: "";
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 10px solid #007bff;
+            position: absolute;
+            bottom: 0;
+        }
+        .arrow-line {
+            height: 20px;
+            width: 2px;
+            background-color: #007bff;
+        }
+        .branches {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+        }
+        .branch {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0 10px;
+            position: relative;
+        }
+        .branch-label {
+            position: absolute;
+            top: -25px;
+            background-color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.8em;
+            color: #007bff;
+        }
+        .note {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #fffde7;
+            border-left: 4px solid #ffeb3b;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>个人中心流程图 - 学习搭子</h1>
+        
+        <h2>1. 个人中心主要功能与入口</h2>
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="start-end-node">开始: 用户点击个人中心入口</div>
+                </div>
+                <div class="note">
+                    用户从顶部导航栏头像进入个人中心
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">系统展示个人中心主页</div>
+                </div>
+                <div class="note">
+                    <p>主页展示内容包括：</p>
+                    <ul>
+                        <li>用户基本信息卡片（头像、昵称、注册时间等）</li>
+                        <li>学习数据总览（学习时长、完成任务数等）</li>
+                        <li>最近学习内容</li>
+                        <li>功能快捷入口</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户选择功能模块</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">个人信息</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">进入个人信息管理页面</div>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">学习数据</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">查看学习数据</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <h2>2. 个人信息管理流程</h2>
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="start-end-node">开始: 用户进入个人信息页面</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">展示当前个人资料</div>
+                </div>
+                <div class="info-box">
+                    <p>个人资料包括：</p>
+                    <ul>
+                        <li>基本信息（昵称、头像、性别、个性签名）</li>
+                        <li>账号信息（手机号、绑定邮箱、注册时间）</li>
+                        <li>安全信息（登录设备、最近登录记录）</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户点击"编辑资料"按钮</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">系统进入资料编辑模式</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户修改个人信息</div>
+                </div>
+                <div class="note">
+                    <p>可修改项目：</p>
+                    <ul>
+                        <li>更换头像（支持上传图片或选择预设）</li>
+                        <li>修改昵称（2-15个字符）</li>
+                        <li>更新个性签名（最多50字）</li>
+                        <li>选择性别</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户点击"保存"按钮</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="decision-node">信息是否有效？</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">是</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">系统保存更新后的信息</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">显示"保存成功"提示</div>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">否</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">显示错误提示</div>
+                        </div>
+                        <div class="info-box">
+                            提示具体错误原因，如"昵称长度不符合要求"
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">用户重新修改</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="node" style="margin-top: 20px;">
+                    <div class="start-end-node">结束: 个人信息更新完成</div>
+                </div>
+            </div>
+        </div>
+        
+        <h2>3. 学习数据查看流程</h2>
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="start-end-node">开始: 用户查看学习数据</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">展示学习总览数据</div>
+                </div>
+                <div class="info-box">
+                    <p>总览数据包括：</p>
+                    <ul>
+                        <li>累计学习天数</li>
+                        <li>累计完成任务数</li>
+                        <li>学习计划完成率</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">展示数据详情</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">学习计划数据</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">显示计划完成情况</div>
+                        </div>
+                        <div class="note">
+                            <ul>
+                                <li>各科目学习进度统计</li>
+                                <li>每周任务完成率趋势图</li>
+                                <li>近期学习计划预览</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">习题练习数据</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">显示习题练习统计</div>
+                        </div>
+                        <div class="note">
+                            <ul>
+                                <li>练习题数量和正确率</li>
+                                <li>各题型得分分布</li>
+                                <li>错题集和薄弱点</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="node" style="margin-top: 20px;">
+                    <div class="start-end-node">结束: 学习数据查看完成</div>
+                </div>
+            </div>
+        </div>
+        
+        <h2>4. 系统设置管理流程</h2>
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="start-end-node">开始: 用户进入设置页面</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">展示设置选项分类</div>
+                </div>
+                <div class="info-box">
+                    <p>设置分类包括：</p>
+                    <ul>
+                        <li>账号安全设置</li>
+                        <li>隐私设置</li>
+                        <li>通知设置</li>
+                        <li>学习偏好设置</li>
+                        <li>主题与显示设置</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户选择设置分类</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">展示相应设置选项</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户修改设置</div>
+                </div>
+                <div class="note">
+                    <p>常用设置包括：</p>
+                    <ul>
+                        <li>学习计划自行设定选项</li>
+                        <li>学习提醒时间</li>
+                        <li>界面主题模式（浅色/深色）</li>
+                        <li>隐私选项（如学习数据分享权限）</li>
+                        <li>消息通知频率设置</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">系统实时保存设置</div>
+                </div>
+                <div class="info-box">
+                    大部分设置无需点击保存按钮，切换即时生效
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">设置同步至用户账号</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="start-end-node">结束: 设置更新完成</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="rule">
+            <p class="rule-title">相关业务规则摘要：</p>
+            <p><strong>个人信息管理规则：</strong></p>
+            <ul>
+                <li>用户昵称禁止使用敏感词、特殊字符，长度限制2-15个字符。</li>
+                <li>头像上传图片大小不超过2MB，支持jpg、png、gif格式。</li>
+                <li>个性签名最多50个字符，不允许包含违规内容。</li>
+                <li>手机号和邮箱变更需要验证原手机号或邮箱。</li>
+            </ul>
+            <p><strong>学习数据规则：</strong></p>
+            <ul>
+                <li>学习数据默认仅自己可见，可在隐私设置中开启分享。</li>
+                <li>数据展示支持日、周、月、年等多种维度切换。</li>
+                <li>历史学习数据保存期为账号注册起的三年内。</li>
+            </ul>
+            <p><strong>安全与隐私规则：</strong></p>
+            <ul>
+                <li>更改重要安全设置需要身份验证（短信验证码）。</li>
+                <li>异地登录将触发安全提醒，用户可查看并管理登录设备。</li>
+                <li>用户可选择性开启学习数据分享，默认关闭。</li>
+                <li>账号注销需满足无未完成订单等前置条件，且有7天冷静期。</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html> 

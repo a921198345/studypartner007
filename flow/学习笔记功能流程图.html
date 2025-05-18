@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学习笔记功能流程图 - 学习搭子</title>
+    <style>
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        h1, h2 {
+            color: #333;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .rule {
+            border: 1px dashed #ccc;
+            padding: 15px;
+            margin-top: 20px;
+            background-color: #f0f8ff;
+        }
+        .rule-title {
+            font-weight: bold;
+            color: #337ab7;
+        }
+        .info-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #6c757d;
+            padding: 10px 15px;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+        .new-feature {
+            background-color: #fffcf0;
+            border-left: 5px solid #ffc107;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        
+        /* 流程图样式 */
+        .flowchart {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+        .flowchart-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .node {
+            position: relative;
+            margin: 15px 0;
+            text-align: center;
+        }
+        .process-node {
+            background-color: white;
+            border: 2px solid #007bff;
+            border-radius: 5px;
+            padding: 10px 15px;
+            min-width: 200px;
+            display: inline-block;
+        }
+        .decision-node {
+            background-color: #f0f8ff;
+            border: 2px solid #007bff;
+            border-radius: 5px;
+            padding: 10px 15px;
+            min-width: 200px;
+            display: inline-block;
+        }
+        .start-end-node {
+            background-color: #e6e6fa;
+            border: 2px solid #9370db;
+            border-radius: 25px;
+            padding: 10px 15px;
+            min-width: 200px;
+            display: inline-block;
+        }
+        .highlight-node {
+            background-color: #fff8e1;
+            border: 2px solid #ffc107;
+        }
+        .new-feature-node {
+            background-color: #fffcf0;
+            border: 2px solid #ffc107;
+        }
+        .arrow {
+            height: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        .arrow::after {
+            content: "";
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 10px solid #007bff;
+            position: absolute;
+            bottom: 0;
+        }
+        .arrow-line {
+            height: 20px;
+            width: 2px;
+            background-color: #007bff;
+        }
+        .branches {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+        }
+        .branch {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0 10px;
+            position: relative;
+        }
+        .branch-label {
+            position: absolute;
+            top: -25px;
+            background-color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.8em;
+            color: #007bff;
+        }
+        .note {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #fffde7;
+            border-left: 4px solid #ffeb3b;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>学习笔记功能流程图 - 学习搭子</h1>
+        <p>文档依据：<a href="javascript:void(0);" title="产品需求文档.md">产品需求文档.md</a>, <a href="javascript:void(0);" title="学习笔记功能.md">学习笔记功能.md</a></p>
+
+        <h2>1. 笔记创建与编辑流程</h2>
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="start-end-node">开始: 用户在侧边栏选择"学习笔记"</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">显示笔记列表和"新建笔记"按钮</div>
+                </div>
+                
+                <div class="node" style="margin-top: 20px;">
+                    <div class="process-node">用户点击"新建笔记"按钮</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">打开笔记编辑界面</div>
+                </div>
+                <div class="note">
+                    <p>编辑界面包含：</p>
+                    <ul>
+                        <li>标题输入区</li>
+                        <li>内容编辑区</li>
+                        <li>格式化工具栏（加粗、斜体、字号、颜色等）</li>
+                        <li>图片上传功能</li>
+                        <li>笔记分类选项</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户输入笔记内容</div>
+                </div>
+                <div class="info-box">
+                    用户可输入文字、调整格式、插入图片等
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node new-feature-node">系统自动保存内容</div>
+                </div>
+                <div class="note">
+                    系统定期自动保存正在编辑的内容，避免意外丢失
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户点击"保存"按钮</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="decision-node">验证笔记内容</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">内容有效</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">保存笔记到数据库</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">显示保存成功提示</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">返回笔记列表</div>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">内容无效</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">显示错误提示</div>
+                        </div>
+                        <div class="note">
+                            如标题缺失、超出字符限制等
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">返回编辑状态</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="node" style="margin-top: 20px;">
+                    <div class="start-end-node">结束: 完成笔记创建</div>
+                </div>
+            </div>
+        </div>
+
+        <h2>2. 笔记管理与查看流程</h2>
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="start-end-node">开始: 用户查看笔记列表</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">系统显示用户所有笔记</div>
+                </div>
+                <div class="note">
+                    <p>显示内容包括：</p>
+                    <ul>
+                        <li>按创建时间倒序排列</li>
+                        <li>显示笔记标题、创建时间、最后更新时间</li>
+                        <li>预览笔记内容前几行</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户可筛选或搜索笔记</div>
+                </div>
+                <div class="info-box">
+                    <p>筛选选项：</p>
+                    <ul>
+                        <li>按学科分类</li>
+                        <li>按创建时间</li>
+                        <li>按内容关键词</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户选择一条笔记</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">系统展示笔记详情</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户操作选择</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">编辑</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">进入编辑模式</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">修改笔记内容</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">保存更新</div>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">删除</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">确认删除对话框</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="decision-node">用户确认？</div>
+                        </div>
+                        
+                        <div class="branches">
+                            <div class="branch">
+                                <div class="branch-label">是</div>
+                                <div class="arrow"><div class="arrow-line"></div></div>
+                                <div class="node">
+                                    <div class="process-node">将笔记移至回收站</div>
+                                </div>
+                                <div class="note">
+                                    30天内可从回收站恢复
+                                </div>
+                            </div>
+                            
+                            <div class="branch">
+                                <div class="branch-label">否</div>
+                                <div class="arrow"><div class="arrow-line"></div></div>
+                                <div class="node">
+                                    <div class="process-node">取消操作</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">返回列表</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">返回笔记列表页</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="node" style="margin-top: 20px;">
+                    <div class="start-end-node">结束: 完成笔记管理</div>
+                </div>
+            </div>
+        </div>
+
+        <h2>3. 笔记与其他功能联动流程</h2>
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="start-end-node new-feature-node">开始: 用户在其他功能模块使用笔记联动</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">AI问答联动</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node new-feature-node">用户点击"保存为笔记"</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">系统自动提取AI回答内容</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">创建新笔记并预填充内容</div>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">知识导图联动</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node new-feature-node">用户在知识点上点击"添加笔记"</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">系统记录知识点信息</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">打开笔记编辑界面并关联知识点</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="node" style="margin-top: 20px;">
+                    <div class="process-node">用户编辑补充笔记内容</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">保存带有关联信息的笔记</div>
+                </div>
+                <div class="info-box">
+                    <p>关联信息会存储在笔记元数据中，包括：</p>
+                    <ul>
+                        <li>AI问答的问题ID</li>
+                        <li>知识导图的知识点ID</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node new-feature-node">创建双向关联</div>
+                </div>
+                <div class="note">
+                    <ul>
+                        <li>从笔记可跳转到关联的知识点</li>
+                        <li>从知识点可查看关联的笔记</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="start-end-node new-feature-node">结束: 完成笔记联动</div>
+                </div>
+            </div>
+        </div>
+
+        <h2>4. 笔记回收站管理流程</h2>
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="start-end-node">开始: 用户访问笔记回收站</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">系统展示已删除笔记列表</div>
+                </div>
+                <div class="note">
+                    <p>显示内容：</p>
+                    <ul>
+                        <li>删除的笔记标题</li>
+                        <li>原始创建时间</li>
+                        <li>删除时间</li>
+                        <li>剩余可恢复天数</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户选择一条已删除笔记</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户操作选择</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">恢复笔记</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">系统将笔记恢复到笔记列表</div>
+                        </div>
+                        <div class="note">
+                            恢复后的笔记保留原有的创建时间和关联信息
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">永久删除</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">二次确认对话框</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="decision-node">用户确认？</div>
+                        </div>
+                        
+                        <div class="branches">
+                            <div class="branch">
+                                <div class="branch-label">是</div>
+                                <div class="arrow"><div class="arrow-line"></div></div>
+                                <div class="node">
+                                    <div class="process-node">从数据库永久删除笔记</div>
+                                </div>
+                            </div>
+                            
+                            <div class="branch">
+                                <div class="branch-label">否</div>
+                                <div class="arrow"><div class="arrow-line"></div></div>
+                                <div class="node">
+                                    <div class="process-node">取消操作</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="node" style="margin-top: 20px;">
+                    <div class="process-node">系统自动处理过期笔记</div>
+                </div>
+                <div class="info-box">
+                    删除超过30天的笔记会被系统自动永久删除
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="start-end-node">结束: 完成回收站管理</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="rule">
+            <p class="rule-title">相关业务规则摘要：</p>
+            <p><strong>用户权限控制：</strong></p>
+            <ul>
+                <li>学习笔记功能对所有用户开放，无论是免费用户还是会员用户。</li>
+                <li>所有用户都可无限创建和管理笔记。</li>
+            </ul>
+            <p><strong>笔记内容规则：</strong></p>
+            <ul>
+                <li>笔记标题长度上限为50个字符。</li>
+                <li>单条笔记最多可插入10张图片。</li>
+                <li>每张图片大小不超过5MB。</li>
+                <li>支持的图片格式：PNG、JPG、JPEG、GIF。</li>
+            </ul>
+            <p><strong>笔记管理规则：</strong></p>
+            <ul>
+                <li>笔记按创建时间自动排序，最新创建的显示在前。</li>
+                <li>用户可手动设置笔记的置顶状态。</li>
+                <li>被删除的笔记在30天内可从"回收站"恢复。</li>
+                <li>一条笔记可同时关联多个知识点。</li>
+            </ul>
+            <p><strong>数据安全规则：</strong></p>
+            <ul>
+                <li>笔记数据仅对创建者可见。</li>
+                <li>系统定期备份笔记数据，防止意外丢失。</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html> 

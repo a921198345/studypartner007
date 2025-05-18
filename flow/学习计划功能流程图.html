@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学习计划功能流程图 - 学习搭子</title>
+    <style>
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        h1, h2 {
+            color: #333;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .rule {
+            border: 1px dashed #ccc;
+            padding: 15px;
+            margin-top: 20px;
+            background-color: #f0f8ff;
+        }
+        .rule-title {
+            font-weight: bold;
+            color: #337ab7;
+        }
+        .info-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #6c757d;
+            padding: 10px 15px;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+        .new-feature {
+            background-color: #fffcf0;
+            border-left: 5px solid #ffc107;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        
+        /* 流程图样式 */
+        .flowchart {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+        .flowchart-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .node {
+            position: relative;
+            margin: 15px 0;
+            text-align: center;
+        }
+        .process-node {
+            background-color: white;
+            border: 2px solid #007bff;
+            border-radius: 5px;
+            padding: 10px 15px;
+            min-width: 200px;
+            display: inline-block;
+        }
+        .decision-node {
+            background-color: #f0f8ff;
+            border: 2px solid #007bff;
+            border-radius: 5px;
+            padding: 10px 15px;
+            min-width: 200px;
+            display: inline-block;
+        }
+        .start-end-node {
+            background-color: #e6e6fa;
+            border: 2px solid #9370db;
+            border-radius: 25px;
+            padding: 10px 15px;
+            min-width: 200px;
+            display: inline-block;
+        }
+        .highlight-node {
+            background-color: #fff8e1;
+            border: 2px solid #ffc107;
+        }
+        .new-feature-node {
+            background-color: #fffcf0;
+            border: 2px solid #ffc107;
+        }
+        .arrow {
+            height: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        .arrow::after {
+            content: "";
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 10px solid #007bff;
+            position: absolute;
+            bottom: 0;
+        }
+        .arrow-line {
+            height: 20px;
+            width: 2px;
+            background-color: #007bff;
+        }
+        .branches {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+        }
+        .branch {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0 10px;
+            position: relative;
+        }
+        .branch-label {
+            position: absolute;
+            top: -25px;
+            background-color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.8em;
+            color: #007bff;
+        }
+        .note {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #fffde7;
+            border-left: 4px solid #ffeb3b;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>学习计划功能流程图 - 学习搭子</h1>
+        <p>文档依据：<a href="javascript:void(0);" title="产品需求文档.md">产品需求文档.md</a>, <a href="javascript:void(0);" title="学习计划功能.md">学习计划功能.md</a></p>
+
+        <h2>1. 学习计划定制流程</h2>
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="start-end-node">开始: 用户点击"学习计划"</div>
+                </div>
+                <div class="note">
+                    用户可从顶部导航栏或侧边栏进入学习计划功能
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+
+                <div class="node">
+                    <div class="decision-node">判断是否已有学习计划</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">无</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">显示"定制我的学习计划"入口</div>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">有</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">显示当前计划概览和"重新定制"选项</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="node" style="margin-top: 20px;">
+                    <div class="decision-node">是否首次点击"立即开始"？</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">是</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">跳转到计划页面</div>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">否</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">跳转到AI问答页面</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="node" style="margin-top: 20px;">
+                    <div class="process-node">用户点击"定制我的学习计划"按钮</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">系统弹出信息采集表单</div>
+                </div>
+                <div class="note">
+                    <p>用户需填写的信息：</p>
+                    <ul>
+                        <li>预计法考日期/剩余备考天数</li>
+                        <li>每日可学习时长（小时/天）</li>
+                        <li>每周可学习天数（天/周）</li>
+                        <li>学习科目顺序偏好</li>
+                        <li>当前学习科目及进度</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户填写表单并提交</div>
+                </div>
+                <div class="info-box">
+                    用户可选择"推荐顺序"或"自定义排列"学科顺序，当前科目学习进度可按章节或百分比选择
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="decision-node">用户是否选择自行设定计划？</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">是</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">用户每日自行设定学习任务</div>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">否</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">系统生成个性化学习计划</div>
+                        </div>
+                        <div class="note">
+                            <p>系统处理逻辑：</p>
+                            <ul>
+                                <li>计算各学科所需时间，合理分配学习任务</li>
+                                <li>生成日/周/月维度的学习计划</li>
+                                <li>根据用户输入信息和内置的学习规律模型优化计划</li>
+                                <li>单日学习科目只安排一个</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="node" style="margin-top: 20px;">
+                    <div class="process-node">在侧边栏展示学习计划</div>
+                </div>
+                <div class="info-box">
+                    <p>展示方式：</p>
+                    <ul>
+                        <li>采用列表视图展示方式</li>
+                        <li>突出显示今日/本周任务</li>
+                        <li>提供进度指示器显示整体完成情况</li>
+                    </ul>
+                </div>
+                
+                <div class="node" style="margin-top: 20px;">
+                    <div class="start-end-node">结束: 学习计划定制完成</div>
+                </div>
+            </div>
+        </div>
+
+        <h2>2. 学习进度跟踪流程</h2>
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="start-end-node">开始: 用户查看学习计划</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">系统显示今日/本周学习任务</div>
+                </div>
+                <div class="note">
+                    <p>显示内容包括：</p>
+                    <ul>
+                        <li>学习科目及具体章节</li>
+                        <li>任务优先级标记</li>
+                        <li>学习进度统计</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户可根据自身情况随时调整任务</div>
+                </div>
+                <div class="info-box">
+                    允许用户增删任务选项，调整学习内容和顺序
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户完成学习后进行打卡</div>
+                </div>
+                <div class="info-box">
+                    <p>打卡内容：</p>
+                    <ul>
+                        <li>对完成任务进行打勾标记</li>
+                        <li>用户可以每完成一项就手动打勾</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">系统记录打卡数据，更新完成进度</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">进度可视化展示</div>
+                </div>
+                <div class="note">
+                    <ul>
+                        <li>以进度条方式直观显示各学科完成情况</li>
+                        <li>提供学习热力图，展示用户学习频率</li>
+                        <li>与预期计划对比，显示进度是否达标</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">所有任务打卡完成后显示恭喜信息</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">列出明日任务预览</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="start-end-node">结束: 完成学习进度跟踪</div>
+                </div>
+            </div>
+        </div>
+
+        <h2>3. 计划调整与优化流程</h2>
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="start-end-node">开始: 系统定期评估计划执行情况</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">每周评估学习进度与计划的偏差</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="decision-node">进度偏差是否超过阈值？</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">是</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">触发计划调整</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">提供调整建议</div>
+                        </div>
+                        <div class="note">
+                            如调整学习时长、调整学科顺序等
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="decision-node">用户是否确认调整？</div>
+                        </div>
+                        
+                        <div class="branches">
+                            <div class="branch">
+                                <div class="branch-label">是</div>
+                                <div class="arrow"><div class="arrow-line"></div></div>
+                                <div class="node">
+                                    <div class="process-node">更新学习计划</div>
+                                </div>
+                                <div class="arrow"><div class="arrow-line"></div></div>
+                                <div class="node">
+                                    <div class="process-node">保留调整历史</div>
+                                </div>
+                            </div>
+                            
+                            <div class="branch">
+                                <div class="branch-label">否</div>
+                                <div class="arrow"><div class="arrow-line"></div></div>
+                                <div class="node">
+                                    <div class="process-node">继续原计划</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">否</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">继续原计划</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="node" style="margin-top: 20px;">
+                    <div class="process-node">智能预警监控</div>
+                </div>
+                <div class="note">
+                    <ul>
+                        <li>监控用户学习频率和进度变化</li>
+                        <li>当检测到连续多日未学习或进度显著落后时</li>
+                        <li>发送提醒通知，鼓励用户回归学习</li>
+                        <li>提供"快速调整"选项，帮助用户重回正轨</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="start-end-node">结束: 完成计划调整与优化</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="rule">
+            <p class="rule-title">相关业务规则摘要：</p>
+            <p><strong>用户权限控制：</strong></p>
+            <ul>
+                <li>学习计划功能所有用户均可使用。</li>
+                <li>用户可无限次重新定制和调整计划。</li>
+            </ul>
+            <p><strong>计划生成规则：</strong></p>
+            <ul>
+                <li>每个学科分配时间基于行业经验和用户可用时间。</li>
+                <li>科目学习顺序考虑内在逻辑关联性和难度递进。</li>
+                <li>相关学科（如民法与民事诉讼法）尽量安排适当间隔。</li>
+                <li>单日学习科目只安排一个。</li>
+                <li>每个阶段设置复习日，巩固所学内容。</li>
+                <li>考试前1个月自动安排密集复习和模拟考试。</li>
+            </ul>
+            <p><strong>进度管理规则：</strong></p>
+            <ul>
+                <li>用户打卡需在当日或次日进行，超过时间则记为未完成。</li>
+                <li>进度完成率按实际完成任务数/计划任务数计算。</li>
+                <li>用户可根据自身情况随时增删调整任务。</li>
+                <li>连续3天未打卡触发关怀提醒。</li>
+                <li>月度完成率低于60%触发计划强制调整建议。</li>
+                <li>任务完成后显示恭喜信息并预览明日任务。</li>
+            </ul>
+            <p><strong>自定义与AI计划：</strong></p>
+            <ul>
+                <li>用户可在设置中选择使用AI制定的计划或每日自行设定。</li>
+                <li>自行设定模式下，系统会提供基础模板辅助用户制定计划。</li>
+                <li>系统记录用户的学习偏好，为后续计划优化提供数据支持。</li>
+                <li>用户每次打勾完成一项任务后，系统立即更新进度数据。</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

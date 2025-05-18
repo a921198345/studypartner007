@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI问答功能流程图 - 学习搭子</title>
+    <style>
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        h1, h2 {
+            color: #333;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .rule {
+            border: 1px dashed #ccc;
+            padding: 15px;
+            margin-top: 20px;
+            background-color: #f0f8ff;
+        }
+        .rule-title {
+            font-weight: bold;
+            color: #337ab7;
+        }
+        .info-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #6c757d;
+            padding: 10px 15px;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+        .new-feature {
+            background-color: #fffcf0;
+            border-left: 5px solid #ffc107;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        
+        /* 流程图样式 */
+        .flowchart {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+        .flowchart-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .node {
+            position: relative;
+            margin: 15px 0;
+            text-align: center;
+        }
+        .process-node {
+            background-color: white;
+            border: 2px solid #007bff;
+            border-radius: 5px;
+            padding: 10px 15px;
+            min-width: 200px;
+            display: inline-block;
+        }
+        .decision-node {
+            background-color: #f0f8ff;
+            border: 2px solid #007bff;
+            border-radius: 5px;
+            padding: 10px 15px;
+            min-width: 200px;
+            display: inline-block;
+        }
+        .start-end-node {
+            background-color: #e6e6fa;
+            border: 2px solid #9370db;
+            border-radius: 25px;
+            padding: 10px 15px;
+            min-width: 200px;
+            display: inline-block;
+        }
+        .highlight-node {
+            background-color: #fff8e1;
+            border: 2px solid #ffc107;
+        }
+        .new-feature-node {
+            background-color: #fffcf0;
+            border: 2px solid #ffc107;
+        }
+        .arrow {
+            height: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        .arrow::after {
+            content: "";
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 10px solid #007bff;
+            position: absolute;
+            bottom: 0;
+        }
+        .arrow-line {
+            height: 20px;
+            width: 2px;
+            background-color: #007bff;
+        }
+        .branches {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+        }
+        .branch {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0 10px;
+            position: relative;
+        }
+        .branch-label {
+            position: absolute;
+            top: -25px;
+            background-color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.8em;
+            color: #007bff;
+        }
+        .note {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #fffde7;
+            border-left: 4px solid #ffeb3b;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AI问答功能流程图 - 学习搭子</h1>
+        <p>文档依据：<a href="javascript:void(0);" title="产品需求文档.md">产品需求文档.md</a>, <a href="javascript:void(0);" title="AI功能模块.md">AI功能模块.md</a></p>
+
+        <h2>1. AI问答主流程</h2>
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="start-end-node">开始: 用户进入AI问答页面</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户选择学科分类</div>
+                </div>
+                <div class="note">
+                    <p><strong>学科分类:</strong></p>
+                    <ul>
+                        <li>刑法</li>
+                        <li>民法</li>
+                        <li>民事诉讼法</li>
+                        <li>刑事诉讼法</li>
+                        <li>商法与经济法</li>
+                        <li>理论法学</li>
+                        <li>行政法与行政诉讼法</li>
+                        <li>三国法</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户输入法律问题或上传图片</div>
+                </div>
+                <div class="note">
+                    <ul>
+                        <li>文字输入限制：最多2000字</li>
+                        <li>图片上传：支持PNG、JPG格式，最大5MB</li>
+                        <li>图片文字识别：自动提取图片中的文字内容</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="decision-node">检查用户登录状态</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">未登录</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node highlight-node">触发登录流程</div>
+                        </div>
+                        <div class="note">
+                            引导用户完成登录/注册，登录成功后返回问答页面
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">已登录</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">继续流程</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="node" style="margin-top: 20px;">
+                    <div class="decision-node">检查用户会员状态与使用权限</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">免费用户</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">检查今日AI问答使用次数</div>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="decision-node">今日使用次数 < 2？</div>
+                        </div>
+                        <div class="branches">
+                            <div class="branch">
+                                <div class="branch-label">是</div>
+                                <div class="arrow"><div class="arrow-line"></div></div>
+                                <div class="node">
+                                    <div class="process-node">允许使用并记录使用次数</div>
+                                </div>
+                            </div>
+                            
+                            <div class="branch">
+                                <div class="branch-label">否</div>
+                                <div class="arrow"><div class="arrow-line"></div></div>
+                                <div class="node">
+                                    <div class="process-node highlight-node">显示会员升级提示</div>
+                                </div>
+                                <div class="arrow"><div class="arrow-line"></div></div>
+                                <div class="node">
+                                    <div class="process-node">引导用户购买会员</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">会员用户</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">无使用限制，直接继续</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="node" style="margin-top: 40px;">
+                    <div class="process-node">系统预处理用户问题</div>
+                </div>
+                <div class="info-box">
+                    <ul>
+                        <li>识别关键词和问题类型</li>
+                        <li>提取图片中的文字（如有图片）</li>
+                        <li>格式化问题内容</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node new-feature-node">调用大语言模型API分析并生成答案</div>
+                </div>
+                <div class="info-box">
+                    结合学科知识库进行问题解答
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">格式化答案并展示给用户</div>
+                </div>
+                <div class="note">
+                    <ul>
+                        <li>答案采用费曼学习法，善于举例说明</li>
+                        <li>添加法条引用和链接</li>
+                        <li>添加相关案例参考</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node new-feature-node">用户提交学习计划完成情况</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                <div class="node">
+                    <div class="process-node new-feature-node">自动进入复习模式（费曼学习法）</div>
+                </div>
+                <div class="note">
+                    <ul>
+                        <li>AI根据昨天学习内容，提炼3个重点问题</li>
+                        <li>用户可选择跳过复习，或用语音/文字作答</li>
+                        <li>AI根据用户回答给予评价、纠正和补充说明</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="start-end-node">结束: 完成AI问答</div>
+                </div>
+            </div>
+        </div>
+
+        <h2>2. AI答案质量反馈流程</h2>
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="start-end-node">开始: 用户查看AI回答</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">系统提供反馈选项</div>
+                </div>
+                <div class="note">
+                    <p><strong>反馈选项:</strong></p>
+                    <ul>
+                        <li>👍 有帮助</li>
+                        <li>👎 不满意</li>
+                        <li>💬 提交详细反馈</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户选择反馈类型</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="decision-node">是否为详细反馈？</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">是</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">显示详细反馈表单</div>
+                        </div>
+                        <div class="note">
+                            <p>包含以下反馈类型:</p>
+                            <ul>
+                                <li>答案不准确</li>
+                                <li>答案不完整</li>
+                                <li>法条引用错误</li>
+                                <li>案例不相关</li>
+                                <li>内容过于复杂</li>
+                                <li>内容过于简单</li>
+                                <li>其他问题(文本框)</li>
+                            </ul>
+                        </div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">用户提交详细反馈</div>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">否 (简单反馈)</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">记录简单反馈结果</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="node" style="margin-top: 20px;">
+                    <div class="process-node">系统存储用户反馈数据</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">定期分析反馈数据，优化AI模型</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="start-end-node">结束: 完成反馈处理</div>
+                </div>
+            </div>
+        </div>
+
+        <h2>3. AI智能联动功能流程</h2>
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="start-end-node new-feature-node">开始: 用户提问完成后</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node new-feature-node">智能匹配推荐功能触发</div>
+                </div>
+                <div class="info-box">
+                    系统分析用户问题关键词和内容，寻找相关联的学习资源
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node new-feature-node">展示知识导图联动区域</div>
+                </div>
+                <div class="note">
+                    <p>根据问题学科和主题，推荐相关的知识导图节点，如:</p>
+                    <ul>
+                        <li>"物权法 > 所有权 > 共有"</li>
+                        <li>"合同法 > 合同效力 > 可撤销合同"</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node new-feature-node">展示真题库联动区域</div>
+                </div>
+                <div class="note">
+                    <p>推荐相关的历年真题和答案解析，如:</p>
+                    <ul>
+                        <li>"2022年客观题-民法-第35题"</li>
+                        <li>"2023年主观题-民法-案例分析第2题"</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="decision-node">用户身份检查</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">免费用户</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">应用免费用户限制</div>
+                        </div>
+                        <div class="info-box">
+                            <ul>
+                                <li>每日可使用2次AI问答智能联动功能</li>
+                                <li>仅能查看民法学科相关的真题联动</li>
+                                <li>知识导图联动仅显示部分内容</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">会员用户</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">无限制访问所有联动功能</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="node" style="margin-top: 20px;">
+                    <div class="process-node new-feature-node">用户点击联动内容</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">跳转至对应学习资源页面</div>
+                </div>
+                <div class="info-box">
+                    <ul>
+                        <li>直接定位到知识导图的特定节点</li>
+                        <li>或直接展示真题及答案解析页面</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="start-end-node new-feature-node">结束: 完成智能联动</div>
+                </div>
+            </div>
+        </div>
+
+        <h2>4. 问答历史记录与管理流程</h2>
+        <div class="flowchart">
+            <div class="flowchart-container">
+                <div class="node">
+                    <div class="start-end-node">开始: 用户访问"我的问答记录"</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">系统展示用户历史问答记录列表</div>
+                </div>
+                <div class="note">
+                    <ul>
+                        <li>按时间倒序排列</li>
+                        <li>显示提问时间、问题标题、学科分类</li>
+                        <li>支持按学科筛选</li>
+                        <li>支持按关键词搜索</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">用户选择历史问答记录</div>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">展示完整问答详情</div>
+                </div>
+                <div class="info-box">
+                    包含原始问题、AI回答、关联的知识导图与真题链接
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="process-node">提供问答管理功能</div>
+                </div>
+                <div class="note">
+                    <p><strong>管理选项:</strong></p>
+                    <ul>
+                        <li>添加个人备注</li>
+                        <li>收藏问答</li>
+                        <li>删除记录</li>
+                        <li>继续提问（基于此问题进行追问）</li>
+                    </ul>
+                </div>
+                <div class="arrow"><div class="arrow-line"></div></div>
+                
+                <div class="node">
+                    <div class="decision-node">用户会员状态检查</div>
+                </div>
+                
+                <div class="branches">
+                    <div class="branch">
+                        <div class="branch-label">免费用户</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">仅保留最近7天的问答记录</div>
+                        </div>
+                    </div>
+                    
+                    <div class="branch">
+                        <div class="branch-label">会员用户</div>
+                        <div class="arrow"><div class="arrow-line"></div></div>
+                        <div class="node">
+                            <div class="process-node">永久保存所有问答记录</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="node" style="margin-top: 20px;">
+                    <div class="start-end-node">结束: 完成问答历史管理</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="rule">
+            <p class="rule-title">相关业务规则摘要：</p>
+            <p><strong>AI问答使用规则：</strong></p>
+            <ul>
+                <li>所有用户必须登录才能使用AI问答功能。</li>
+                <li>免费用户每日限制使用AI问答2次。</li>
+                <li>会员用户无使用次数限制。</li>
+                <li>单次问题字数上限为2000字。</li>
+                <li>支持上传图片进行文字识别并问答。</li>
+            </ul>
+            <p><strong>智能联动规则：</strong></p>
+            <ul>
+                <li>系统自动分析问题，关联相关知识导图和真题资源。</li>
+                <li>免费用户每日可使用2次AI问答智能联动功能。</li>
+                <li>免费用户仅能使用民法学科真题的智能联动功能。</li>
+                <li>会员用户无任何限制。</li>
+            </ul>
+            <p><strong>问答记录管理规则：</strong></p>
+            <ul>
+                <li>免费用户仅保留最近7天的问答记录。</li>
+                <li>会员用户永久保存所有问答记录。</li>
+                <li>用户可对问答记录进行收藏、添加备注、删除和分享操作。</li>
+                <li>收藏的问答即使超过7天也不会被删除（免费用户）。</li>
+            </ul>
+            <p><strong>用户体验优化规则：</strong></p>
+            <ul>
+                <li>问答结果分步骤展示，先快速给出简要回答，再补充详细解析。</li>
+                <li>问答界面支持暗色模式，减轻用户视觉疲劳。</li>
+                <li>问答过程支持语音输入功能。</li>
+                <li>答案支持一键复制功能。</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html> 
