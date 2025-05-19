@@ -7,16 +7,7 @@
                 "--package=task-master-ai",
                 "task-master-ai"
             ],
-            "env": {
-                "ANTHROPIC_API_KEY": "ANTHROPIC_API_KEY_HERE",
-                "PERPLEXITY_API_KEY": "PERPLEXITY_API_KEY_HERE",
-                "OPENAI_API_KEY": "OPENAI_API_KEY_HERE",
-                "GOOGLE_API_KEY": "AIzaSyB9fsGdXyrbpXwiLGUqraz9WOUpbHnwJSM",
-                "XAI_API_KEY": "XAI_API_KEY_HERE",
-                "OPENROUTER_API_KEY": "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",
-                "MISTRAL_API_KEY": "MISTRAL_API_KEY_HERE",
-                "AZURE_OPENAI_API_KEY": "AZURE_OPENAI_API_KEY_HERE",
-                "OLLAMA_API_KEY": "OLLAMA_API_KEY_HERE"
+        
             }
         }
     }

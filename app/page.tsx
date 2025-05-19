@@ -1,44 +1,172 @@
-import React from 'react';
-import Link from 'next/link';
+"use client"
+
+import Link from "next/link"
+import { ArrowRight, BookOpen, Brain, MessageCircle, FileText, Calendar, Zap } from "lucide-react"
+import { motion } from "framer-motion"
+
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { MainNav } from "@/components/main-nav"
+import { Footer } from "@/components/footer"
+import { ImageCarousel } from "@/components/image-carousel"
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24">
-      <div className="z-10 w-full max-w-5xl items-center justify-center font-mono text-sm">
-        <h1 className="text-4xl font-bold text-center mb-8">学习搭子</h1>
-        <p className="text-xl text-center mb-12">智能法考辅助平台</p>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-10">
-          <Link href="/ai-chat" className="group bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
-            <h2 className="text-2xl font-semibold mb-2 text-blue-600">AI问答</h2>
-            <p className="text-gray-600">基于法考知识库的智能问答系统</p>
-          </Link>
-          
-          <Link href="/knowledge-map" className="group bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
-            <h2 className="text-2xl font-semibold mb-2 text-blue-600">知识导图</h2>
-            <p className="text-gray-600">交互式法律知识结构可视化</p>
-          </Link>
-          
-          <Link href="/question-bank" className="group bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
-            <h2 className="text-2xl font-semibold mb-2 text-blue-600">真题库</h2>
-            <p className="text-gray-600">历年法考真题练习与解析</p>
-          </Link>
-          
-          <Link href="/learning-plan" className="group bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
-            <h2 className="text-2xl font-semibold mb-2 text-blue-600">学习计划</h2>
-            <p className="text-gray-600">个性化学习路径规划</p>
-          </Link>
+    <div className="flex min-h-screen flex-col">
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-16 items-center">
+          <div className="flex-1">
+            <MainNav />
+          </div>
+        </div>
+      </header>
+      <main className="flex-1">
+        <section className="relative">
+          <div className="absolute inset-0 bg-gradient-to-b from-background via-background/90 to-background">
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
         </div>
         
-        <div className="mt-12 text-center">
-          <Link href="/login" className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full mr-4">
-            登录
+          <div className="container relative">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 py-24">
+              <motion.div
+                className="space-y-10"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+              >
+                <div className="space-y-8">
+                  <h1 className="text-5xl font-bold tracking-tighter sm:text-6xl md:text-7xl lg:text-8xl">
+                    让法考学习{" "}
+                    <motion.span
+                      className="bg-gradient-to-r from-primary to-primary/50 bg-clip-text text-transparent"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.3, duration: 0.8 }}
+                    >
+                      更加高效
+                    </motion.span>
+                  </h1>
+                  <p className="text-xl leading-relaxed text-muted-foreground max-w-[42rem]">
+                    基于最新法考知识库的AI智能问答，结构化知识导图，历年真题库在线练习，
+                    量身定制学习计划，助力你早日上岸！
+                  </p>
+                </div>
+                <motion.div
+                  className="flex flex-wrap gap-6"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.5, duration: 0.5 }}
+                >
+                  <Link href="/learning-plan">
+                    <Button size="lg" className="gap-2 text-base px-8 py-6">
+                      立即开始 <ArrowRight className="h-4 w-4" />
+                    </Button>
           </Link>
-          <Link href="/register" className="bg-white hover:bg-gray-100 text-blue-600 font-bold py-2 px-6 rounded-full border border-blue-600">
-            注册
-          </Link>
+                </motion.div>
+                <motion.div
+                  className="grid grid-cols-3 gap-8 pt-8"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.7, duration: 0.5 }}
+                >
+                  <div className="space-y-2">
+                    <h4 className="text-4xl font-bold text-primary">100%</h4>
+                    <p className="text-sm text-muted-foreground">知识点覆盖率</p>
+                  </div>
+                  <div className="space-y-2">
+                    <h4 className="text-4xl font-bold text-primary">24/7</h4>
+                    <p className="text-sm text-muted-foreground">全天候AI辅导</p>
+                  </div>
+                  <div className="space-y-2">
+                    <h4 className="text-4xl font-bold text-primary">10万+</h4>
+                    <p className="text-sm text-muted-foreground">用户选择</p>
+                  </div>
+                </motion.div>
+              </motion.div>
+              <motion.div
+                className="relative hidden lg:block"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.7 }}
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-primary/10 rounded-2xl blur-3xl" />
+                <ImageCarousel />
+              </motion.div>
+            </div>
+          </div>
+        </section>
+
+        <section id="features" className="bg-muted/50 py-32">
+          <div className="container space-y-16">
+            <motion.h2
+              className="text-4xl font-bold tracking-tighter text-center sm:text-5xl md:text-6xl"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+            >
+              核心功能
+            </motion.h2>
+            <div className="mx-auto grid max-w-6xl grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
+              {[
+                {
+                  icon: <MessageCircle className="h-12 w-12 text-primary" />,
+                  title: "智能问答",
+                  description: "基于最新法考知识库（2025年）的AI实时问答，解答你的法考疑惑。",
+                },
+                {
+                  icon: <Brain className="h-12 w-12 text-primary" />,
+                  title: "结构化学习",
+                  description: "分科目、可交互的法考知识导图，帮助构建完整知识体系。",
+                },
+                {
+                  icon: <BookOpen className="h-12 w-12 text-primary" />,
+                  title: "实战演练",
+                  description: "历年真题库在线作答与专业解析，巩固知识点。",
+                },
+                {
+                  icon: <Zap className="h-12 w-12 text-primary" />,
+                  title: "智能联动",
+                  description: "知识导图与AI问答、真题练习的实时智能关联，加深理解。",
+                },
+                {
+                  icon: <Calendar className="h-12 w-12 text-primary" />,
+                  title: "个性规划",
+                  description: "量身定制的学习计划与AI督学动态跟进，提高学习效率。",
+                },
+                {
+                  icon: <FileText className="h-12 w-12 text-primary" />,
+                  title: "便捷记录",
+                  description: "支持图文的在线学习笔记，随时记录学习心得。",
+                },
+              ].map((feature, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                >
+                  <Card className="h-full border-none shadow-lg hover:shadow-xl transition-all duration-300">
+                    <CardContent className="p-8 space-y-4">
+                      <motion.div
+                        whileHover={{ scale: 1.1 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                        className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4"
+                      >
+                        {feature.icon}
+                      </motion.div>
+                      <h3 className="text-2xl font-bold">{feature.title}</h3>
+                      <p className="text-muted-foreground">{feature.description}</p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
         </div>
       </div>
+        </section>
     </main>
-  );
+      <Footer />
+    </div>
+  )
 } 
