@@ -1,6 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import React from 'react';
+import dynamic from 'next/dynamic';
+import { useState, useRef, useCallback } from "react"
 import { MainNav } from "@/components/main-nav"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -10,8 +12,41 @@ import { Badge } from "@/components/ui/badge"
 import { Search, ZoomIn, ZoomOut, Lock, Brain } from "lucide-react"
 import { Footer } from "@/components/footer"
 
+// 使用 dynamic import 避免 SSR 相关问题
+const MindMapViewer = dynamic(
+  () => import('@/components/knowledge-map/MindMapViewer'),
+  { ssr: false } // 禁用服务器端渲染
+);
+
 export default function KnowledgeMapPage() {
   const [selectedSubject, setSelectedSubject] = useState("民法")
+  const [zoomLevel, setZoomLevel] = useState(1.0); // 添加缩放级别状态
+  const [searchTerm, setSearchTerm] = useState(""); // 添加搜索词状态
+  const [inputValue, setInputValue] = useState(""); // 添加输入框值状态
+  
+  // 创建引用，用于访问SVG元素或知识导图容器
+  const mindMapRef = useRef<HTMLDivElement>(null);
+  
+  // 缩放处理函数
+  const handleZoomIn = () => {
+    setZoomLevel(prev => Math.min(prev + 0.1, 2.0)); // 放大但限制最大值
+  };
+  
+  const handleZoomOut = () => {
+    setZoomLevel(prev => Math.max(prev - 0.1, 0.3)); // 缩小但限制最小值
+  };
+
+  // 输入变化处理函数
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+  };
+
+  // 搜索处理函数
+  const handleSearch = useCallback((e: React.KeyboardEvent | React.MouseEvent) => {
+    if ((e as React.KeyboardEvent).key === 'Enter' || e.type === 'click') {
+      setSearchTerm(inputValue);
+    }
+  }, [inputValue]);
 
   const subjects = [
     { id: "civil", name: "民法", free: true },
@@ -32,34 +67,47 @@ export default function KnowledgeMapPage() {
         </div>
       </header>
       <main className="flex-1 bg-gray-50">
-        <div className="container mx-auto py-6">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-3xl font-bold">法考知识导图</h1>
-            <div className="flex items-center space-x-2">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input type="search" placeholder="搜索知识点..." className="w-[200px] pl-8 custom-input" />
+        <div className="container mx-auto py-4"> {/* 减少顶部内边距 */}
+          <Tabs defaultValue="map" className="mt-0">
+            <div className="flex justify-between items-center mb-3"> {/* 修改为两侧对齐 */}
+              <TabsList>
+                <TabsTrigger value="map" className="custom-tab">
+                  知识导图
+                </TabsTrigger>
+                <TabsTrigger value="subjects" className="custom-tab">
+                  学科选择
+                </TabsTrigger>
+              </TabsList>
+              <div className="flex items-center space-x-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    type="search" 
+                    placeholder="搜索知识点..." 
+                    className="w-[200px] pl-8 custom-input" 
+                    value={inputValue}
+                    onChange={handleInputChange}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch(e)}
+                  />
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="absolute right-0 top-0" 
+                    onClick={handleSearch}
+                  >
+                    <Search className="h-4 w-4" />
+                  </Button>
+                </div>
+                <Button variant="outline" size="icon" onClick={handleZoomIn}>
+                  <ZoomIn className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="icon" onClick={handleZoomOut}>
+                  <ZoomOut className="h-4 w-4" />
+                </Button>
               </div>
-              <Button variant="outline" size="icon">
-                <ZoomIn className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="icon">
-                <ZoomOut className="h-4 w-4" />
-              </Button>
             </div>
-          </div>
-
-          <Tabs defaultValue="map" className="space-y-4">
-            <TabsList>
-              <TabsTrigger value="map" className="custom-tab">
-                知识导图
-              </TabsTrigger>
-              <TabsTrigger value="subjects" className="custom-tab">
-                学科选择
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="map" className="space-y-4">
+            
+            <TabsContent value="map">
               <div className="bg-white rounded-lg p-4 card-shadow">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-semibold flex items-center">
@@ -69,39 +117,20 @@ export default function KnowledgeMapPage() {
                   <Badge className="badge-outline">共 156 个知识点</Badge>
                 </div>
 
-                <div className="bg-gray-50 rounded-lg border p-4 min-h-[600px] relative grid-background">
-                  {/* 这里是知识导图的可视化部分，使用react-d3-tree实现 */}
-                  {/* 为了原型展示，这里使用静态图片 */}
-                  <div className="flex justify-center">
-                    <div className="relative w-full max-w-4xl">
-                      <img src="/placeholder.svg?height=600&width=1000" alt="民法知识导图" className="w-full h-auto" />
-
-                      {/* 模拟知识点节点 */}
-                      <div className="absolute left-[50%] top-[20%] transform -translate-x-1/2 knowledge-node active">
-                        <CardContent className="p-2 text-sm font-medium">民法总则</CardContent>
-                      </div>
-
-                      <div className="absolute left-[30%] top-[40%] transform -translate-x-1/2 knowledge-node">
-                        <CardContent className="p-2 text-sm">民事法律行为</CardContent>
-                      </div>
-
-                      <div className="absolute left-[70%] top-[40%] transform -translate-x-1/2 knowledge-node">
-                        <CardContent className="p-2 text-sm">民事责任</CardContent>
-                      </div>
-
-                      <div className="absolute left-[20%] top-[60%] transform -translate-x-1/2 knowledge-node active">
-                        <CardContent className="p-2 text-sm">有效要件</CardContent>
-                      </div>
-
-                      <div className="absolute left-[40%] top-[60%] transform -translate-x-1/2 knowledge-node">
-                        <CardContent className="p-2 text-sm">无效与可撤销</CardContent>
-                      </div>
-                    </div>
-                  </div>
+                <div 
+                  className="bg-gray-50 rounded-lg border p-4 min-h-[700px] relative grid-background" 
+                  ref={mindMapRef}
+                  style={{ height: "75vh" }} 
+                >
+                  <MindMapViewer 
+                    subject={selectedSubject} 
+                    customZoom={zoomLevel} 
+                    searchTerm={searchTerm} 
+                  />
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg p-4 card-shadow">
+              <div className="bg-white rounded-lg p-4 card-shadow mt-4">
                 <h3 className="text-lg font-medium mb-3">当前知识点详情</h3>
                 <Card>
                   <CardContent className="p-4">

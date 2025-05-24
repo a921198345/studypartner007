@@ -3,6 +3,8 @@
 import type React from "react"
 
 import { useState } from "react"
+import { signIn } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,11 +16,13 @@ interface PhoneLoginProps {
   redirectUrl?: string
 }
 
-export function PhoneLogin({ onLoginSuccess, redirectUrl }: PhoneLoginProps) {
+export function PhoneLogin({ onLoginSuccess, redirectUrl = "/learning-plan" }: PhoneLoginProps) {
+  const router = useRouter()
   const [phone, setPhone] = useState("")
   const [code, setCode] = useState("")
   const [countdown, setCountdown] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
+  const [isSendingCode, setIsSendingCode] = useState(false)
   const [error, setError] = useState("")
 
   const startCountdown = () => {
@@ -46,20 +50,30 @@ export function PhoneLogin({ onLoginSuccess, redirectUrl }: PhoneLoginProps) {
     }
 
     setError("")
-    setIsLoading(true)
+    setIsSendingCode(true)
 
     try {
-      // 这里应该是发送验证码的API调用
-      // const response = await fetch('/api/auth/sms-code', {...})
+      // 调用发送验证码的API
+      const response = await fetch('/api/sms/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ phoneNumber: phone }),
+      });
 
-      // 模拟API调用
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      startCountdown()
+      const data = await response.json();
+      
+      if (data.success) {
+        startCountdown()
+      } else {
+        setError(data.message || "发送验证码失败，请稍后重试")
+      }
     } catch (err) {
+      console.error("发送验证码错误:", err)
       setError("发送验证码失败，请稍后重试")
     } finally {
-      setIsLoading(false)
+      setIsSendingCode(false)
     }
   }
 
@@ -71,8 +85,8 @@ export function PhoneLogin({ onLoginSuccess, redirectUrl }: PhoneLoginProps) {
       return
     }
 
-    if (!code || code.length !== 6) {
-      setError("请输入6位验证码")
+    if (!code || code.length < 4) {
+      setError("请输入验证码")
       return
     }
 
@@ -80,22 +94,29 @@ export function PhoneLogin({ onLoginSuccess, redirectUrl }: PhoneLoginProps) {
     setIsLoading(true)
 
     try {
-      // 这里应该是登录/注册的API调用
-      // const response = await fetch('/api/auth/login', {...})
+      // 使用NextAuth的signIn方法进行登录
+      const result = await signIn("credentials", {
+        redirect: false,
+        phone,
+        code,
+      })
 
-      // 模拟API调用
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      if (result?.error) {
+        // 处理登录错误
+        setError("登录失败：" + (result.error === "CredentialsSignin" ? "验证码错误或已过期" : result.error))
+        return
+      }
 
+      // 登录成功的处理
       if (onLoginSuccess) {
         onLoginSuccess()
       }
 
-      // 如果有重定向URL，则跳转
-      if (redirectUrl) {
-        window.location.href = redirectUrl
-      }
+      // 重定向到指定页面
+      router.push(redirectUrl)
     } catch (err) {
-      setError("登录失败，请检查验证码是否正确")
+      console.error("登录错误:", err)
+      setError("登录过程中发生错误，请稍后重试")
     } finally {
       setIsLoading(false)
     }
@@ -138,16 +159,16 @@ export function PhoneLogin({ onLoginSuccess, redirectUrl }: PhoneLoginProps) {
                   type="button"
                   variant="outline"
                   onClick={handleSendCode}
-                  disabled={countdown > 0 || isLoading}
+                  disabled={countdown > 0 || isSendingCode}
                   className="whitespace-nowrap outline-button"
                 >
-                  {countdown > 0 ? `${countdown}秒后重发` : "获取验证码"}
+                  {isSendingCode ? "发送中..." : countdown > 0 ? `${countdown}秒后重发` : "获取验证码"}
                 </Button>
               </div>
             </div>
             {error && <p className="text-sm text-red-500">{error}</p>}
             <Button type="submit" className="w-full primary-button" disabled={isLoading}>
-              {isLoading ? "处理中..." : "登录/注册"}
+              {isLoading ? "登录中..." : "登录/注册"}
             </Button>
           </div>
         </form>
