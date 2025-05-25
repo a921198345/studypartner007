@@ -91,9 +91,26 @@ const searchNodes = (node, searchTerm) => {
   return isMatch || hasMatchingChild;
 };
 
+// 递归计算节点总数的函数
+const countAllNodes = (node) => {
+  if (!node) return 0;
+  
+  // 当前节点计数为1
+  let count = 1;
+  
+  // 递归计算所有子节点
+  if (node.children && node.children.length > 0) {
+    for (const child of node.children) {
+      count += countAllNodes(child);
+    }
+  }
+  
+  return count;
+};
+
 // 这是一个基础的MindMapViewer组件
 // 它会尝试从 /api/mindmaps/民法 获取数据并使用 react-d3-tree 展示
-const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '' }) => {
+const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '', onNodeCountUpdate }) => {
     // mindMapData 用于存储从API获取的树状数据
     const [mindMapData, setMindMapData] = useState(null);
     // 保存一个原始的未经搜索处理的数据副本
@@ -106,14 +123,25 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '' 
     const treeRef = useRef(null);
     // 控制自动调整视图的状态
     const [needsRecentering, setNeedsRecentering] = useState(false);
+    // 自定义的缩放状态
+    const [zoomLevel, setZoomLevel] = useState(customZoom);
+    // 保存节点总数
+    const [totalNodeCount, setTotalNodeCount] = useState(0);
 
     // 处理自定义缩放级别变化
     useEffect(() => {
-        // 当customZoom改变且树引用存在时，应用新的缩放级别
-        if (customZoom !== null && treeRef.current) {
-            treeRef.current.zoom(customZoom);
+        // 当customZoom改变时，更新内部缩放状态
+        if (customZoom !== null) {
+            setZoomLevel(customZoom);
         }
     }, [customZoom]);
+
+    // 当节点总数变化时，调用回调函数通知父组件
+    useEffect(() => {
+        if (onNodeCountUpdate && totalNodeCount > 0) {
+            onNodeCountUpdate(totalNodeCount);
+        }
+    }, [totalNodeCount, onNodeCountUpdate]);
 
     // useEffect Hook 用于在组件首次渲染后执行副作用操作，如此处用于获取数据
     useEffect(() => {
@@ -170,6 +198,10 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '' 
                     setMindMapData(data.mindmap.map_data); // 更新状态
                     setOriginalData(JSON.parse(JSON.stringify(data.mindmap.map_data))); // 深拷贝原始数据
                     
+                    // 计算总节点数
+                    const nodeCount = countAllNodes(data.mindmap.map_data);
+                    setTotalNodeCount(nodeCount);
+                    
                     // 缓存数据
                     try {
                         localStorage.setItem(`mindmap-${subject}`, JSON.stringify(data.mindmap.map_data));
@@ -188,6 +220,10 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '' 
                 // 使用默认数据作为备用
                 setMindMapData(DEFAULT_CIVIL_LAW_DATA);
                 setOriginalData(JSON.parse(JSON.stringify(DEFAULT_CIVIL_LAW_DATA))); // 深拷贝原始数据
+                
+                // 计算默认数据的节点总数
+                const nodeCount = countAllNodes(DEFAULT_CIVIL_LAW_DATA);
+                setTotalNodeCount(nodeCount);
             } finally {
                 setIsLoading(false);
             }
@@ -224,10 +260,10 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '' 
         if (searchTerm && treeRef.current) {
             // 重新应用缩放并调整视图位置
             setTimeout(() => {
-                if (treeRef.current && treeRef.current.zoom) {
+                if (treeRef.current) {
                     // 应用较小的缩放以便能看到更多节点
                     const searchZoomLevel = 0.35; 
-                    treeRef.current.zoom(searchZoomLevel);
+                    setZoomLevel(searchZoomLevel); // 使用状态更新而不是直接调用方法
                     
                     // 手动重新居中
                     const dimensions = treeRef.current.getBoundingClientRect ? 
@@ -290,7 +326,7 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '' 
             nameText: {
                 fontSize: '19px', // 进一步增大字体
                 fontFamily: '"SimSun", "宋体", serif', // 使用宋体
-                fontWeight: isMatch ? 'bold' : 'normal', // 匹配时加粗
+                fontWeight: 'normal', // 移除条件加粗，所有节点都使用normal
                 fill: isMatch ? '#E53E3E' : '#000000', // 匹配时使用红色文字
                 x: 30, // 增加与圆圈的距离
                 y: 0,
@@ -440,7 +476,7 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '' 
                 depthFactor={600}
                 centeringTransitionDuration={800}
                 shouldCollapseNeighborNodes={true}
-                zoom={customZoom} // 使用传入的缩放级别
+                zoom={zoomLevel} // 使用状态变量
                 scaleExtent={{ min: 0.1, max: 3 }}
                 enableLegacyTransitions={true}
                 transitionDuration={300}

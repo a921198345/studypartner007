@@ -2,7 +2,7 @@
 
 import React from 'react';
 import dynamic from 'next/dynamic';
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import { MainNav } from "@/components/main-nav"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -23,6 +23,7 @@ export default function KnowledgeMapPage() {
   const [zoomLevel, setZoomLevel] = useState(1.0); // 添加缩放级别状态
   const [searchTerm, setSearchTerm] = useState(""); // 添加搜索词状态
   const [inputValue, setInputValue] = useState(""); // 添加输入框值状态
+  const [totalNodeCount, setTotalNodeCount] = useState(0); // 添加知识点总数状态
   
   // 创建引用，用于访问SVG元素或知识导图容器
   const mindMapRef = useRef<HTMLDivElement>(null);
@@ -47,6 +48,11 @@ export default function KnowledgeMapPage() {
       setSearchTerm(inputValue);
     }
   }, [inputValue]);
+  
+  // 回调函数，用于从MindMapViewer获取节点总数
+  const handleNodeCountUpdate = (count: number) => {
+    setTotalNodeCount(count);
+  };
 
   const subjects = [
     { id: "civil", name: "民法", free: true },
@@ -114,7 +120,7 @@ export default function KnowledgeMapPage() {
                     <Brain className="mr-2 h-5 w-5 text-[#E9B949]" />
                     {selectedSubject}知识导图
                   </h2>
-                  <Badge className="badge-outline">共 156 个知识点</Badge>
+                  <Badge className="badge-outline">共 {totalNodeCount} 个知识点</Badge>
                 </div>
 
                 <div 
@@ -126,6 +132,7 @@ export default function KnowledgeMapPage() {
                     subject={selectedSubject} 
                     customZoom={zoomLevel} 
                     searchTerm={searchTerm} 
+                    onNodeCountUpdate={handleNodeCountUpdate}
                   />
                 </div>
               </div>
