@@ -96,8 +96,8 @@ export function KnowledgeMapViewer({ subject, initialNode, isMember = false }: K
         })
       }
     } else {
-      // 默认展开到第三级
-      setExpandedNodes(new Set(["node1", "node1-1"]))
+      // 默认展开到第二级（共三层）
+      setExpandedNodes(new Set(["node1"]))
     }
   }, [initialNode])
 

@@ -467,7 +467,7 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
                 data={mindMapData}
                 orientation="horizontal"
                 pathFunc="bezier"
-                initialDepth={3}
+                initialDepth={2}
                 translate={{ x: 150, y: 300 }}
                 zoomable={true}
                 separation={{ siblings: 1.3, nonSiblings: 2.8 }}
