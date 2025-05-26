@@ -1,217 +1,183 @@
-const { executeQuery } = require('../config/database');
+import { query, queryOne, transaction } from '../lib/db.js';
 
 class Question {
-  constructor(data) {
-    this.id = data.id;
-    this.subject = data.subject;
-    this.year = data.year;
-    this.question_type = data.question_type;
-    this.question_text = data.question_text;
-    this.options_json = data.options_json;
-    this.correct_answer = data.correct_answer;
-    this.explanation_text = data.explanation_text;
-    this.difficulty = data.difficulty || 3;
-    this.created_at = data.created_at;
-    this.updated_at = data.updated_at;
+  /**
+   * 获取所有题目
+   * @returns {Promise<Array>} 题目列表
+   */
+  static async getAll() {
+    return await query('SELECT * FROM questions');
   }
-
-  // 创建新题目
-  static async create(questionData) {
-    // 确保options_json是字符串
-    const options = typeof questionData.options_json === 'string' 
-      ? questionData.options_json 
-      : JSON.stringify(questionData.options_json);
+  
+  /**
+   * 根据ID获取题目
+   * @param {number} id - 题目ID
+   * @returns {Promise<Object|null>} 题目对象或null
+   */
+  static async getById(id) {
+    return await queryOne('SELECT * FROM questions WHERE id = ?', [id]);
+  }
+  
+  /**
+   * 按学科和年份筛选题目
+   * @param {string} subject - 学科名称
+   * @param {number} year - 年份
+   * @param {number} page - 页码，默认为1
+   * @param {number} limit - 每页条数，默认为10
+   * @returns {Promise<Array>} 题目列表
+   */
+  static async getBySubjectAndYear(subject, year, page = 1, limit = 10) {
+    const offset = (page - 1) * limit;
+    let sql = 'SELECT * FROM questions WHERE 1=1';
+    const params = [];
     
+    if (subject) {
+      sql += ' AND subject = ?';
+      params.push(subject);
+    }
+    
+    if (year) {
+      sql += ' AND year = ?';
+      params.push(year);
+    }
+    
+    sql += ' LIMIT ? OFFSET ?';
+    params.push(parseInt(limit), parseInt(offset));
+    
+    return await query(sql, params);
+  }
+  
+  /**
+   * 获取题目总数(用于分页)
+   * @param {string} subject - 学科名称，可选
+   * @param {number} year - 年份，可选
+   * @returns {Promise<number>} 题目总数
+   */
+  static async getCount(subject = null, year = null) {
+    let sql = 'SELECT COUNT(*) as total FROM questions WHERE 1=1';
+    const params = [];
+    
+    if (subject) {
+      sql += ' AND subject = ?';
+      params.push(subject);
+    }
+    
+    if (year) {
+      sql += ' AND year = ?';
+      params.push(year);
+    }
+    
+    const result = await queryOne(sql, params);
+    return result.total;
+  }
+  
+  /**
+   * 创建新题目
+   * @param {Object} questionData - 题目数据
+   * @param {string} questionData.subject - 学科
+   * @param {number} questionData.year - 年份
+   * @param {string} questionData.question_text - 题目文本
+   * @param {Object} questionData.options_json - 选项JSON对象
+   * @param {string} questionData.correct_answer - 正确答案
+   * @param {string} questionData.explanation_text - 题目解析
+   * @param {number} questionData.question_type - 题目类型(1:单选,2:多选,3:不定项)
+   * @returns {Promise<Object>} 插入结果
+   */
+  static async create(questionData) {
     const sql = `
       INSERT INTO questions 
-      (subject, year, question_type, question_text, options_json, correct_answer, explanation_text, difficulty) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      (subject, year, question_text, options_json, correct_answer, explanation_text, question_type) 
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
     
-    const result = await executeQuery(sql, [
+    const params = [
       questionData.subject,
       questionData.year,
-      questionData.question_type,
       questionData.question_text,
-      options,
+      JSON.stringify(questionData.options_json),
       questionData.correct_answer,
       questionData.explanation_text,
-      questionData.difficulty || 3
-    ]);
+      questionData.question_type
+    ];
     
-    return result.insertId;
+    return await query(sql, params);
   }
-
-  // 根据ID查找题目
-  static async findById(id) {
-    const sql = 'SELECT * FROM questions WHERE id = ?';
-    const results = await executeQuery(sql, [id]);
-    
-    if (results.length === 0) {
-      return null;
-    }
-    
-    // 确保options_json是对象
-    const question = results[0];
-    if (typeof question.options_json === 'string') {
-      question.options_json = JSON.parse(question.options_json);
-    }
-    
-    return new Question(question);
-  }
-
-  // 根据条件查询题目列表
-  static async findByFilter(filters = {}, page = 1, limit = 10) {
-    // 构建WHERE子句
-    let whereConditions = [];
-    let queryParams = [];
-    
-    if (filters.subject) {
-      whereConditions.push('subject = ?');
-      queryParams.push(filters.subject);
-    }
-    
-    if (filters.year) {
-      whereConditions.push('year = ?');
-      queryParams.push(filters.year);
-    }
-    
-    if (filters.question_type) {
-      whereConditions.push('question_type = ?');
-      queryParams.push(filters.question_type);
-    }
-    
-    // 组合WHERE子句
-    const whereClause = whereConditions.length > 0 
-      ? `WHERE ${whereConditions.join(' AND ')}` 
-      : '';
-    
-    // 计算偏移量
-    const offset = (page - 1) * limit;
-    
-    // 查询数据
-    const sql = `
-      SELECT * FROM questions 
-      ${whereClause} 
-      ORDER BY year DESC, id ASC
-      LIMIT ? OFFSET ?
-    `;
-    
-    // 添加分页参数
-    queryParams.push(parseInt(limit), parseInt(offset));
-    
-    const results = await executeQuery(sql, queryParams);
-    
-    // 处理结果集，将options_json从字符串转换为对象
-    const questions = results.map(q => {
-      if (typeof q.options_json === 'string') {
-        q.options_json = JSON.parse(q.options_json);
-      }
-      return new Question(q);
-    });
-    
-    // 获取总数
-    const countSql = `
-      SELECT COUNT(*) as total 
-      FROM questions 
-      ${whereClause}
-    `;
-    
-    const countResult = await executeQuery(countSql, queryParams.slice(0, -2));
-    const total = countResult[0].total;
-    
-    return {
-      questions,
-      pagination: {
-        total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.ceil(total / limit)
-      }
-    };
-  }
-
-  // 更新题目
-  static async update(id, questionData) {
-    // 构建SET子句
-    const updates = [];
-    const queryParams = [];
-    
-    // 遍历可更新的字段
-    const updatableFields = ['subject', 'year', 'question_type', 'question_text', 
-                           'options_json', 'correct_answer', 'explanation_text', 'difficulty'];
-    
-    updatableFields.forEach(field => {
-      if (questionData[field] !== undefined) {
-        updates.push(`${field} = ?`);
+  
+  /**
+   * 批量创建题目
+   * @param {Array<Object>} questionsData - 题目数据数组
+   * @returns {Promise<Object>} 执行结果
+   */
+  static async createBatch(questionsData) {
+    return await transaction(async (connection) => {
+      const results = [];
+      
+      for (const questionData of questionsData) {
+        const sql = `
+          INSERT INTO questions 
+          (subject, year, question_text, options_json, correct_answer, explanation_text, question_type) 
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `;
         
-        // 特殊处理options_json字段
-        if (field === 'options_json' && typeof questionData[field] !== 'string') {
-          queryParams.push(JSON.stringify(questionData[field]));
-        } else {
-          queryParams.push(questionData[field]);
-        }
+        const params = [
+          questionData.subject,
+          questionData.year,
+          questionData.question_text,
+          JSON.stringify(questionData.options_json),
+          questionData.correct_answer,
+          questionData.explanation_text,
+          questionData.question_type
+        ];
+        
+        const [result] = await connection.execute(sql, params);
+        results.push(result);
       }
+      
+      return results;
     });
-    
-    if (updates.length === 0) {
-      return false; // 没有要更新的字段
-    }
-    
+  }
+  
+  /**
+   * 更新题目
+   * @param {number} id - 题目ID
+   * @param {Object} questionData - 题目更新数据
+   * @returns {Promise<Object>} 更新结果
+   */
+  static async update(id, questionData) {
     const sql = `
-      UPDATE questions
-      SET ${updates.join(', ')}
+      UPDATE questions 
+      SET subject = ?, 
+          year = ?, 
+          question_text = ?, 
+          options_json = ?, 
+          correct_answer = ?, 
+          explanation_text = ?, 
+          question_type = ?
       WHERE id = ?
     `;
     
-    queryParams.push(id);
+    const params = [
+      questionData.subject,
+      questionData.year,
+      questionData.question_text,
+      JSON.stringify(questionData.options_json),
+      questionData.correct_answer,
+      questionData.explanation_text,
+      questionData.question_type,
+      id
+    ];
     
-    const result = await executeQuery(sql, queryParams);
-    return result.affectedRows > 0;
+    return await query(sql, params);
   }
-
-  // 删除题目
+  
+  /**
+   * 删除题目
+   * @param {number} id - 题目ID
+   * @returns {Promise<Object>} 删除结果
+   */
   static async delete(id) {
-    const sql = 'DELETE FROM questions WHERE id = ?';
-    const result = await executeQuery(sql, [id]);
-    return result.affectedRows > 0;
-  }
-  
-  // 获取所有可用的学科
-  static async getSubjects() {
-    const sql = 'SELECT DISTINCT subject FROM questions ORDER BY subject';
-    const results = await executeQuery(sql);
-    return results.map(row => row.subject);
-  }
-  
-  // 获取所有可用的年份
-  static async getYears() {
-    const sql = 'SELECT DISTINCT year FROM questions ORDER BY year DESC';
-    const results = await executeQuery(sql);
-    return results.map(row => row.year);
-  }
-  
-  // 将数据库记录转换为API响应格式
-  toPublic(includeAnswer = false) {
-    // 基本信息，不包含答案和解析
-    const publicData = {
-      id: this.id,
-      subject: this.subject,
-      year: this.year,
-      question_type: this.question_type,
-      question_text: this.question_text,
-      options: this.options_json,
-      difficulty: this.difficulty
-    };
-    
-    // 如果需要包含答案和解析
-    if (includeAnswer) {
-      publicData.correct_answer = this.correct_answer;
-      publicData.explanation_text = this.explanation_text;
-    }
-    
-    return publicData;
+    return await query('DELETE FROM questions WHERE id = ?', [id]);
   }
 }
 
-module.exports = Question; 
+export default Question;
