@@ -2,10 +2,16 @@
 const { createClient } = require('redis');
 
 // Redis客户端配置
-const redisClient = createClient({
-  url: 'redis://localhost:6379',  // Redis服务器地址
-  password: '你的Redis密码',       // 替换为你刚才在配置文件中设置的密码
-});
+const config = {
+  url: process.env.REDIS_URL || 'redis://localhost:6379',  // Redis服务器地址
+};
+
+// 只有环境变量中设置了密码才添加密码配置
+if (process.env.REDIS_PASSWORD) {
+  config.password = process.env.REDIS_PASSWORD;
+}
+
+const redisClient = createClient(config);
 
 // 连接事件
 redisClient.on('error', (err) => console.log('Redis连接错误', err));

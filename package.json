@@ -9,7 +9,9 @@
     "start": "next start",
     "lint": "next lint",
     "init-db": "node scripts/init-db.js",
-    "seed-data": "node scripts/seed-test-data.js"
+    "seed-data": "node scripts/seed-test-data.js",
+    "migrate": "node scripts/run-migrations.js",
+    "test-auth": "node scripts/test_user_auth.js"
   },
   "dependencies": {
     "@alicloud/pop-core": "^1.7.13",
