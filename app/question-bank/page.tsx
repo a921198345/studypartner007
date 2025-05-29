@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 export default function QuestionBankPage() {
   const [searchQuery, setSearchQuery] = useState("")
+  const [selectedQuestionTypes, setSelectedQuestionTypes] = useState<string[]>(["全部题型"])
 
   const subjects = [
     { id: "all", name: "全部科目" },
@@ -68,14 +69,6 @@ export default function QuestionBankPage() {
       type: "单选题",
       content: "关于民事诉讼中的管辖权，下列说法正确的是：",
       isFavorite: true,
-    },
-    {
-      id: 5,
-      year: 2022,
-      subject: "民法",
-      type: "判断题",
-      content: "限制民事行为能力人实施的纯获利益的民事法律行为有效。",
-      isFavorite: false,
     },
     {
       id: 6,
@@ -166,12 +159,32 @@ export default function QuestionBankPage() {
                   <div>
                     <h3 className="font-medium mb-2">题型筛选</h3>
                     <div className="space-y-2">
-                      {["全部题型", "单选题", "多选题", "判断题"].map((type) => (
+                      {["全部题型", "单选题", "多选题"].map((type) => (
                         <label key={type} className="flex items-center space-x-2 text-sm cursor-pointer">
                           <input
                             type="checkbox"
                             className="rounded text-primary"
-                            defaultChecked={type === "全部题型"}
+                            checked={selectedQuestionTypes.includes(type)}
+                            onChange={(e) => {
+                              if (type === "全部题型") {
+                                // 当选择"全部题型"时，取消其他选项
+                                setSelectedQuestionTypes(e.target.checked ? ["全部题型"] : []);
+                              } else {
+                                // 当选择具体题型时，取消"全部题型"选项
+                                let newTypes = [...selectedQuestionTypes];
+                                if (e.target.checked) {
+                                  newTypes = newTypes.filter(t => t !== "全部题型");
+                                  newTypes.push(type);
+                                } else {
+                                  newTypes = newTypes.filter(t => t !== type);
+                                  // 如果没有选择任何具体题型，则自动选择"全部题型"
+                                  if (newTypes.filter(t => t !== "全部题型").length === 0) {
+                                    newTypes = ["全部题型"];
+                                  }
+                                }
+                                setSelectedQuestionTypes(newTypes);
+                              }
+                            }}
                           />
                           <span>{type}</span>
                         </label>
@@ -237,30 +250,35 @@ export default function QuestionBankPage() {
                 </TabsList>
 
                 <TabsContent value="all" className="space-y-4">
-                  {questions.map((question) => (
-                    <Card key={question.id} className="hover:shadow-md transition-shadow">
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-center">
-                            <Badge variant="outline" className="mr-2">
-                              {question.year}
-                            </Badge>
-                            <Badge variant="secondary" className="mr-2">
-                              {question.subject}
-                            </Badge>
-                            <Badge variant="outline">{question.type}</Badge>
+                  {questions
+                    .filter(question => 
+                      selectedQuestionTypes.includes("全部题型") || 
+                      selectedQuestionTypes.includes(question.type)
+                    )
+                    .map((question) => (
+                      <Card key={question.id} className="hover:shadow-md transition-shadow">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center">
+                              <Badge variant="outline" className="mr-2">
+                                {question.year}
+                              </Badge>
+                              <Badge variant="secondary" className="mr-2">
+                                {question.subject}
+                              </Badge>
+                              <Badge variant="outline">{question.type}</Badge>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              {question.isFavorite && <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />}
+                            </div>
                           </div>
-                          <div className="flex items-center space-x-1">
-                            {question.isFavorite && <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />}
+                          <p className="text-sm mb-3">{question.content}</p>
+                          <div className="flex items-center justify-end">
+                            <Button size="sm">开始答题</Button>
                           </div>
-                        </div>
-                        <p className="text-sm mb-3">{question.content}</p>
-                        <div className="flex items-center justify-end">
-                          <Button size="sm">开始答题</Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        </CardContent>
+                      </Card>
+                    ))}
 
                   {questions.some((q) => q.year !== 2024 && q.year !== 2023) && (
                     <Card className="border-dashed border-2 p-6 text-center">
@@ -278,6 +296,10 @@ export default function QuestionBankPage() {
                   <div className="space-y-4">
                     {questions
                       .filter((q) => wrongQuestions.includes(q.id))
+                      .filter(question => 
+                        selectedQuestionTypes.includes("全部题型") || 
+                        selectedQuestionTypes.includes(question.type)
+                      )
                       .map((question) => (
                         <Card key={question.id} className="hover:shadow-md transition-shadow">
                           <CardContent className="p-4">
@@ -309,6 +331,10 @@ export default function QuestionBankPage() {
                   <div className="space-y-4">
                     {questions
                       .filter((q) => q.isFavorite)
+                      .filter(question => 
+                        selectedQuestionTypes.includes("全部题型") || 
+                        selectedQuestionTypes.includes(question.type)
+                      )
                       .map((question) => (
                         <Card key={question.id} className="hover:shadow-md transition-shadow">
                           <CardContent className="p-4">
