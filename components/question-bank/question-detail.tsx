@@ -115,22 +115,44 @@ export function QuestionDetail({
     return Array.isArray(selectedAnswer) && selectedAnswer.includes(key)
   }
 
-  // 检查答案是否正确（仅当已提交答案时有效）
+  // 修改正确答案的确定方法
   const isCorrectOption = (key: string) => {
-    if (!answerResult || !submittedAnswer) return false
+    if (!submittedAnswer) return false;
     
-    return answerResult.correct_answer.includes(key)
+    // 尝试从所有可能的来源获取正确答案
+    const correctAnswerArray = answerResult?.correct_answer 
+      ? (Array.isArray(answerResult.correct_answer) 
+          ? answerResult.correct_answer 
+          : typeof answerResult.correct_answer === 'string'
+            ? answerResult.correct_answer.split('') 
+            : [String(answerResult.correct_answer)])
+      : (Array.isArray(question.answer) && question.answer.length > 0) 
+          ? question.answer 
+          : ['A']; // 最后的兜底值
+    
+    return correctAnswerArray.includes(key);
   }
 
-  // 检查答案是否错误（仅当已提交答案时有效）
+  // 修改错误答案的确定方法
   const isWrongOption = (key: string) => {
-    if (!answerResult || !submittedAnswer) return false
+    if (!submittedAnswer) return false;
     
     const isSubmitted = Array.isArray(submittedAnswer) 
       ? submittedAnswer.includes(key) 
-      : submittedAnswer === key
+      : submittedAnswer === key;
     
-    return isSubmitted && !answerResult.correct_answer.includes(key)
+    // 使用上面同样的逻辑获取正确答案
+    const correctAnswerArray = answerResult?.correct_answer 
+      ? (Array.isArray(answerResult.correct_answer) 
+          ? answerResult.correct_answer 
+          : typeof answerResult.correct_answer === 'string'
+            ? answerResult.correct_answer.split('') 
+            : [String(answerResult.correct_answer)])
+      : (Array.isArray(question.answer) && question.answer.length > 0) 
+          ? question.answer 
+          : ['A']; // 最后的兜底值
+    
+    return isSubmitted && !correctAnswerArray.includes(key);
   }
 
   // 获取选项样式
@@ -202,6 +224,45 @@ export function QuestionDetail({
     }));
   };
 
+  // 获取正确答案的显示数组
+  const getDisplayCorrectAnswers = () => {
+    // 优先使用answerResult中的correct_answer
+    if (answerResult?.correct_answer) {
+      if (Array.isArray(answerResult.correct_answer)) {
+        return answerResult.correct_answer;
+      } else if (typeof answerResult.correct_answer === 'string') {
+        return answerResult.correct_answer.split('');
+      } else {
+        return [String(answerResult.correct_answer)];
+      }
+    }
+    
+    // 如果没有answerResult，尝试使用question.answer
+    if (Array.isArray(question.answer) && question.answer.length > 0) {
+      return question.answer;
+    }
+    
+    // 最后兜底返回默认答案
+    console.warn(`题目 #${question.id} 没有可用的正确答案，使用默认值A`);
+    return ['A'];
+  };
+  
+  // 获取解析文本
+  const getExplanationText = () => {
+    // 优先使用answerResult中的explanation
+    if (answerResult?.explanation && answerResult.explanation !== "暂无解析") {
+      return answerResult.explanation;
+    }
+    
+    // 其次使用question中的analysis
+    if (question?.analysis && question.analysis !== "暂无解析" && question.analysis.trim() !== '') {
+      return question.analysis;
+    }
+    
+    // 最后兜底
+    return "暂无解析";
+  };
+
   if (!canAccess) {
     return (
       <div className="h-[600px] flex items-center justify-center">
@@ -225,7 +286,7 @@ export function QuestionDetail({
             `题号: ${question.question_code}` : 
             `题号: ${question.id}`}
         </h2>
-          </div>
+      </div>
       
       <div className="text-base font-medium mb-6">{question.content}</div>
 
@@ -248,56 +309,119 @@ export function QuestionDetail({
               `}
               onClick={() => !disabled && handleOptionSelect(optionKey)}
             >
-              <div className="flex items-start">
-                <div className="flex-shrink-0 w-6">{optionKey}.</div>
+              <div className="flex items-center">
+                <div className="mr-2 min-w-[24px] h-6 w-6 flex items-center justify-center rounded-full border">
+                  {optionKey}
+                </div>
                 <div>{optionText}</div>
+                
+                {/* 显示答案状态指示器 */}
+                {submittedAnswer && (
+                  <div className="ml-auto">
+                    {isCorrectOption(optionKey) && (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="text-green-500"
+                      >
+                        <path d="M20 6L9 17l-5-5" />
+                      </svg>
+                    )}
+                    {isWrongOption(optionKey) && (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="text-red-500"
+                      >
+                        <path d="M18 6L6 18M6 6l12 12" />
+                      </svg>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           );
         })}
-        </div>
+      </div>
 
-        {isSubmitted && (
-          <div className="mt-4 space-y-4">
-            <div
-              className={`p-4 rounded-lg ${isCorrect ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}
-            >
-              <div className="font-medium mb-2">{isCorrect ? "回答正确！" : "回答错误"}</div>
-              <div className="text-sm">正确答案: {question.answer.join(", ")}</div>
-            </div>
+      {!hideSubmitButton && !submittedAnswer && (
+        <Button
+          className="mt-4"
+          onClick={onSelectAnswer ? undefined : handleSubmit}
+          disabled={
+            disabled || 
+            (question.type === "single" && !selectedAnswer) || 
+            (question.type === "multiple" && (!Array.isArray(selectedAnswer) || selectedAnswer.length === 0))
+          }
+        >
+          提交答案
+        </Button>
+      )}
 
-          {question.analysis && question.analysis.trim() !== "" ? (
-            <div className="p-4 rounded-lg bg-gray-50 border">
-              <div className="font-medium mb-2">解析</div>
-              <div className="text-sm whitespace-pre-wrap">{question.analysis}</div>
+      {/* 答案和解析区域 - 增强版 */}
+      {submittedAnswer && (
+        <div className="mt-8 p-4 rounded-lg border bg-gray-50">
+          <h3 className="text-xl font-semibold mb-4">
+            {answerResult?.is_correct ? (
+              <span className="text-green-500">回答正确！</span>
+            ) : (
+              <span className="text-red-500">回答错误</span>
+            )}
+          </h3>
+          
+          {/* 正确答案显示 - 使用新的获取方法 */}
+          <div className="mb-4">
+            <div className="font-medium mb-2">正确答案：</div>
+            <div className="flex flex-wrap gap-2">
+              {getDisplayCorrectAnswers().map((opt, index) => (
+                <Badge
+                  key={`${opt}-${index}`}
+                  className="bg-green-100 text-green-800 border border-green-300"
+                >
+                  {opt}
+                </Badge>
+              ))}
             </div>
-          ) : (
-            <div className="p-4 rounded-lg bg-gray-50 border">
-              <div className="font-medium mb-2">解析</div>
-              <div className="text-sm">暂无解析</div>
+          </div>
+          
+          {/* 解析显示 - 使用新的获取方法 */}
+          <div>
+            <div className="font-medium mb-2">解析：</div>
+            <div className="mt-1 whitespace-pre-wrap text-gray-700">
+              {getExplanationText()}
             </div>
-          )}
-
-            <div className="flex justify-between">
-              <Button variant="outline" onClick={handleReset}>
-                重新作答
+          </div>
+          
+          {/* 操作按钮 */}
+          <div className="flex justify-between mt-6">
+            <Button variant="outline" onClick={handleReset}>
+              重新作答
+            </Button>
+            <Link href={`/knowledge-map?point=related-to-${question.id}`}>
+              <Button className="flex items-center">
+                <Brain className="mr-2 h-4 w-4" />
+                查看相关知识导图
               </Button>
-              <Link href={`/knowledge-map?point=related-to-${question.id}`}>
-                <Button className="flex items-center">
-                  <Brain className="mr-2 h-4 w-4" />
-                  查看相关知识导图
-                </Button>
-              </Link>
-            </div>
+            </Link>
           </div>
-        )}
-
-      {!isSubmitted && !hideSubmitButton && (
-          <div className="flex justify-end">
-            <Button onClick={handleSubmit}>提交答案</Button>
-          </div>
-        )}
         </div>
+      )}
+      
+    </div>
   )
 }
 

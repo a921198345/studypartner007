@@ -15,7 +15,7 @@ import Link from "next/link"
 import { questionApi, getWrongQuestions, getFavoriteQuestions } from "@/lib/api/questions"
 
 // 辅助函数：比较两个数组是否内容相同（忽略顺序）
-function arraysEqual(a, b) {
+function arraysEqual(a: any[], b: any[]): boolean {
   if (!a || !b) return false;
   if (a.length !== b.length) return false;
   
@@ -256,7 +256,7 @@ export default function QuestionBankPage() {
     };
     
     // 辅助函数：更新页面上的统计数据
-    const updateStatistics = (totalAnswered, totalCorrect) => {
+    const updateStatistics = (totalAnswered: number, totalCorrect: number) => {
       // 更新统计信息DOM元素
       const answeredElement = document.getElementById('stats-answered');
       const correctRateElement = document.getElementById('stats-correct-rate');
@@ -332,7 +332,7 @@ export default function QuestionBankPage() {
     };
     
     // 新增函数：获取所有筛选后的题目信息并保存到 localStorage
-    const fetchAllFilteredQuestionInfoAndSave = async (totalItems, filters, currentPageData) => {
+    const fetchAllFilteredQuestionInfoAndSave = async (totalItems: number, filters: any, currentPageData: any[]) => {
       try {
         // 假设 questionApi.getQuestions 支持一个fetchAllIds: true 或者类似的参数
         // 或者后端有新的专门接口
@@ -344,7 +344,7 @@ export default function QuestionBankPage() {
         });
 
         if (response.success && response.data && response.data.questions) {
-          const allFilteredQuestionInfo = response.data.questions.map(q => ({
+          const allFilteredQuestionInfo = response.data.questions.map((q: any) => ({
             id: q.id,
             question_code: q.question_code || null
           }));
@@ -362,7 +362,7 @@ export default function QuestionBankPage() {
         } else {
           console.warn("获取所有筛选题目ID和题号失败，将使用当前页数据作为导航降级。", response.message);
           // 降级：只保存当前页的题目信息
-          const currentFilteredQuestions = currentPageData.map(q => ({ id: q.id, question_code: q.question_code || null }));
+          const currentFilteredQuestions = currentPageData.map((q: any) => ({ id: q.id, question_code: q.question_code || null }));
           localStorage.setItem('filteredQuestionsList', JSON.stringify({
             questions: currentFilteredQuestions,
             filters: {
@@ -377,7 +377,7 @@ export default function QuestionBankPage() {
       } catch (error) {
         console.error("请求所有筛选题目ID和题号时出错:", error);
         // 降级：只保存当前页的题目信息
-        const currentFilteredQuestions = currentPageData.map(q => ({ id: q.id, question_code: q.question_code || null }));
+        const currentFilteredQuestions = currentPageData.map((q: any) => ({ id: q.id, question_code: q.question_code || null }));
         localStorage.setItem('filteredQuestionsList', JSON.stringify({
           questions: currentFilteredQuestions,
           filters: {
@@ -413,6 +413,27 @@ export default function QuestionBankPage() {
   // 初始加载错题集
   useEffect(() => {
     loadWrongQuestions();
+    
+    // 添加错题集变化事件的监听器
+    const handleWrongQuestionsChange = (event: Event) => {
+      // 将event转换为CustomEvent以访问detail属性
+      const customEvent = event as CustomEvent<{removedId?: number}>;
+      console.log("检测到错题集变化事件:", customEvent.detail);
+      if (customEvent.detail && customEvent.detail.removedId) {
+        console.log(`题目 #${customEvent.detail.removedId} 已从错题集中移除，刷新错题列表`);
+        loadWrongQuestions(); // 重新加载错题集
+      }
+    };
+    
+    // 添加多种可能的事件名称监听，确保兼容性
+    window.addEventListener('wrongQuestionsChanged', handleWrongQuestionsChange);
+    window.addEventListener('wrongQuestionsUpdated', handleWrongQuestionsChange);
+    
+    // 组件卸载时移除事件监听
+    return () => {
+      window.removeEventListener('wrongQuestionsChanged', handleWrongQuestionsChange);
+      window.removeEventListener('wrongQuestionsUpdated', handleWrongQuestionsChange);
+    };
   }, []);
 
   // 处理标签切换
@@ -559,7 +580,7 @@ export default function QuestionBankPage() {
   };
 
   // 处理点击题目进入详情页的函数
-  const handleQuestionClick = (questionId) => {
+  const handleQuestionClick = (questionId: number) => {
     // 检查localStorage中是否已存在完整的筛选列表数据
     try {
       const existingFilteredListStr = localStorage.getItem('filteredQuestionsList');
@@ -843,7 +864,7 @@ export default function QuestionBankPage() {
                   )}
                   
                   {activeTab === "wrong" && wrongQuestions.length > 0 && (
-                    <Button onClick={() => wrongQuestions.length > 0 && router.push(`/question-bank/${wrongQuestions[0].id}`)}>
+                    <Button onClick={() => wrongQuestions.length > 0 && router.push(`/question-bank/${wrongQuestions[0].id}?source=wrong&wrongIndex=0&resetWrong=true`)}>
                       开始练习
                     </Button>
                   )}
@@ -1005,9 +1026,9 @@ export default function QuestionBankPage() {
                           <h3 className="font-medium">共收集到 {wrongQuestions.length} 道错题</h3>
                         </div>
                         
-                        {wrongQuestions.map((question) => (
+                        {wrongQuestions.map((question, index) => (
                           <Link 
-                            href={`/question-bank/${question.id}?source=wrong&wrongIndex=${wrongQuestions.findIndex(q => q.id === question.id)}`} 
+                            href={`/question-bank/${question.id}?source=wrong&wrongIndex=${index}`} 
                             key={question.id}
                           >
                             <div 
