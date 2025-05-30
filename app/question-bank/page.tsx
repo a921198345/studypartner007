@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
@@ -10,78 +11,650 @@ import { Badge } from "@/components/ui/badge"
 import { Search, BookOpen, Star, Filter, Lock } from "lucide-react"
 import { Footer } from "@/components/footer"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import Link from "next/link"
+import { questionApi, getWrongQuestions, getFavoriteQuestions } from "@/lib/api/questions"
+
+// 辅助函数：比较两个数组是否内容相同（忽略顺序）
+function arraysEqual(a, b) {
+  if (!a || !b) return false;
+  if (a.length !== b.length) return false;
+  
+  // 对基本类型数组，先排序再比较
+  if (a.every(item => typeof item === 'string' || typeof item === 'number')) {
+    const sortedA = [...a].sort();
+    const sortedB = [...b].sort();
+    return sortedA.every((val, idx) => val === sortedB[idx]);
+  }
+  
+  // 如果是对象数组，则需要更复杂的比较
+  // 简化起见，这里仅支持基本类型数组比较
+  return false;
+}
 
 export default function QuestionBankPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedQuestionTypes, setSelectedQuestionTypes] = useState<string[]>(["全部题型"])
+  const [selectedSubject, setSelectedSubject] = useState("all")
+  const [selectedYears, setSelectedYears] = useState<string[]>(["2023", "2024"])
+  const [questions, setQuestions] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [actualTotalQuestions, setActualTotalQuestions] = useState(25)
+  const [pagination, setPagination] = useState({
+    total: 0,
+    currentPage: 1,
+    totalPages: 1,
+    perPage: 10
+  })
+  const [hasLastProgress, setHasLastProgress] = useState(false)
+  const [lastQuestionId, setLastQuestionId] = useState<number | null>(null)
+  const [wrongQuestions, setWrongQuestions] = useState<any[]>([])
+  const [loadingWrongQuestions, setLoadingWrongQuestions] = useState(false)
+  const [favoriteQuestions, setFavoriteQuestions] = useState<any[]>([])
+  const [loadingFavorites, setLoadingFavorites] = useState(false)
 
   const subjects = [
     { id: "all", name: "全部科目" },
-    { id: "civil", name: "民法" },
-    { id: "criminal", name: "刑法" },
-    { id: "civilProcedure", name: "民事诉讼法" },
-    { id: "criminalProcedure", name: "刑事诉讼法" },
-    { id: "commercial", name: "商法与经济法" },
-    { id: "theory", name: "理论法学" },
-    { id: "administrative", name: "行政法与行政诉讼法" },
-    { id: "international", name: "三国法" },
+    { id: "民法", name: "民法" },
+    { id: "刑法", name: "刑法" },
+    { id: "民事诉讼法", name: "民事诉讼法" },
+    { id: "刑事诉讼法", name: "刑事诉讼法" },
+    { id: "商法", name: "商法与经济法" },
+    { id: "法理学", name: "理论法学" },
+    { id: "行政法", name: "行政法与行政诉讼法" },
+    { id: "三国法", name: "三国法" },
   ]
 
   const years = [
     { id: "all", name: "全部年份" },
     { id: "2024", name: "2024年", free: true },
     { id: "2023", name: "2023年", free: true },
-    { id: "2022", name: "2022年", free: false },
+    { id: "2022", name: "2022年", free: true },
     { id: "2021", name: "2021年", free: false },
     { id: "2020", name: "2020年", free: false },
     { id: "2019", name: "2019年", free: false },
   ]
 
-  const questions = [
-    {
-      id: 1,
-      year: 2024,
-      subject: "民法",
-      type: "单选题",
-      content: "根据《民法典》规定，下列关于民事法律行为有效要件的说法，正确的是：",
-      isFavorite: true,
-    },
-    {
-      id: 2,
-      year: 2024,
-      subject: "民法",
-      type: "多选题",
-      content: "根据《民法典》规定，下列关于无效民事法律行为的表述中，正确的有：",
-      isFavorite: false,
-    },
-    {
-      id: 3,
-      year: 2023,
-      subject: "刑法",
-      type: "单选题",
-      content: "关于正当防卫的成立条件，下列说法错误的是：",
-      isFavorite: false,
-    },
-    {
-      id: 4,
-      year: 2023,
-      subject: "民事诉讼法",
-      type: "单选题",
-      content: "关于民事诉讼中的管辖权，下列说法正确的是：",
-      isFavorite: true,
-    },
-    {
-      id: 6,
-      year: 2022,
-      subject: "刑法",
-      type: "多选题",
-      content: "下列哪些情形属于刑法中的犯罪中止：",
-      isFavorite: false,
-    },
-  ]
-
   // 创建错题列表（为了保留"我的错题"标签页功能，但不显示错题标签）
-  const wrongQuestions = [2, 4, 6] // 假设这些ID是错题
+  // const wrongQuestions = [2, 4, 6] // 假设这些ID是错题
+
+  const router = useRouter()
+
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      try {
+        setLoading(true)
+        
+        // 获取题目列表
+        let questionsData;
+        try {
+          const response = await questionApi.getQuestions({
+            subject: selectedSubject !== 'all' ? selectedSubject : undefined,
+            year: selectedYears.includes('all') ? undefined : selectedYears,
+            question_type: !selectedQuestionTypes.includes('全部题型') ? selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题' : undefined,
+            page: pagination.currentPage,
+            limit: pagination.perPage
+          });
+          
+          questionsData = response;
+          
+          if (response.success) {
+            setQuestions(response.data.questions);
+            
+            // 更新分页信息和题目总数
+            const newTotal = response.data.pagination.total;
+            setPagination(prev => ({
+              ...prev,
+              total: newTotal,
+              totalPages: response.data.pagination.totalPages
+            }));
+            
+            // 更新实际题目总数
+            setActualTotalQuestions(newTotal);
+            
+            // 保存题目总数到localStorage，供其他页面使用
+            localStorage.setItem('questionTotalCount', newTotal.toString());
+            
+            // --- 修改开始: 获取并保存所有筛选后的题目信息 ---
+            if (newTotal > 0) {
+              fetchAllFilteredQuestionInfoAndSave(newTotal, {
+                subject: selectedSubject !== 'all' ? selectedSubject : undefined,
+                year: selectedYears.includes('all') ? undefined : selectedYears,
+                question_type: !selectedQuestionTypes.includes('全部题型') ? (selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题') : undefined,
+              }, response.data.questions); // 传入当前页数据作为降级
+            } else {
+              // 如果筛选结果为0，清空或保存空列表
+              localStorage.setItem('filteredQuestionsList', JSON.stringify({
+                questions: [],
+                filters: {
+                  subject: selectedSubject,
+                  years: selectedYears,
+                  types: selectedQuestionTypes
+                },
+                timestamp: Date.now()
+              }));
+            }
+            // --- 修改结束 ---
+          } else {
+            console.error("获取题目列表API响应失败:", response.message);
+            setError(response.message || "获取题目列表失败");
+          }
+        } catch (questionsError) {
+          console.error("获取题目列表请求异常:", questionsError);
+          setError("获取题目列表失败，请稍后再试");
+        }
+        
+        // 尝试获取用户答题历史 - 即使题目获取失败也继续尝试
+        try {
+          const historyResponse = await questionApi.getAnswerHistory();
+          
+          // 如果成功获取历史数据，更新统计信息
+          if (historyResponse.success) {
+            // 更新学习统计区域的数据
+            const totalAnswered = historyResponse.data.totalAnswered;
+            const totalCorrect = historyResponse.data.totalCorrect;
+            
+            // 更新DOM元素中的统计数据
+            updateStatistics(totalAnswered, totalCorrect);
+          } else if (historyResponse.offline) {
+            // 使用了离线数据
+            console.log("使用离线答题历史数据");
+            if (historyResponse.data) {
+              const totalAnswered = historyResponse.data.totalAnswered;
+              const totalCorrect = historyResponse.data.totalCorrect;
+              updateStatistics(totalAnswered, totalCorrect);
+            }
+          }
+        } catch (historyError) {
+          console.error("获取用户答题历史失败:", historyError);
+          // 错误处理，但不影响主页面功能
+        }
+        
+        // 尝试获取上次练习进度 - 无论前面的请求是否成功
+        try {
+          // 首先检查本地存储是否有最近答题记录
+          const historyString = localStorage.getItem('answerHistory');
+          let lastQuestionFromLocal = null;
+          let hasLocalProgress = false;
+          
+          if (historyString) {
+            try {
+              const history = JSON.parse(historyString);
+              // 如果本地有答题历史且不超过1天
+              if (history && history.timestamp && Date.now() - history.timestamp < 86400000) {
+                // 找出最近回答的题目ID（最大ID）
+                const answeredIds = Object.keys(history.answered || {}).map(Number);
+                if (answeredIds.length > 0) {
+                  lastQuestionFromLocal = Math.max(...answeredIds);
+                  hasLocalProgress = true;
+                }
+              }
+            } catch (e) {
+              console.error("解析本地答题历史失败:", e);
+            }
+          }
+          
+          // 尝试从服务器获取最近答题进度
+          const progressResponse = await questionApi.getLastPracticeProgress({
+            subject: selectedSubject !== 'all' ? selectedSubject : undefined,
+            year: selectedYears.includes('all') ? undefined : selectedYears.length === 1 ? selectedYears[0] : undefined,
+            question_type: !selectedQuestionTypes.includes('全部题型') ? selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题' : undefined
+          });
+          
+          if (progressResponse.success) {
+            setHasLastProgress(true);
+            setLastQuestionId(progressResponse.data.last_question_id);
+            console.log("成功获取最近练习进度:", progressResponse.data);
+          } else if (hasLocalProgress && lastQuestionFromLocal) {
+            // 如果服务器请求失败但本地有记录，使用本地记录
+            console.log("使用本地存储的最近答题记录:", lastQuestionFromLocal);
+            setHasLastProgress(true);
+            setLastQuestionId(lastQuestionFromLocal);
+          } else {
+            setHasLastProgress(false);
+            setLastQuestionId(null);
+          }
+        } catch (progressError) {
+          console.error("获取练习进度失败:", progressError);
+          
+          // 如果API请求失败，尝试从本地存储获取
+          try {
+            const historyString = localStorage.getItem('answerHistory');
+            if (historyString) {
+              const history = JSON.parse(historyString);
+              // 如果本地有答题历史且不超过1天
+              if (history && history.timestamp && Date.now() - history.timestamp < 86400000) {
+                // 找出最近回答的题目ID（最大ID）
+                const answeredIds = Object.keys(history.answered || {}).map(Number);
+                if (answeredIds.length > 0) {
+                  const lastQuestionFromLocal = Math.max(...answeredIds);
+                  setHasLastProgress(true);
+                  setLastQuestionId(lastQuestionFromLocal);
+                  console.log("从本地存储恢复的最近答题ID:", lastQuestionFromLocal);
+                } else {
+                  setHasLastProgress(false);
+                }
+              }
+            } else {
+              setHasLastProgress(false);
+            }
+          } catch (e) {
+            console.error("从本地存储获取练习进度失败:", e);
+            setHasLastProgress(false);
+          }
+        }
+        
+      } catch (err) {
+        console.error("获取题目列表失败:", err);
+        setError("获取题目失败，请稍后再试");
+        // 即使发生错误，仍然尝试从本地存储加载必要数据
+        tryLoadFromLocalStorage();
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    // 辅助函数：更新页面上的统计数据
+    const updateStatistics = (totalAnswered, totalCorrect) => {
+      // 更新统计信息DOM元素
+      const answeredElement = document.getElementById('stats-answered');
+      const correctRateElement = document.getElementById('stats-correct-rate');
+      const wrongCountElement = document.getElementById('stats-wrong-count');
+      
+      if (answeredElement) {
+        answeredElement.textContent = `${totalAnswered}/500`;
+        const progressBar = answeredElement.nextElementSibling?.querySelector('div');
+        if (progressBar) {
+          progressBar.style.width = `${Math.min((totalAnswered / 500) * 100, 100)}%`;
+        }
+      }
+      
+      if (correctRateElement && totalAnswered > 0) {
+        const correctRate = Math.round((totalCorrect / totalAnswered) * 100);
+        correctRateElement.textContent = `${correctRate}%`;
+        const progressBar = correctRateElement.nextElementSibling?.querySelector('div');
+        if (progressBar) {
+          progressBar.style.width = `${correctRate}%`;
+        }
+      }
+      
+      if (wrongCountElement) {
+        wrongCountElement.textContent = `${totalAnswered - totalCorrect}`;
+      }
+    };
+    
+    // 辅助函数：在API请求全部失败时尝试从本地存储加载数据
+    const tryLoadFromLocalStorage = () => {
+      try {
+        // 尝试加载练习进度
+        const historyString = localStorage.getItem('answerHistory');
+        if (historyString) {
+          const history = JSON.parse(historyString);
+          if (history && history.timestamp && Date.now() - history.timestamp < 86400000) {
+            // 找出最近回答的题目ID
+            const answeredIds = Object.keys(history.answered || {}).map(Number);
+            if (answeredIds.length > 0) {
+              setHasLastProgress(true);
+              setLastQuestionId(Math.max(...answeredIds));
+              
+              // 更新统计信息
+              const totalAnswered = answeredIds.length;
+              const totalCorrect = Object.values(history.correct || {}).filter(Boolean).length;
+              updateStatistics(totalAnswered, totalCorrect);
+            }
+          }
+        }
+        
+        // 尝试加载缓存的题目列表
+        const cachedQuestionsStr = localStorage.getItem('cachedQuestions');
+        if (cachedQuestionsStr && questions.length === 0) {
+          try {
+            const cached = JSON.parse(cachedQuestionsStr);
+            if (cached && cached.data && cached.data.success && cached.data.data && cached.data.data.questions) {
+              setQuestions(cached.data.data.questions);
+              // 更新分页信息
+              if (cached.data.data.pagination) {
+                setPagination(prev => ({
+                  ...prev,
+                  total: cached.data.data.pagination.total || 0,
+                  totalPages: cached.data.data.pagination.totalPages || 1
+                }));
+              }
+            }
+          } catch (e) {
+            console.error("解析缓存题目数据失败:", e);
+          }
+        }
+      } catch (e) {
+        console.error("从本地存储加载备份数据失败:", e);
+      }
+    };
+    
+    // 新增函数：获取所有筛选后的题目信息并保存到 localStorage
+    const fetchAllFilteredQuestionInfoAndSave = async (totalItems, filters, currentPageData) => {
+      try {
+        // 假设 questionApi.getQuestions 支持一个fetchAllIds: true 或者类似的参数
+        // 或者后端有新的专门接口
+        const response = await questionApi.getQuestions({
+          ...filters,
+          // page: 1, // 根据后端API设计调整
+          // limit: totalItems, // 根据后端API设计调整
+          fetchAllIdsAndCodes: true // 假设的新参数，用于获取所有ID和题号
+        });
+
+        if (response.success && response.data && response.data.questions) {
+          const allFilteredQuestionInfo = response.data.questions.map(q => ({
+            id: q.id,
+            question_code: q.question_code || null
+          }));
+
+          localStorage.setItem('filteredQuestionsList', JSON.stringify({
+            questions: allFilteredQuestionInfo,
+            filters: {
+              subject: filters.subject || 'all',
+              years: filters.year || ['all'],
+              types: filters.question_type ? [filters.question_type] : ['全部题型']
+            },
+            timestamp: Date.now()
+          }));
+          console.log(`成功保存 ${allFilteredQuestionInfo.length} 条筛选后的题目信息到localStorage`);
+        } else {
+          console.warn("获取所有筛选题目ID和题号失败，将使用当前页数据作为导航降级。", response.message);
+          // 降级：只保存当前页的题目信息
+          const currentFilteredQuestions = currentPageData.map(q => ({ id: q.id, question_code: q.question_code || null }));
+          localStorage.setItem('filteredQuestionsList', JSON.stringify({
+            questions: currentFilteredQuestions,
+            filters: {
+              subject: filters.subject || 'all',
+              years: filters.year || ['all'],
+              types: filters.question_type ? [filters.question_type] : ['全部题型']
+            },
+            page: pagination.currentPage, // 保留当前页信息，因为列表不完整
+            timestamp: Date.now()
+          }));
+        }
+      } catch (error) {
+        console.error("请求所有筛选题目ID和题号时出错:", error);
+        // 降级：只保存当前页的题目信息
+        const currentFilteredQuestions = currentPageData.map(q => ({ id: q.id, question_code: q.question_code || null }));
+        localStorage.setItem('filteredQuestionsList', JSON.stringify({
+          questions: currentFilteredQuestions,
+          filters: {
+            subject: filters.subject || 'all',
+            years: filters.year || ['all'],
+            types: filters.question_type ? [filters.question_type] : ['全部题型']
+          },
+          page: pagination.currentPage, // 保留当前页信息，因为列表不完整
+          timestamp: Date.now()
+        }));
+      }
+    };
+
+    fetchQuestions();
+  }, [selectedSubject, selectedYears, selectedQuestionTypes, pagination.currentPage, pagination.perPage]);
+
+  // 加载错题集
+  useEffect(() => {
+    const loadWrongQuestions = async () => {
+      setLoadingWrongQuestions(true);
+      try {
+        console.log("开始加载错题集...");
+        // 从本地存储获取错题集
+        const wrongQs = getWrongQuestions();
+        console.log("获取到错题集:", wrongQs.length, "题");
+        setWrongQuestions(wrongQs);
+      } catch (error) {
+        console.error("加载错题集失败:", error);
+      } finally {
+        setLoadingWrongQuestions(false);
+      }
+    };
+    
+    loadWrongQuestions();
+  }, []);
+
+  // 处理标签切换
+  const handleTabChange = (value: string) => {
+    if (value === "wrong") {
+      const wrongQs = getWrongQuestions();
+      console.log("切换到错题标签，重新加载错题集:", wrongQs.length, "题");
+      setWrongQuestions(wrongQs);
+    } else if (value === "favorite") {
+      loadFavoriteQuestions();
+    }
+  };
+
+  // 加载收藏的题目
+  const loadFavoriteQuestions = async () => {
+    setLoadingFavorites(true);
+    try {
+      // 获取所有收藏的题目ID
+      const favoriteIds = getFavoriteQuestions();
+      console.log("收藏题目IDs:", favoriteIds);
+      
+      if (favoriteIds.length === 0) {
+        setFavoriteQuestions([]);
+        return;
+      }
+      
+      // 收集收藏题目数据
+      const favQuestions = [];
+      
+      // 从本地缓存优先加载题目信息
+      const cachedQuestionsStr = localStorage.getItem('cachedQuestions');
+      let cachedData = null;
+      if (cachedQuestionsStr) {
+        try {
+          const parsed = JSON.parse(cachedQuestionsStr);
+          if (parsed && parsed.data && parsed.data.data && parsed.data.data.questions) {
+            cachedData = parsed.data.data.questions;
+          }
+        } catch (e) {
+          console.error("解析缓存题目数据失败:", e);
+        }
+      }
+      
+      // 整理收藏题目数据
+      for (const id of favoriteIds) {
+        let question = null;
+        
+        // 先从缓存中查找
+        if (cachedData) {
+          question = cachedData.find((q: any) => q.id === id);
+        }
+        
+        // 如果缓存没有则单独请求题目数据
+        if (!question) {
+          try {
+            const result = await questionApi.getQuestionById(id);
+            if (result.success && result.data) {
+              question = result.data;
+            }
+          } catch (error) {
+            console.error(`获取收藏题目 #${id} 数据失败:`, error);
+          }
+        }
+        
+        if (question) {
+          favQuestions.push({
+            ...question,
+            isFavorite: true
+          });
+        }
+      }
+      
+      console.log("加载到的收藏题目:", favQuestions.length, "题");
+      setFavoriteQuestions(favQuestions);
+      
+    } catch (error) {
+      console.error("加载收藏题目失败:", error);
+    } finally {
+      setLoadingFavorites(false);
+    }
+  };
+  
+  // 初始加载收藏题目
+  useEffect(() => {
+    loadFavoriteQuestions();
+  }, []);
+
+  // 处理学科选择变化
+  const handleSubjectChange = (value: string) => {
+    setSelectedSubject(value);
+    // 重置分页
+    setPagination(prev => ({ ...prev, currentPage: 1 }));
+  };
+
+  // 处理年份选择变化
+  const handleYearChange = (yearId: string, checked: boolean) => {
+    setSelectedYears(prev => {
+      if (yearId === 'all') {
+        // 如果选择"全部年份"，清除其他选择
+        return checked ? ['all'] : [];
+      } else {
+        // 如果选择具体年份，移除"全部年份"
+        let newYears = prev.filter(y => y !== 'all');
+        
+        if (checked) {
+          // 添加选中的年份
+          if (!newYears.includes(yearId)) {
+            newYears.push(yearId);
+          }
+        } else {
+          // 移除取消选中的年份
+          newYears = newYears.filter(y => y !== yearId);
+        }
+
+        // 如果没有选择任何年份，默认选择"全部年份"
+        if (newYears.length === 0) {
+          return ['all'];
+        }
+
+        return newYears;
+      }
+    });
+    // 重置分页
+    setPagination(prev => ({ ...prev, currentPage: 1 }));
+  };
+
+  // 检查用户是否可以访问某年份的题目（免费或会员）
+  const canAccessYear = (year: string) => {
+    const yearObj = years.find(y => y.id === year);
+    // 如果找不到年份信息，默认可访问
+    if (!yearObj) return true;
+    // 如果是免费年份，可以访问
+    if (yearObj.free) return true;
+    // 这里可以添加会员检查逻辑
+    const isMember = false; // 假设用户不是会员
+    return isMember;
+  };
+
+  // 处理点击题目进入详情页的函数
+  const handleQuestionClick = (questionId) => {
+    // 检查localStorage中是否已存在完整的筛选列表数据
+    try {
+      const existingFilteredListStr = localStorage.getItem('filteredQuestionsList');
+      let navigationState;
+      
+      if (existingFilteredListStr) {
+        const existingFilteredData = JSON.parse(existingFilteredListStr);
+        // 检查现有数据是否有效且包含完整题目列表
+        if (existingFilteredData && 
+            existingFilteredData.questions && 
+            existingFilteredData.questions.length > 0 &&
+            // 检查时间戳，确保数据不超过1小时
+            existingFilteredData.timestamp && 
+            (Date.now() - existingFilteredData.timestamp < 3600000) &&
+            // 检查筛选条件是否匹配当前条件
+            existingFilteredData.filters.subject === selectedSubject &&
+            arraysEqual(existingFilteredData.filters.years, selectedYears) &&
+            arraysEqual(existingFilteredData.filters.types, selectedQuestionTypes)) {
+          
+          console.log(`找到有效的完整筛选列表，包含 ${existingFilteredData.questions.length} 题，不覆盖它`);
+          
+          // 使用现有的完整列表，仅更新当前页码和点击的题目索引
+          navigationState = {
+            ...existingFilteredData,
+            currentPage: pagination.currentPage,
+            timestamp: Date.now()
+          };
+          
+          // 更新并保存
+          localStorage.setItem('filteredQuestionsList', JSON.stringify(navigationState));
+        } else {
+          console.log('现有筛选列表无效或已过期，或筛选条件已变更，创建新的导航状态');
+          createAndSaveNewNavigationState();
+        }
+      } else {
+        console.log('未找到现有筛选列表，创建新的导航状态');
+        createAndSaveNewNavigationState();
+      }
+    } catch (e) {
+      console.error('处理筛选列表时出错，创建新的导航状态:', e);
+      createAndSaveNewNavigationState();
+    }
+    
+    // 创建并保存新的导航状态的辅助函数
+    function createAndSaveNewNavigationState() {
+      // 注意：这只会包含当前页的题目，但作为降级方案保留
+      const currentFilterState = {
+        questions: questions.map(q => ({
+          id: q.id,
+          question_code: q.question_code || null
+        })),
+        filters: {
+          subject: selectedSubject,
+          years: selectedYears,
+          types: selectedQuestionTypes
+        },
+        currentPage: pagination.currentPage,
+        totalPages: pagination.totalPages,
+        total: pagination.total,
+        perPage: pagination.perPage,
+        timestamp: Date.now()
+      };
+      
+      // 保存到localStorage，用于快速本地导航
+      localStorage.setItem('filteredQuestionsList', JSON.stringify(currentFilterState));
+    }
+    
+    // 创建查询参数，用于通过URL传递关键筛选条件
+    const queryParams = new URLSearchParams();
+    
+    // 添加基本筛选参数
+    if (selectedSubject !== 'all') {
+      queryParams.append('subject', selectedSubject);
+    }
+    
+    // 年份参数（如果不是"全部"）
+    if (!selectedYears.includes('all')) {
+      queryParams.append('years', selectedYears.join(','));
+    }
+    
+    // 题型参数（如果不是"全部题型"）
+    if (!selectedQuestionTypes.includes('全部题型')) {
+      queryParams.append('types', selectedQuestionTypes.join(','));
+    }
+    
+    // 当前页码
+    queryParams.append('page', pagination.currentPage.toString());
+    
+    // 列表位置索引（当前题目是第几个）
+    const questionIndex = questions.findIndex(q => q.id === questionId);
+    if (questionIndex !== -1) {
+      queryParams.append('index', questionIndex.toString());
+    }
+    
+    // 构建带查询参数的URL
+    const url = queryParams.toString() 
+      ? `/question-bank/${questionId}?${queryParams.toString()}`
+      : `/question-bank/${questionId}`;
+    
+    console.log(`准备跳转到题目 #${questionId}，URL: ${url}`);
+    
+    // 使用路由导航到题目详情页
+    router.push(url);
+  };
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -118,7 +691,7 @@ export default function QuestionBankPage() {
                 <CardContent className="p-4 space-y-4">
                   <div>
                     <h3 className="font-medium mb-2">学科筛选</h3>
-                    <Select defaultValue="all">
+                    <Select value={selectedSubject} onValueChange={handleSubjectChange}>
                       <SelectTrigger>
                         <SelectValue placeholder="选择学科" />
                       </SelectTrigger>
@@ -141,7 +714,8 @@ export default function QuestionBankPage() {
                             <input
                               type="checkbox"
                               className="rounded text-primary"
-                              defaultChecked={year.id === "2024" || year.id === "2023"}
+                              checked={selectedYears.includes(year.id)}
+                              onChange={(e) => handleYearChange(year.id, e.target.checked)}
                             />
                             <span>{year.name}</span>
                           </label>
@@ -184,6 +758,8 @@ export default function QuestionBankPage() {
                                 }
                                 setSelectedQuestionTypes(newTypes);
                               }
+                              // 重置分页
+                              setPagination(prev => ({ ...prev, currentPage: 1 }));
                             }}
                           />
                           <span>{type}</span>
@@ -204,161 +780,270 @@ export default function QuestionBankPage() {
                     <div>
                       <div className="flex justify-between text-sm mb-1">
                         <span>已做题目</span>
-                        <span className="font-medium">42/500</span>
+                        <span id="stats-answered" className="font-medium">0/500</span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-1.5">
-                        <div className="bg-primary h-1.5 rounded-full" style={{ width: "8.4%" }}></div>
+                        <div className="bg-primary h-1.5 rounded-full" style={{ width: "0%" }}></div>
                       </div>
                     </div>
 
                     <div>
                       <div className="flex justify-between text-sm mb-1">
                         <span>正确率</span>
-                        <span className="font-medium">78%</span>
+                        <span id="stats-correct-rate" className="font-medium">0%</span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-1.5">
-                        <div className="bg-green-500 h-1.5 rounded-full" style={{ width: "78%" }}></div>
+                        <div className="bg-green-500 h-1.5 rounded-full" style={{ width: "0%" }}></div>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 pt-2">
                       <div className="bg-gray-50 p-2 rounded text-center">
-                        <div className="text-lg font-semibold text-red-500">12</div>
+                        <div id="stats-wrong-count" className="text-lg font-semibold text-red-500">0</div>
                         <div className="text-xs text-gray-500">错题数</div>
                       </div>
                       <div className="bg-gray-50 p-2 rounded text-center">
-                        <div className="text-lg font-semibold text-amber-500">8</div>
+                        <div className="text-lg font-semibold text-amber-500">0</div>
                         <div className="text-xs text-gray-500">收藏数</div>
                       </div>
                     </div>
                   </div>
                 </CardContent>
-                <CardFooter className="px-4 py-3 border-t">
-                  <Button variant="outline" className="w-full">
-                    继续上次练习
-                  </Button>
-                </CardFooter>
               </Card>
             </div>
 
             <div className="md:col-span-3">
-              <Tabs defaultValue="all">
+              <Tabs defaultValue="all" onValueChange={handleTabChange}>
                 <TabsList className="mb-4">
                   <TabsTrigger value="all">全部题目</TabsTrigger>
                   <TabsTrigger value="wrong">我的错题</TabsTrigger>
                   <TabsTrigger value="favorite">我的收藏</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="all" className="space-y-4">
-                  {questions
-                    .filter(question => 
-                      selectedQuestionTypes.includes("全部题型") || 
-                      selectedQuestionTypes.includes(question.type)
-                    )
-                    .map((question) => (
-                      <Card key={question.id} className="hover:shadow-md transition-shadow">
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex items-center">
-                              <Badge variant="outline" className="mr-2">
-                                {question.year}
-                              </Badge>
-                              <Badge variant="secondary" className="mr-2">
-                                {question.subject}
-                              </Badge>
-                              <Badge variant="outline">{question.type}</Badge>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              {question.isFavorite && <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />}
-                            </div>
-                          </div>
-                          <p className="text-sm mb-3">{question.content}</p>
-                          <div className="flex items-center justify-end">
-                            <Button size="sm">开始答题</Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-
-                  {questions.some((q) => q.year !== 2024 && q.year !== 2023) && (
-                    <Card className="border-dashed border-2 p-6 text-center">
-                      <div className="flex flex-col items-center justify-center space-y-2">
-                        <Lock className="h-8 w-8 text-muted-foreground mb-2" />
-                        <h3 className="font-medium text-lg">会员专享内容</h3>
-                        <p className="text-sm text-muted-foreground mb-4">升级为会员，解锁全部历年真题</p>
-                        <Button>立即升级</Button>
+                <TabsContent value="all">
+                  {loading ? (
+                    <div className="text-center py-8">加载中...</div>
+                  ) : error ? (
+                    <div className="text-center py-8 text-red-500">{error}</div>
+                  ) : questions.length === 0 ? (
+                    <div className="text-center py-8">未找到符合条件的题目</div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex justify-end mb-6 space-x-4">
+                        {hasLastProgress && (
+                          <Button 
+                            onClick={() => lastQuestionId && router.push(`/question-bank/${lastQuestionId}`)}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            继续上次练习
+                          </Button>
+                        )}
+                        <Button onClick={() => questions.length > 0 && router.push(`/question-bank/${questions[0].id}`)}>
+                          从第一题开始
+                        </Button>
                       </div>
-                    </Card>
+                      
+                      {questions.map((question) => (
+                        <div 
+                          key={question.id}
+                          className="cursor-pointer"
+                          onClick={() => handleQuestionClick(question.id)}
+                        >
+                          <Card className="h-full">
+                        <CardContent className="p-4">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant={question.question_type === "单选题" ? "default" : "secondary"}>
+                                    {question.question_type === "单选题" ? "单选" : "多选"}
+                              </Badge>
+                                  
+                                  {question.subject && (
+                                    <Badge variant="outline">{question.subject}</Badge>
+                                  )}
+                            </div>
+                                
+                                <div className="text-sm text-gray-500">
+                                  {question.question_code || `题号: ${question.id}`}
+                            </div>
+                          </div>
+                              <p className="text-sm">{question.question_text}</p>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      ))}
+
+                      {/* 分页控件增强 */}
+                      <div className="flex justify-between items-center mt-6">
+                        <div className="text-sm text-gray-500">
+                          共 {actualTotalQuestions} 题，每页 {pagination.perPage} 题，当前第 {pagination.currentPage}/{pagination.totalPages} 页
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            disabled={pagination.currentPage <= 1}
+                            onClick={() => setPagination(prev => ({ ...prev, currentPage: 1 }))}
+                          >
+                            首页
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            disabled={pagination.currentPage <= 1}
+                            onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage - 1 }))}
+                          >
+                            上一页
+                          </Button>
+                          
+                          <div className="flex space-x-1">
+                            {(() => {
+                              const maxButtons = 5;
+                              const pages = [];
+                              let startPage = Math.max(1, pagination.currentPage - Math.floor(maxButtons / 2));
+                              let endPage = startPage + maxButtons - 1;
+                              
+                              if (endPage > pagination.totalPages) {
+                                endPage = pagination.totalPages;
+                                startPage = Math.max(1, endPage - maxButtons + 1);
+                              }
+                              
+                              for (let i = startPage; i <= endPage; i++) {
+                                pages.push(
+                                  <Button 
+                                    key={i}
+                                    variant={i === pagination.currentPage ? "default" : "outline"} 
+                                    size="sm"
+                                    className="w-8 h-8 p-0"
+                                    onClick={() => setPagination(prev => ({ ...prev, currentPage: i }))}
+                                  >
+                                    {i}
+                                  </Button>
+                                );
+                              }
+                              
+                              return pages;
+                            })()}
+                          </div>
+                          
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            disabled={pagination.currentPage >= pagination.totalPages}
+                            onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage + 1 }))}
+                          >
+                            下一页
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            disabled={pagination.currentPage >= pagination.totalPages}
+                            onClick={() => setPagination(prev => ({ ...prev, currentPage: pagination.totalPages }))}
+                          >
+                            末页
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </TabsContent>
 
                 <TabsContent value="wrong">
                   <div className="space-y-4">
-                    {questions
-                      .filter((q) => wrongQuestions.includes(q.id))
-                      .filter(question => 
-                        selectedQuestionTypes.includes("全部题型") || 
-                        selectedQuestionTypes.includes(question.type)
-                      )
-                      .map((question) => (
-                        <Card key={question.id} className="hover:shadow-md transition-shadow">
-                          <CardContent className="p-4">
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex items-center">
-                                <Badge variant="outline" className="mr-2">
-                                  {question.year}
+                    {loadingWrongQuestions ? (
+                      <div className="text-center py-8">加载中...</div>
+                    ) : wrongQuestions.length === 0 ? (
+                      <div className="p-10 border rounded-lg text-center">
+                        <h3 className="text-lg font-medium mb-2">错题收集中</h3>
+                        <p className="text-gray-500 mb-4">您需要先做题才能收集错题</p>
+                        <div className="flex justify-center space-x-2">
+                          <Button onClick={() => questions.length > 0 && router.push(`/question-bank/${questions[0].id}`)}>
+                            开始做题
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="font-medium">共收集到 {wrongQuestions.length} 道错题</h3>
+                        </div>
+                        
+                        {wrongQuestions.map((question) => (
+                          <Link 
+                            href={`/question-bank/${question.id}`} 
+                            key={question.id}
+                          >
+                            <div 
+                              className="p-4 border rounded-lg hover:border-primary hover:bg-gray-50 transition-colors cursor-pointer"
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center space-x-2">
+                                  <Badge variant="outline">{question.year}</Badge>
+                                  <Badge variant="secondary">{question.subject}</Badge>
+                                  <Badge>
+                                    {question.question_type === 1 ? "单选题" : "多选题"}
                                 </Badge>
-                                <Badge variant="secondary" className="mr-2">
-                                  {question.subject}
-                                </Badge>
-                                <Badge variant="outline">{question.type}</Badge>
+                                </div>
                               </div>
-                              <div className="flex items-center space-x-1">
-                                {question.isFavorite && <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />}
+                              <p className="text-sm mb-2">{question.question_text}</p>
+                              <div className="text-xs text-red-500">
+                                <span className="font-medium">我的答案:</span> {question.submitted_answer}
+                                <span className="font-medium ml-4">正确答案:</span> {question.correct_answer}
                               </div>
                             </div>
-                            <p className="text-sm mb-3">{question.content}</p>
-                            <div className="flex items-center justify-end">
-                              <Button size="sm">重新练习</Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                          </Link>
+                        ))}
+                      </>
+                    )}
                   </div>
                 </TabsContent>
 
                 <TabsContent value="favorite">
                   <div className="space-y-4">
-                    {questions
-                      .filter((q) => q.isFavorite)
-                      .filter(question => 
-                        selectedQuestionTypes.includes("全部题型") || 
-                        selectedQuestionTypes.includes(question.type)
-                      )
-                      .map((question) => (
-                        <Card key={question.id} className="hover:shadow-md transition-shadow">
-                          <CardContent className="p-4">
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex items-center">
-                                <Badge variant="outline" className="mr-2">
-                                  {question.year}
+                    {loadingFavorites ? (
+                      <div className="text-center py-8">加载中...</div>
+                    ) : favoriteQuestions.length === 0 ? (
+                      <div className="p-10 border rounded-lg text-center">
+                        <h3 className="text-lg font-medium mb-2">收藏夹为空</h3>
+                        <p className="text-gray-500 mb-4">您可以在做题时收藏您认为重要的题目</p>
+                        <div className="flex justify-center space-x-2">
+                          <Button onClick={() => questions.length > 0 && router.push(`/question-bank/${questions[0].id}`)}>
+                            开始做题
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="font-medium">共收藏了 {favoriteQuestions.length} 道题目</h3>
+                          <Button variant="outline" size="sm" onClick={loadFavoriteQuestions}>
+                            刷新收藏
+                          </Button>
+                        </div>
+                        
+                        {favoriteQuestions.map((question) => (
+                          <Link 
+                            href={`/question-bank/${question.id}`} 
+                            key={question.id}
+                          >
+                            <div 
+                              className="p-4 border rounded-lg hover:border-primary hover:bg-gray-50 transition-colors cursor-pointer"
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center space-x-2">
+                                  <Badge variant="outline">{question.year}</Badge>
+                                  <Badge variant="secondary">{question.subject}</Badge>
+                                  <Badge>
+                                    {question.question_type === 1 ? "单选题" : "多选题"}
                                 </Badge>
-                                <Badge variant="secondary" className="mr-2">
-                                  {question.subject}
-                                </Badge>
-                                <Badge variant="outline">{question.type}</Badge>
                               </div>
-                              <div className="flex items-center space-x-1">
                                 <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                               </div>
+                              <p className="text-sm">{question.question_text}</p>
                             </div>
-                            <p className="text-sm mb-3">{question.content}</p>
-                            <div className="flex items-center justify-end">
-                              <Button size="sm">开始答题</Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                          </Link>
+                        ))}
+                      </>
+                    )}
                   </div>
                 </TabsContent>
               </Tabs>

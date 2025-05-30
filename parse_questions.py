@@ -48,10 +48,10 @@ def parse_question(text):
             key = option[0]  # 选项字母A、B、C、D
             value = option[2:].strip()  # 选项内容
             options_dict[key] = value
-    
+               
     # 初始化 correct_answer 变量
     correct_answer = ""
-
+                   
     # 查找答案 - 最直接的方法：找最明确的【答案】标记
     answer_explicit = re.search(r'【答案】\s*([A-D]+)', text)
     if answer_explicit:
@@ -117,9 +117,9 @@ def extract_questions_from_doc(file_path, subject):
         if parsed:
             parsed['subject'] = subject
             parsed_questions.append(parsed)
-    
+       
     return parsed_questions
-
+   
 def save_to_database(questions, db_config):
     """将解析后的题目保存到数据库"""
     conn = mysql.connector.connect(**db_config)
@@ -159,7 +159,7 @@ def save_to_database(questions, db_config):
     conn.commit()
     cursor.close()
     conn.close()
-
+   
     missing_answers = 0
     for question in questions:
         if not question['correct_answer']:
@@ -212,7 +212,6 @@ def main():
         
         print(f"正在将题目保存到数据库...")
         save_to_database(questions, db_config)
-        
     except Exception as e:
         print(f"程序出错: {e}")
 
