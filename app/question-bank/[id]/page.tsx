@@ -11,7 +11,7 @@ import Link from "next/link"
 import { Footer } from "@/components/footer"
 import { QuestionDetail } from "@/components/question-bank/question-detail"
 import { AnswerCard } from "@/components/question-bank/answer-card"
-import { questionApi, addToWrongQuestions, isQuestionFavorited } from "@/lib/api/questions"
+import { questionApi, addToWrongQuestions, isQuestionFavorited, removeFromWrongQuestions } from "@/lib/api/questions"
 
 export default function QuestionPage() {
   const params = useParams()
@@ -43,6 +43,9 @@ export default function QuestionPage() {
   const [totalAllQuestions, setTotalAllQuestions] = useState(25); // 应用级别的总题数
   const [filteredTotalCount, setFilteredTotalCount] = useState(25); // 用于导航面板的筛选后题目总数，确保与filteredQuestions.length同步
   const questionsPerPage = 25; // 导航面板每页显示的题目按钮数量
+  
+  // 添加一个新状态来跟踪当前会话中的答题记录
+  const [sessionAnswers, setSessionAnswers] = useState<Record<string, {isCorrect: boolean}>>({});
   
   // 使用ref避免不必要的重渲染
   const navigationInitializedRef = useRef(false);
@@ -107,7 +110,30 @@ export default function QuestionPage() {
       let questionsToDisplay: {id: number, question_code?: string}[] = [];
       let currentIndex = -1;
 
-      if (filteredData && filteredData.questions && filteredData.questions.length > 0) {
+      // 检测是否来自错题页面
+      const source = searchParams.get('source');
+      const wrongIndex = searchParams.get('wrongIndex');
+      
+      if (source === 'wrong') {
+        // 从错题集加载导航数据
+        console.log('从错题集加载导航数据');
+        const wrongQuestions = JSON.parse(localStorage.getItem('wrongQuestions') || '[]');
+        if (Array.isArray(wrongQuestions) && wrongQuestions.length > 0) {
+          questionsToDisplay = wrongQuestions.map(q => ({
+            id: q.id,
+            question_code: q.question_code || `错题${q.id}`
+          }));
+          
+          // 使用wrongIndex参数或查找当前题目在错题集中的位置
+          if (wrongIndex && !isNaN(parseInt(wrongIndex))) {
+            currentIndex = parseInt(wrongIndex);
+          } else {
+            currentIndex = questionsToDisplay.findIndex(q => q.id === currentId);
+          }
+          
+          console.log(`从错题集加载的导航数据：共${questionsToDisplay.length}题，当前索引：${currentIndex}`);
+        }
+      } else if (filteredData && filteredData.questions && filteredData.questions.length > 0) {
         console.log(`从localStorage加载筛选后的题目列表，共${filteredData.questions.length}题`);
         questionsToDisplay = [...filteredData.questions];
         
@@ -124,8 +150,6 @@ export default function QuestionPage() {
         if (currentIndex === -1) { 
           console.log(`题目ID ${currentId} 不在筛选列表中，尝试添加到列表`);
           questionsToDisplay.push({ id: currentId, question_code: `Q${currentId}` }); // 确保当前题目在列表中
-          // 保持原有筛选顺序，新加入的题目可以放在末尾，或者根据业务逻辑决定排序
-          // 如果需要严格按ID排序： questionsToDisplay.sort((a,b) => a.id - b.id);
           currentIndex = questionsToDisplay.findIndex(q => q.id === currentId); // 重新查找索引
         }
 
@@ -224,7 +248,33 @@ export default function QuestionPage() {
   }, [questionId, initializeNavigation]); // initializeNavigation 现在依赖 totalAllQuestions，所以它会正确地在其更新后运行
 
   const fetchAnswerHistory = async () => {
-    // 如果已知用户未登录，直接使用localStorage
+    // 检查是否来自错题页面
+    const source = searchParams.get('source');
+    const isFromWrongCollection = source === 'wrong';
+    
+    // 如果是从错题页进入，不恢复之前的答案状态，保持新作答状态
+    if (isFromWrongCollection) {
+      console.log("从错题集进入，不恢复之前的答题记录");
+      
+      // 仍然加载整体答题统计数据，但不设置当前题目的答案状态
+      try {
+        const historyString = localStorage.getItem('answerHistory');
+        if (historyString) {
+          const history = JSON.parse(historyString);
+          if (history && history.timestamp && Date.now() - history.timestamp < 86400000) {
+            setAnsweredQuestions(history.answered || {});
+            setCorrectAnswers(history.correct || {});
+            setTotalAnswered(Object.keys(history.answered || {}).length);
+            setTotalCorrect(Object.keys(history.correct || {}).length);
+          }
+        }
+      } catch (e) {
+        console.error("加载答题统计数据失败:", e);
+      }
+      return;
+    }
+    
+    // 原有逻辑：如果已知用户未登录，直接使用localStorage
     if (!isAuthenticated) {
       console.log("用户未登录或会话已过期，直接使用本地存储");
       loadAnswerHistoryFromCache();
@@ -304,7 +354,12 @@ export default function QuestionPage() {
           
           // 检查当前题目是否有本地缓存的答题记录
           const qId = questionId.toString();
-          if (history.results && history.results[qId]) {
+          
+          // 如果来源是错题集，不恢复当前题目的答案状态
+          const source = searchParams.get('source');
+          const isFromWrongCollection = source === 'wrong';
+          
+          if (!isFromWrongCollection && history.results && history.results[qId]) {
             const result = history.results[qId];
             setSelectedAnswer(result.submittedAnswer);
             setSubmittedAnswer(result.submittedAnswer);
@@ -437,6 +492,23 @@ export default function QuestionPage() {
         isCorrect = false;
       }
         
+      // 检查是否来自错题集，且答对了题目
+      const source = searchParams.get('source');
+      const isFromWrongCollection = source === 'wrong';
+      
+      if (isFromWrongCollection && isCorrect) {
+        // 如果是从错题集进入，且答对了，则从错题集中移除该题目
+        try {
+          // 导入removeFromWrongQuestions函数
+          const removed = removeFromWrongQuestions(question.id);
+          if (removed) {
+            console.log(`题目 #${question.id} 已答对，已从错题集中移除`);
+          }
+        } catch (removeErr) {
+          console.error("从错题集移除题目失败:", removeErr);
+        }
+      }
+
       // 更新本地状态
       const newAnsweredQuestions = { ...answeredQuestions, [questionId]: true };
       const newCorrectAnswers = { ...correctAnswers };
@@ -527,6 +599,12 @@ export default function QuestionPage() {
             setTotalAnswered(Object.keys(newAnsweredQuestions).length);
             setTotalCorrect(Object.keys(newCorrectAnswers).length);
             
+            // 更新当前会话中的答题状态
+            setSessionAnswers(prev => ({
+              ...prev,
+              [questionId]: { isCorrect: isAnswerCorrect }
+            }));
+
             // 更新本地存储
             localStorage.setItem('answerHistory', JSON.stringify({
               answered: newAnsweredQuestions,
@@ -570,8 +648,23 @@ export default function QuestionPage() {
         });
         setSubmittedAnswer(selectedAnswer);
         
+        // 检查是否来自错题集，且答对了题目
+        const source = searchParams.get('source');
+        const isFromWrongCollection = source === 'wrong';
+        
+        // 如果是从错题集且答对了，从错题集中移除
+        if (isFromWrongCollection && isCorrect) {
+          try {
+            const removed = removeFromWrongQuestions(question.id);
+            if (removed) {
+              console.log(`本地判断：题目 #${question.id} 已答对，已从错题集中移除`);
+            }
+          } catch (removeErr) {
+            console.error("从错题集移除题目失败:", removeErr);
+          }
+        }
         // 如果本地判断答错，添加到错题集
-        if (!isCorrect) {
+        else if (!isCorrect) {
           addToWrongQuestions({
             id: question.id,
             question_text: question.question_text,
@@ -590,6 +683,12 @@ export default function QuestionPage() {
         setCorrectAnswers(newCorrectAnswers);
         setTotalAnswered(Object.keys(newAnsweredQuestions).length);
         setTotalCorrect(Object.keys(newCorrectAnswers).length);
+        
+        // 更新当前会话中的答题状态
+        setSessionAnswers(prev => ({
+          ...prev,
+          [questionId]: { isCorrect: isCorrect }
+        }));
         
         // 保存到本地存储
         localStorage.setItem('answerHistory', JSON.stringify(localUpdateData));
@@ -641,6 +740,13 @@ export default function QuestionPage() {
         // 更新索引参数
         currentParams.set('index', (currentQuestionIndex + 1).toString());
         
+        // 如果来源是错题集，确保保持source=wrong参数
+        const source = searchParams.get('source');
+        if (source === 'wrong') {
+          currentParams.set('source', 'wrong');
+          currentParams.set('wrongIndex', (currentQuestionIndex + 1).toString());
+        }
+        
         try {
           const nextUrl = `/question-bank/${nextQuestion.id}?${currentParams.toString()}`;
           router.replace(nextUrl);
@@ -670,6 +776,13 @@ export default function QuestionPage() {
       const currentParams = new URLSearchParams(searchParams.toString());
       // 更新索引参数
       currentParams.set('index', (currentQuestionIndex - 1).toString());
+      
+      // 如果来源是错题集，确保保持source=wrong参数
+      const source = searchParams.get('source');
+      if (source === 'wrong') {
+        currentParams.set('source', 'wrong');
+        currentParams.set('wrongIndex', (currentQuestionIndex - 1).toString());
+      }
       
       try {
         const prevUrl = `/question-bank/${prevQuestion.id}?${currentParams.toString()}`;
@@ -860,6 +973,10 @@ export default function QuestionPage() {
     
     console.log(`渲染导航按钮: 页码=${currentNavPage}, 范围=${startIndex}-${endIndex}, 总数=${filteredQuestions.length}`);
     
+    // 获取当前导航来源
+    const source = searchParams.get('source');
+    const isFromWrong = source === 'wrong';
+    
     // 生成要显示的按钮
     const buttons = [];
     
@@ -872,11 +989,21 @@ export default function QuestionPage() {
       
       // 高亮当前题目
       const isCurrentQuestion = q.id === currentId;
+      const qIdStr = q.id.toString();
+      
       if (isCurrentQuestion) {
         buttonStyle = "default";
         extraStyle = "bg-blue-500 text-white font-bold";
-      } else if (answeredQuestions[q.id]) {
-        if (correctAnswers[q.id]) {
+      } else if (isFromWrong && sessionAnswers[qIdStr]) {
+        // 如果是从错题集进入，优先显示当前会话中的答题状态
+        if (sessionAnswers[qIdStr].isCorrect) {
+          extraStyle = "border-green-500 text-green-500";
+        } else {
+          extraStyle = "border-red-500 text-red-500";
+        }
+      } else if (!isFromWrong && answeredQuestions[qIdStr]) {
+        // 其他情况，显示全局答题历史
+        if (correctAnswers[qIdStr]) {
           extraStyle = "border-green-500 text-green-500";
         } else {
           extraStyle = "border-red-500 text-red-500";
@@ -896,6 +1023,13 @@ export default function QuestionPage() {
             // 保留当前URL参数
             const currentParams = new URLSearchParams(searchParams.toString());
             currentParams.set('index', absoluteIndex.toString());
+            
+            // 如果是从错题集进入，保持source=wrong参数
+            if (isFromWrong) {
+              currentParams.set('source', 'wrong');
+              currentParams.set('wrongIndex', absoluteIndex.toString());
+            }
+            
             const url = `/question-bank/${q.id}?${currentParams.toString()}`;
             router.push(url);
           }}
@@ -906,7 +1040,7 @@ export default function QuestionPage() {
     }
     
     return buttons;
-  }, [filteredQuestions, questionId, currentNavPage, answeredQuestions, correctAnswers, searchParams, questionsPerPage, router]);
+  }, [filteredQuestions, questionId, currentNavPage, answeredQuestions, correctAnswers, searchParams, questionsPerPage, router, sessionAnswers]);
 
   // 分页控件
   const paginationControl = useMemo(() => {
@@ -1085,12 +1219,14 @@ export default function QuestionPage() {
               <Card>
                 <CardContent className="p-6">
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-medium">题目导航</h3>
+                    <h3 className="text-lg font-medium">
+                      {searchParams.get('source') === 'wrong' ? '错题导航' : '题目导航'}
+                  </h3>
                     <div className="text-sm">
                       {/* 使用 filteredTotalCount 来计算总页数和显示总题数 */}
                       第{currentNavPage}/{Math.max(1, Math.ceil(filteredTotalCount / questionsPerPage))}页
                       <span className="ml-1 text-xs">({filteredTotalCount}题)</span>
-                    </div>
+                      </div>
                     </div>
 
                   {/* 修改为滚动容器和全部最大高度覆盖的布局 */}

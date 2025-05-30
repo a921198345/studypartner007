@@ -92,7 +92,7 @@ main() {
   # 检查并启动Redis
   check_redis
   # 无论Redis是否启动成功，都继续运行应用
-  start_app
+    start_app
 }
 
 # 执行主流程

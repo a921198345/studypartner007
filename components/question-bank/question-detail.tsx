@@ -225,7 +225,7 @@ export function QuestionDetail({
             `题号: ${question.question_code}` : 
             `题号: ${question.id}`}
         </h2>
-      </div>
+          </div>
       
       <div className="text-base font-medium mb-6">{question.content}</div>
 

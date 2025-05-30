@@ -52,6 +52,7 @@ export default function QuestionBankPage() {
   const [loadingWrongQuestions, setLoadingWrongQuestions] = useState(false)
   const [favoriteQuestions, setFavoriteQuestions] = useState<any[]>([])
   const [loadingFavorites, setLoadingFavorites] = useState(false)
+  const [activeTab, setActiveTab] = useState("all")
 
   const subjects = [
     { id: "all", name: "全部科目" },
@@ -393,36 +394,38 @@ export default function QuestionBankPage() {
     fetchQuestions();
   }, [selectedSubject, selectedYears, selectedQuestionTypes, pagination.currentPage, pagination.perPage]);
 
-  // 加载错题集
+  // 加载错题集函数
+  const loadWrongQuestions = async () => {
+    setLoadingWrongQuestions(true);
+    try {
+      console.log("开始加载错题集...");
+      // 从本地存储获取错题集
+      const wrongQs = getWrongQuestions();
+      console.log("获取到错题集:", wrongQs.length, "题");
+      setWrongQuestions(wrongQs);
+    } catch (error) {
+      console.error("加载错题集失败:", error);
+    } finally {
+      setLoadingWrongQuestions(false);
+    }
+  };
+  
+  // 初始加载错题集
   useEffect(() => {
-    const loadWrongQuestions = async () => {
-      setLoadingWrongQuestions(true);
-      try {
-        console.log("开始加载错题集...");
-        // 从本地存储获取错题集
-        const wrongQs = getWrongQuestions();
-        console.log("获取到错题集:", wrongQs.length, "题");
-        setWrongQuestions(wrongQs);
-      } catch (error) {
-        console.error("加载错题集失败:", error);
-      } finally {
-        setLoadingWrongQuestions(false);
-      }
-    };
-    
     loadWrongQuestions();
   }, []);
 
   // 处理标签切换
   const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    
     if (value === "wrong") {
-      const wrongQs = getWrongQuestions();
-      console.log("切换到错题标签，重新加载错题集:", wrongQs.length, "题");
-      setWrongQuestions(wrongQs);
-    } else if (value === "favorite") {
+      // 每次进入错题标签时都重新加载错题列表
+      loadWrongQuestions();
+    } else if (value === "favorite" && favoriteQuestions.length === 0) {
       loadFavoriteQuestions();
     }
-  };
+  }
 
   // 加载收藏的题目
   const loadFavoriteQuestions = async () => {
@@ -460,7 +463,7 @@ export default function QuestionBankPage() {
         
         // 先从缓存中查找
         if (cachedData) {
-          question = cachedData.find((q: any) => q.id === id);
+          question = cachedData.find((q: any) => q.id === Number(id) || q.id === id);
         }
         
         // 如果缓存没有则单独请求题目数据
@@ -476,8 +479,14 @@ export default function QuestionBankPage() {
         }
         
         if (question) {
+          // 确保数据格式正确，添加默认值
           favQuestions.push({
             ...question,
+            id: question.id || id,
+            year: question.year || '未知年份',
+            subject: question.subject || '未分类',
+            question_type: question.question_type || '未知类型',
+            question_text: question.question_text || '题目内容未加载',
             isFavorite: true
           });
         }
@@ -673,15 +682,11 @@ export default function QuestionBankPage() {
                 <Input
                   type="search"
                   placeholder="搜索题目..."
-                  className="w-[200px] pl-8"
+                  className="w-[350px] pl-8"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
-              <Button variant="outline">
-                <Filter className="h-4 w-4 mr-2" />
-                筛选
-              </Button>
             </div>
           </div>
 
@@ -813,12 +818,51 @@ export default function QuestionBankPage() {
             </div>
 
             <div className="md:col-span-3">
-              <Tabs defaultValue="all" onValueChange={handleTabChange}>
-                <TabsList className="mb-4">
+              <Tabs defaultValue="all" value={activeTab} onValueChange={handleTabChange}>
+                <div className="flex justify-between items-center mb-4">
+                  <TabsList>
                   <TabsTrigger value="all">全部题目</TabsTrigger>
                   <TabsTrigger value="wrong">我的错题</TabsTrigger>
                   <TabsTrigger value="favorite">我的收藏</TabsTrigger>
                 </TabsList>
+
+                  {/* 根据不同标签页显示不同的按钮 */}
+                  {activeTab === "all" && (
+                    <div className="flex space-x-4">
+                      <Button 
+                        onClick={() => lastQuestionId && router.push(`/question-bank/${lastQuestionId}`)}
+                        className={`${hasLastProgress ? "bg-green-600 hover:bg-green-700" : "bg-gray-400 opacity-70 cursor-not-allowed"}`}
+                        disabled={!hasLastProgress}
+                      >
+                        继续练习
+                      </Button>
+                      <Button onClick={() => questions.length > 0 && router.push(`/question-bank/${questions[0].id}`)}>
+                        开始练习
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {activeTab === "wrong" && wrongQuestions.length > 0 && (
+                    <Button onClick={() => wrongQuestions.length > 0 && router.push(`/question-bank/${wrongQuestions[0].id}`)}>
+                      开始练习
+                    </Button>
+                  )}
+                  
+                  {activeTab === "favorite" && favoriteQuestions.length > 0 && (
+                    <div className="flex space-x-4">
+                      <Button 
+                        onClick={() => lastQuestionId && router.push(`/question-bank/${lastQuestionId}`)}
+                        className={`${hasLastProgress ? "bg-green-600 hover:bg-green-700" : "bg-gray-400 opacity-70 cursor-not-allowed"}`}
+                        disabled={!hasLastProgress}
+                      >
+                        继续练习
+                      </Button>
+                      <Button onClick={() => favoriteQuestions.length > 0 && router.push(`/question-bank/${favoriteQuestions[0].id}`)}>
+                        开始练习
+                      </Button>
+                    </div>
+                  )}
+                </div>
 
                 <TabsContent value="all">
                   {loading ? (
@@ -829,18 +873,8 @@ export default function QuestionBankPage() {
                     <div className="text-center py-8">未找到符合条件的题目</div>
                   ) : (
                     <div className="space-y-4">
-                      <div className="flex justify-end mb-6 space-x-4">
-                        {hasLastProgress && (
-                          <Button 
-                            onClick={() => lastQuestionId && router.push(`/question-bank/${lastQuestionId}`)}
-                            className="bg-green-600 hover:bg-green-700"
-                          >
-                            继续上次练习
-                          </Button>
-                        )}
-                        <Button onClick={() => questions.length > 0 && router.push(`/question-bank/${questions[0].id}`)}>
-                          从第一题开始
-                        </Button>
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-medium">共 {actualTotalQuestions} 道题目</h3>
                       </div>
                       
                       {questions.map((question) => (
@@ -858,7 +892,11 @@ export default function QuestionBankPage() {
                               </Badge>
                                   
                                   {question.subject && (
-                                    <Badge variant="outline">{question.subject}</Badge>
+                                    <Badge variant="secondary">{question.subject}</Badge>
+                                  )}
+                                  
+                                  {question.year && (
+                                    <Badge variant="outline">{question.year}</Badge>
                                   )}
                             </div>
                                 
@@ -872,7 +910,7 @@ export default function QuestionBankPage() {
                         </div>
                       ))}
 
-                      {/* 分页控件增强 */}
+                      {/* 分页控件保持不变 */}
                       <div className="flex justify-between items-center mt-6">
                         <div className="text-sm text-gray-500">
                           共 {actualTotalQuestions} 题，每页 {pagination.perPage} 题，当前第 {pagination.currentPage}/{pagination.totalPages} 页
@@ -957,7 +995,7 @@ export default function QuestionBankPage() {
                         <p className="text-gray-500 mb-4">您需要先做题才能收集错题</p>
                         <div className="flex justify-center space-x-2">
                           <Button onClick={() => questions.length > 0 && router.push(`/question-bank/${questions[0].id}`)}>
-                            开始做题
+                            开始练习
                           </Button>
                         </div>
                       </div>
@@ -969,7 +1007,7 @@ export default function QuestionBankPage() {
                         
                         {wrongQuestions.map((question) => (
                           <Link 
-                            href={`/question-bank/${question.id}`} 
+                            href={`/question-bank/${question.id}?source=wrong&wrongIndex=${wrongQuestions.findIndex(q => q.id === question.id)}`} 
                             key={question.id}
                           >
                             <div 
@@ -982,13 +1020,9 @@ export default function QuestionBankPage() {
                                   <Badge>
                                     {question.question_type === 1 ? "单选题" : "多选题"}
                                 </Badge>
-                                </div>
+                              </div>
                               </div>
                               <p className="text-sm mb-2">{question.question_text}</p>
-                              <div className="text-xs text-red-500">
-                                <span className="font-medium">我的答案:</span> {question.submitted_answer}
-                                <span className="font-medium ml-4">正确答案:</span> {question.correct_answer}
-                              </div>
                             </div>
                           </Link>
                         ))}
@@ -1007,7 +1041,7 @@ export default function QuestionBankPage() {
                         <p className="text-gray-500 mb-4">您可以在做题时收藏您认为重要的题目</p>
                         <div className="flex justify-center space-x-2">
                           <Button onClick={() => questions.length > 0 && router.push(`/question-bank/${questions[0].id}`)}>
-                            开始做题
+                            开始练习
                           </Button>
                         </div>
                       </div>
@@ -1015,9 +1049,6 @@ export default function QuestionBankPage() {
                       <>
                         <div className="flex justify-between items-center mb-4">
                           <h3 className="font-medium">共收藏了 {favoriteQuestions.length} 道题目</h3>
-                          <Button variant="outline" size="sm" onClick={loadFavoriteQuestions}>
-                            刷新收藏
-                          </Button>
                         </div>
                         
                         {favoriteQuestions.map((question) => (
@@ -1030,15 +1061,21 @@ export default function QuestionBankPage() {
                             >
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center space-x-2">
-                                  <Badge variant="outline">{question.year}</Badge>
-                                  <Badge variant="secondary">{question.subject}</Badge>
+                                  <Badge variant="outline">
+                                    {typeof question.year === 'string' ? question.year : '未知年份'}
+                                  </Badge>
+                                  <Badge variant="secondary">
+                                    {typeof question.subject === 'string' ? question.subject : '未分类'}
+                                </Badge>
                                   <Badge>
-                                    {question.question_type === 1 ? "单选题" : "多选题"}
+                                    {question.question_type === 1 || question.question_type === '单选题' ? 
+                                      "单选题" : (question.question_type === 2 || question.question_type === '多选题' ? 
+                                        "多选题" : "未知类型")}
                                 </Badge>
                               </div>
                                 <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                               </div>
-                              <p className="text-sm">{question.question_text}</p>
+                              <p className="text-sm">{question.question_text || '题目内容未加载'}</p>
                             </div>
                           </Link>
                         ))}

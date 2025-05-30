@@ -153,56 +153,56 @@ export async function GET(request) {
         return NextResponse.json(response);
       } else {
         // 正常分页查询
-        const dataQuery = `
-          SELECT 
-            id, 
-            question_code,
-            subject, 
-            year, 
+    const dataQuery = `
+      SELECT 
+        id, 
+        question_code,
+        subject, 
+        year, 
             question_type,
-            question_text, 
-            options_json 
-          FROM questions 
-          ${whereClause} 
-          ORDER BY id 
-          LIMIT ? OFFSET ?
-        `;
+        question_text, 
+        options_json 
+      FROM questions 
+      ${whereClause} 
+      ORDER BY id 
+      LIMIT ? OFFSET ?
+    `;
         
         console.log('执行SQL查询:', dataQuery);
         console.log('参数:', [...params, limit, offset]);
-        
-        // 添加分页参数
+    
+    // 添加分页参数
         const queryParams = [...params, limit, offset];
         const [questions] = await connection.execute(dataQuery, queryParams);
-      
+    
         console.log(`查询到 ${questions.length} 条记录，共 ${total} 条记录`);
-      
-        // 构建响应数据
-        const response = {
-          success: true,
-          message: "获取题目成功",
-          data: {
-            questions: questions.map(q => ({
-              id: q.id,
-              question_code: q.question_code,
-              subject: q.subject,
-              year: q.year,
+    
+    // 构建响应数据
+    const response = {
+      success: true,
+      message: "获取题目成功",
+      data: {
+        questions: questions.map(q => ({
+          id: q.id,
+          question_code: q.question_code,
+          subject: q.subject,
+          year: q.year,
               question_type: q.question_type,
-              question_text: q.question_text,
+          question_text: q.question_text,
               options: typeof q.options_json === 'string' 
                 ? JSON.parse(q.options_json) 
                 : q.options_json
-            })),
-            pagination: {
-              total,
-              totalPages,
-              currentPage: page,
-              perPage: limit
-            }
-          }
-        };
-      
-        // 返回响应
+        })),
+        pagination: {
+          total,
+          totalPages,
+          currentPage: page,
+          perPage: limit
+        }
+      }
+    };
+    
+    // 返回响应
         return NextResponse.json(response);
       }
     } finally {

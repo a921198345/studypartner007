@@ -1,11 +1,11 @@
-import re
-import json
-import sys
-import os
-import mysql.connector
-from datetime import datetime
-from docx import Document
-
+   import re
+   import json
+   import sys
+   import os
+   import mysql.connector
+   from datetime import datetime
+   from docx import Document
+   
 def parse_question(text):
     """解析单个题目文本，提取题号、题干、选项、答案和解析"""
     # 正则表达式匹配题号
@@ -79,13 +79,13 @@ def parse_question(text):
         last_paragraph = analysis.split('\n')[-1].strip()
         # 查找单个字母形式的答案（通常在最后一段）
         answer_match = re.search(r'[^A-D]([A-D])[^A-D]', last_paragraph)
-        if answer_match:
+                   if answer_match:
             correct_answer = answer_match.group(1)
 
     # 根据答案长度判断题型 (现在 correct_answer 一定有值)
     if correct_answer and len(correct_answer) > 1:
         question_type = 2  # 多选
-    else:
+                       else:
         question_type = 1  # 单选
     
     return {
@@ -122,9 +122,9 @@ def extract_questions_from_doc(file_path, subject):
    
 def save_to_database(questions, db_config):
     """将解析后的题目保存到数据库"""
-    conn = mysql.connector.connect(**db_config)
-    cursor = conn.cursor()
-    
+           conn = mysql.connector.connect(**db_config)
+           cursor = conn.cursor()
+           
     for question in questions:
         # 检查是否已存在该题目
         cursor.execute(
@@ -138,14 +138,14 @@ def save_to_database(questions, db_config):
                 UPDATE questions
                 SET subject = %s, year = %s, question_text = %s, options_json = %s,
                     correct_answer = %s, explanation_text = %s, question_type = %s
-                WHERE question_code = %s
+           WHERE question_code = %s
             """, (
                 question['subject'], question['year'], question['question_text'],
                 question['options'], question['correct_answer'], question['analysis'],
                 question['question_type'], question['question_id']
-            ))
-        else:
-            # 插入新题目
+                   ))
+               else:
+                   # 插入新题目
             cursor.execute("""
                 INSERT INTO questions
                 (question_code, subject, year, question_text, options_json, correct_answer, explanation_text, question_type)
@@ -154,11 +154,11 @@ def save_to_database(questions, db_config):
                 question['question_id'], question['subject'], question['year'],
                 question['question_text'], question['options'], question['correct_answer'],
                 question['analysis'], question['question_type']
-            ))
-    
-    conn.commit()
-    cursor.close()
-    conn.close()
+                   ))
+           
+           conn.commit()
+               cursor.close()
+               conn.close()
    
     missing_answers = 0
     for question in questions:
@@ -182,38 +182,38 @@ def apply_manual_answers(questions):
             q['correct_answer'] = manual_answers[q['question_id']]
     
     return questions
-
-def main():
-    if len(sys.argv) < 3:
-        print("用法: python parse_exam_questions.py <Word文件路径> <学科名称>")
-        print("例如: python parse_exam_questions.py 民法.docx 民法")
-        return
-    
-    file_path = sys.argv[1]
-    subject = sys.argv[2]
-    
-    if not os.path.exists(file_path):
-        print(f"错误: 文件 '{file_path}' 不存在")
-        return
-    
-    # 数据库配置
-    db_config = {
+   
+   def main():
+       if len(sys.argv) < 3:
+           print("用法: python parse_exam_questions.py <Word文件路径> <学科名称>")
+           print("例如: python parse_exam_questions.py 民法.docx 民法")
+           return
+       
+       file_path = sys.argv[1]
+       subject = sys.argv[2]
+       
+       if not os.path.exists(file_path):
+           print(f"错误: 文件 '{file_path}' 不存在")
+           return
+       
+       # 数据库配置
+       db_config = {
         'host': '8.141.4.192',  # 或者宝塔面板中的数据库地址
         'user': 'law_user',  # 替换为你的数据库用户名
         'password': 'Accd0726351x.',  # 替换为你的数据库密码
-        'database': 'law_exam_assistant'  # 替换为你的数据库名
-    }
-    
-    try:
-        print(f"正在解析文件: {file_path}...")
+           'database': 'law_exam_assistant'  # 替换为你的数据库名
+       }
+       
+       try:
+           print(f"正在解析文件: {file_path}...")
         questions = extract_questions_from_doc(file_path, subject)
         questions = apply_manual_answers(questions)  # 应用手动规则
-        print(f"共解析出 {len(questions)} 个题目")
-        
-        print(f"正在将题目保存到数据库...")
+           print(f"共解析出 {len(questions)} 个题目")
+           
+           print(f"正在将题目保存到数据库...")
         save_to_database(questions, db_config)
-    except Exception as e:
-        print(f"程序出错: {e}")
-
-if __name__ == "__main__":
-    main()
+       except Exception as e:
+           print(f"程序出错: {e}")
+   
+   if __name__ == "__main__":
+       main()

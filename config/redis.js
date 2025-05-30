@@ -69,24 +69,24 @@ let isUsingMock = false;
 try {
   redisClient = createClient(config);
 
-  // 连接事件
+// 连接事件
   redisClient.on('error', (err) => {
     console.log('Redis连接错误', err);
   });
-  redisClient.on('connect', () => console.log('Redis已连接'));
-  redisClient.on('reconnecting', () => console.log('Redis重新连接中...'));
-  redisClient.on('ready', () => console.log('Redis准备就绪!'));
+redisClient.on('connect', () => console.log('Redis已连接'));
+redisClient.on('reconnecting', () => console.log('Redis重新连接中...'));
+redisClient.on('ready', () => console.log('Redis准备就绪!'));
 
-  // 连接Redis
-  (async () => {
+// 连接Redis
+(async () => {
     try {
-      await redisClient.connect();
+  await redisClient.connect();
     } catch (err) {
       console.log('⚠️ Redis连接失败，切换到内存模拟模式:', err.message);
       isUsingMock = true;
       redisClient = new MockRedisClient();
     }
-  })();
+})();
 } catch (err) {
   console.log('⚠️ Redis初始化失败，使用内存模拟模式:', err.message);
   isUsingMock = true;
