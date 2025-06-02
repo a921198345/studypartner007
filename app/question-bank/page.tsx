@@ -467,74 +467,62 @@ export default function QuestionBankPage() {
   const loadFavoriteQuestions = async () => {
     setLoadingFavorites(true);
     try {
-      // 获取所有收藏的题目ID
-      const favoriteIds = getFavoriteQuestions();
-      console.log("收藏题目IDs:", favoriteIds);
+      console.log("开始加载收藏题目列表");
       
-      if (favoriteIds.length === 0) {
+      // 使用新的API方法获取收藏题目（带完整详情）
+      const result = await questionApi.getFavorites(true);
+      
+      if (result.success && result.data.favorites) {
+        console.log("成功获取收藏题目:", result.data.favorites.length, "题");
+        console.log("数据来源:", result.source || "API");
+        
+        // 格式化题目数据，确保字段完整
+        const formattedFavorites = result.data.favorites.map(question => ({
+          ...question,
+          id: question.id,
+          question_code: question.question_code || `题目${question.id}`,
+          year: question.year || '未知年份',
+          subject: question.subject || '未分类',
+          question_type: question.question_type || 1, // 默认单选
+          question_text: question.question_text || '题目内容未加载',
+          is_favorite: true
+        }));
+        
+        setFavoriteQuestions(formattedFavorites);
+        
+        // 保存收藏题目列表到localStorage（用于题目导航）
+        saveFavoriteListToLocalStorage(formattedFavorites);
+      } else {
+        console.error("获取收藏题目失败或列表为空:", result);
         setFavoriteQuestions([]);
-        return;
       }
-      
-      // 收集收藏题目数据
-      const favQuestions = [];
-      
-      // 从本地缓存优先加载题目信息
-      const cachedQuestionsStr = localStorage.getItem('cachedQuestions');
-      let cachedData = null;
-      if (cachedQuestionsStr) {
-        try {
-          const parsed = JSON.parse(cachedQuestionsStr);
-          if (parsed && parsed.data && parsed.data.data && parsed.data.data.questions) {
-            cachedData = parsed.data.data.questions;
-          }
-        } catch (e) {
-          console.error("解析缓存题目数据失败:", e);
-        }
-      }
-      
-      // 整理收藏题目数据
-      for (const id of favoriteIds) {
-        let question = null;
-        
-        // 先从缓存中查找
-        if (cachedData) {
-          question = cachedData.find((q: any) => q.id === Number(id) || q.id === id);
-        }
-        
-        // 如果缓存没有则单独请求题目数据
-        if (!question) {
-          try {
-            const result = await questionApi.getQuestionById(id);
-            if (result.success && result.data) {
-              question = result.data;
-            }
-          } catch (error) {
-            console.error(`获取收藏题目 #${id} 数据失败:`, error);
-          }
-        }
-        
-        if (question) {
-          // 确保数据格式正确，添加默认值
-          favQuestions.push({
-            ...question,
-            id: question.id || id,
-            year: question.year || '未知年份',
-            subject: question.subject || '未分类',
-            question_type: question.question_type || '未知类型',
-            question_text: question.question_text || '题目内容未加载',
-            isFavorite: true
-          });
-        }
-      }
-      
-      console.log("加载到的收藏题目:", favQuestions.length, "题");
-      setFavoriteQuestions(favQuestions);
-      
     } catch (error) {
       console.error("加载收藏题目失败:", error);
+      setFavoriteQuestions([]);
     } finally {
       setLoadingFavorites(false);
+    }
+  };
+  
+  // 保存收藏题目列表到本地存储
+  const saveFavoriteListToLocalStorage = (questions) => {
+    try {
+      // 提取导航所需的基本信息，避免保存完整题目内容
+      const favoritesList = {
+        questions: questions.map(q => ({
+          id: q.id,
+          question_code: q.question_code || `题目${q.id}`,
+          year: q.year || '未知年份',
+          subject: q.subject || '未分类',
+          question_type: q.question_type || 1
+        })),
+        total: questions.length,
+        timestamp: Date.now(),
+        source: "favorites"
+      };
+      localStorage.setItem('favoriteQuestionsList', JSON.stringify(favoritesList));
+    } catch (e) {
+      console.error("保存收藏题目列表到本地存储失败:", e);
     }
   };
   

@@ -15,6 +15,90 @@ import { questionApi, addToWrongQuestions, isQuestionFavorited } from "@/lib/api
 import { CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 
+// 获取当前页面模式（普通、错题、收藏）
+const getCurrentPageMode = (searchParams) => {
+  const source = searchParams?.get('source');
+  
+  if (source === 'wrong-questions') {
+    return 'wrong';
+  } else if (source === 'favorites') {
+    return 'favorites';
+  } else {
+    return 'normal';
+  }
+};
+
+// 根据不同模式返回对应的localStorage键名
+const getStorageKeyForMode = (mode) => {
+  switch(mode) {
+    case 'wrong':
+      return 'wrongAnswerHistory';
+    case 'favorites':
+      return 'favoriteAnswerHistory';
+    default:
+      return 'answerHistory';
+  }
+};
+
+// 获取当前模式的答题历史
+const getAnswerHistoryForMode = (mode) => {
+  try {
+    const storageKey = getStorageKeyForMode(mode);
+    const historyString = localStorage.getItem(storageKey);
+    if (historyString) {
+      const history = JSON.parse(historyString);
+      if (history && history.timestamp && Date.now() - history.timestamp < 86400000) {
+        return history;
+      }
+    }
+  } catch (e) {
+    console.error(`获取${mode}模式答题历史失败:`, e);
+  }
+  // 返回空的历史记录结构
+  return { answered: {}, correct: {}, results: {}, timestamp: Date.now() };
+};
+
+// 保存当前模式的答题历史
+const saveAnswerHistoryForMode = (mode, historyData) => {
+  try {
+    const storageKey = getStorageKeyForMode(mode);
+    localStorage.setItem(storageKey, JSON.stringify({
+      ...historyData,
+      timestamp: Date.now()
+    }));
+    console.log(`保存${mode}模式答题历史成功`);
+  } catch (e) {
+    console.error(`保存${mode}模式答题历史失败:`, e);
+  }
+};
+
+// 清除特定模式的答题状态
+const clearModeAnswerState = (mode, questionId = null) => {
+  try {
+    // 如果提供了questionId，则只清除该题的状态
+    if (questionId) {
+      const history = getAnswerHistoryForMode(mode);
+      if (history.answered && history.answered[questionId]) {
+        delete history.answered[questionId];
+      }
+      if (history.correct && history.correct[questionId]) {
+        delete history.correct[questionId];
+      }
+      if (history.results && history.results[questionId]) {
+        delete history.results[questionId];
+      }
+      saveAnswerHistoryForMode(mode, history);
+      console.log(`已清除${mode}模式题目#${questionId}的答题状态`);
+    } else {
+      // 如果未提供questionId，则清除整个模式的状态
+      saveAnswerHistoryForMode(mode, { answered: {}, correct: {}, results: {}, timestamp: Date.now() });
+      console.log(`已清除${mode}模式的所有答题状态`);
+    }
+  } catch (e) {
+    console.error(`清除${mode}模式答题状态失败:`, e);
+  }
+};
+
 export default function QuestionPage() {
   const params = useParams()
   const router = useRouter()
@@ -315,215 +399,86 @@ export default function QuestionPage() {
   }, [questionId, initializeNavigation]); // initializeNavigation 现在依赖 totalAllQuestions，所以它会正确地在其更新后运行
 
   const fetchAnswerHistory = async () => {
-    // 检查是否来自错题页面或收藏页面
-    const source = searchParams.get('source');
-    const isFromWrongCollection = source === 'wrong';
-    const isFromFavorites = source === 'favorites';
-    const resetWrong = searchParams.get('resetWrong') === 'true';
-    // 修改：对于收藏模式，默认都是新开始，除非明确标记为continue=true
-    const isContinue = searchParams.get('continue') === 'true';
-    
-    console.log('[DEBUG] fetchAnswerHistory开始执行', {
-      source,
-      isFromWrongCollection,
-      isFromFavorites,
-      resetWrong,
-      isContinue,
+    // 获取当前页面的模式
+    const currentMode = getCurrentPageMode(searchParams);
+    console.log(`[DEBUG] fetchAnswerHistory开始执行，当前模式: ${currentMode}`, {
       questionId,
       currentSessionAnswers: sessionAnswers
     });
     
-    // 如果是从错题页进入，保持未答状态
-    if (isFromWrongCollection) {
-      console.log("[DEBUG] 从错题集进入，不恢复之前的答题记录，保持未答状态");
-      
+    // 是否需要重置当前题目状态 - 根据查询参数决定
+    const isContinue = searchParams.get('continue') === 'true';
+    const shouldResetState = !isContinue;
+    
+    if (shouldResetState) {
+      console.log(`[DEBUG] ${currentMode}模式，重置当前题目状态为未答状态`);
       // 清空当前题目的答题状态
       setSelectedAnswer("");
       setSubmittedAnswer(null);
       setAnswerResult(null);
+    }
+    
+    // 加载当前模式的答题历史
+    const historyKey = getStorageKeyForMode(currentMode);
+    console.log(`[DEBUG] 加载${currentMode}模式的答题历史，使用键: ${historyKey}`);
+    
+    try {
+      // 读取本地存储中的答题历史
+      const historyString = localStorage.getItem(historyKey);
       
-      console.log('[DEBUG] 已清空当前题目状态');
-      
-      // 仍然加载整体答题统计数据，但不设置当前题目的答案状态
-      try {
-        const historyString = localStorage.getItem('answerHistory');
-        if (historyString) {
+      if (historyString) {
+        try {
           const history = JSON.parse(historyString);
+          
+          // 检查历史记录是否有效且未过期
           if (history && history.timestamp && Date.now() - history.timestamp < 86400000) {
-            console.log('[DEBUG] 从localStorage加载答题历史', {
-              totalAnswered: Object.keys(history.answered || {}).length,
-              totalCorrect: Object.keys(history.correct || {}).length,
-              hasCurrentQuestion: history.answered && history.answered[questionId]
-            });
-            
+            // 使用历史数据更新状态
             setAnsweredQuestions(history.answered || {});
             setCorrectAnswers(history.correct || {});
             setTotalAnswered(Object.keys(history.answered || {}).length);
             setTotalCorrect(Object.keys(history.correct || {}).length);
-          }
-        }
-      } catch (e) {
-        console.error("[DEBUG] 加载答题统计数据失败:", e);
-      }
-      return;
-    }
-    
-    // 收藏模式的处理
-    if (isFromFavorites) {
-      // 只有明确标记为"继续练习"才恢复答题状态，否则都重置为未作答
-      if (isContinue) {
-        // "继续练习收藏" - 应恢复之前的答题记录
-        console.log("[DEBUG] 继续练习收藏：恢复之前的答题记录");
-        // 继续执行正常的历史记录恢复流程
-      } else {
-        // "开始练习收藏"或直接点击题目 - 保持所有题目为未作答状态
-        console.log("[DEBUG] 收藏模式：重置所有收藏题目为未作答状态");
-        
-        // 清空当前题目的答题状态
-        setSelectedAnswer("");
-        setSubmittedAnswer(null);
-        setAnswerResult(null);
-        
-        // 仍然加载整体答题统计数据
-        try {
-          const historyString = localStorage.getItem('answerHistory');
-          if (historyString) {
-            const history = JSON.parse(historyString);
-            if (history && history.timestamp && Date.now() - history.timestamp < 86400000) {
-              // 只设置全局统计数据，不设置具体题目状态
-              setAnsweredQuestions(history.answered || {});
-              setCorrectAnswers(history.correct || {});
-              setTotalAnswered(Object.keys(history.answered || {}).length);
-              setTotalCorrect(Object.keys(history.correct || {}).length);
+            
+            // 如果没有重置状态，且有当前题目的答题记录，恢复答题状态
+            if (!shouldResetState && history.results && history.results[questionId]) {
+              const questionResult = history.results[questionId];
+              console.log(`[DEBUG] 恢复题目 #${questionId} 的答题状态:`, questionResult);
+              
+              setSubmittedAnswer(questionResult.submittedAnswer);
+              setAnswerResult({
+                is_correct: questionResult.isCorrect,
+                correct_answer: questionResult.correctAnswer,
+                explanation: questionResult.explanation || "暂无解析"
+              });
+              
+              // 更新当前会话状态
+              setSessionAnswers(prev => ({
+                ...prev,
+                [questionId]: {
+                  submitted: questionResult.submittedAnswer,
+                  correct: questionResult.correctAnswer,
+                  isCorrect: questionResult.isCorrect
+                }
+              }));
             }
+            
+            console.log(`[DEBUG] 成功加载${currentMode}模式答题历史`);
+            return;
           }
         } catch (e) {
-          console.error("[DEBUG] 加载答题统计数据失败:", e);
+          console.error(`[DEBUG] 解析${currentMode}模式答题历史失败:`, e);
         }
-        return;
       }
-    }
-    
-    // 原有逻辑：如果已知用户未登录，直接使用localStorage
-    if (!isAuthenticated) {
-      console.log("用户未登录或会话已过期，直接使用本地存储");
-      loadAnswerHistoryFromCache();
-      return;
-    }
-
-    try {
-      // 尝试从服务器获取答题历史
-      try {
-        const historyResponse = await questionApi.getAnswerHistory();
-        
-        if (historyResponse.success) {
-          // 设置服务器返回的答题状态
-          setAnsweredQuestions(historyResponse.data.answered);
-          setCorrectAnswers(historyResponse.data.correct);
-          setTotalAnswered(historyResponse.data.totalAnswered);
-          setTotalCorrect(historyResponse.data.totalCorrect);
-          
-          // 同时更新本地存储，用于提高页面间切换的体验
-          localStorage.setItem('answerHistory', JSON.stringify({
-            answered: historyResponse.data.answered,
-            correct: historyResponse.data.correct,
-            results: historyResponse.data.results,
-            timestamp: Date.now()
-          }));
-          
-          // 如果当前题目已作答，恢复其状态
-          const qId = questionId.toString();
-          if (historyResponse.data.answered[qId] && historyResponse.data.results[qId]) {
-            const result = historyResponse.data.results[qId];
-            setSelectedAnswer(result.submittedAnswer);
-            setSubmittedAnswer(result.submittedAnswer);
-            setAnswerResult({
-              is_correct: result.isCorrect,
-              correct_answer: result.correctAnswer,
-              explanation: result.explanation || "暂无解析"
-            });
-          }
-        } else {
-          // API请求失败，尝试从localStorage加载
-          console.log("服务器响应成功但未返回数据，尝试从本地存储加载");
-          loadAnswerHistoryFromCache();
-        }
-      } catch (error) {
-        // 检查是否为401错误
-        const is401Error = error.message && (error.message.includes('401') || error.message.includes('Unauthorized'));
-        if (is401Error) {
-          console.log("用户未登录或会话已过期，使用本地存储模式");
-          setIsAuthenticated(false);
-          setUsingLocalStorage(true);
-        } else {
-          console.error("获取答题历史失败:", error);
-        }
-        // 错误处理 - 从本地加载
-        loadAnswerHistoryFromCache();
-      }
+      
+      // 如果没有有效历史记录，则初始化为空状态
+      console.log(`[DEBUG] ${currentMode}模式无有效答题历史，初始化为空状态`);
+      setAnsweredQuestions({});
+      setCorrectAnswers({});
+      setTotalAnswered(0);
+      setTotalCorrect(0);
+      
     } catch (error) {
-      console.error("加载答题历史主函数失败:", error);
-      // 即使主函数出错，也能继续运行
-      loadAnswerHistoryFromCache();
-    }
-  };
-
-  // 从本地缓存加载答题历史作为后备
-  const loadAnswerHistoryFromCache = () => {
-    try {
-      const historyString = localStorage.getItem('answerHistory');
-      if (historyString) {
-        const history = JSON.parse(historyString);
-        
-        // 仅使用不超过1天的缓存
-        if (history.timestamp && Date.now() - history.timestamp < 86400000) {
-          setAnsweredQuestions(history.answered || {});
-          setCorrectAnswers(history.correct || {});
-          setTotalAnswered(Object.keys(history.answered || {}).length);
-          setTotalCorrect(Object.keys(history.correct || {}).length);
-          
-          // 检查当前题目是否有本地缓存的答题记录
-          const qId = questionId.toString();
-          
-          // 检查是否来自错题集或收藏，以及是否是继续练习
-          const source = searchParams.get('source');
-          const isFromWrongCollection = source === 'wrong';
-          const isFromFavorites = source === 'favorites';
-          const resetWrong = searchParams.get('resetWrong') === 'true';
-          const isContinue = searchParams.get('continue') === 'true';
-          
-          // 如果来源是错题集，不恢复当前题目的答案状态
-          if (isFromWrongCollection) {
-            console.log("从错题集进入，不恢复缓存的答题记录，保持未答状态");
-            setSelectedAnswer("");
-            setSubmittedAnswer(null);
-            setAnswerResult(null);
-          }
-          // 如果是收藏模式但不是继续练习，不恢复答题状态
-          else if (isFromFavorites && !isContinue) {
-            console.log("收藏模式(非继续练习)，不恢复缓存的答题记录，保持未答状态");
-            setSelectedAnswer("");
-            setSubmittedAnswer(null);
-            setAnswerResult(null);
-          }
-          // 如果是继续收藏练习或正常模式，恢复答题状态
-          else if (history.results && history.results[qId]) {
-            // 正常模式或继续收藏模式：恢复缓存的答题状态
-            console.log(`恢复题目 #${qId} 的缓存答题状态，模式: ${isFromFavorites && isContinue ? '继续收藏' : '正常'}`);
-            const result = history.results[qId];
-            setSelectedAnswer(result.submittedAnswer);
-            setSubmittedAnswer(result.submittedAnswer);
-            setAnswerResult({
-              is_correct: result.isCorrect,
-              correct_answer: result.correctAnswer,
-              explanation: result.explanation || "暂无解析"
-            });
-          }
-        }
-      }
-    } catch (e) {
-      console.error("加载缓存答题历史失败:", e);
-      // 即使本地存储访问失败，也不影响应用核心功能
+      console.error(`[DEBUG] 获取${currentMode}模式答题历史失败:`, error);
+      setError(`加载答题历史失败: ${error.message}`);
     }
   };
 
@@ -575,12 +530,26 @@ export default function QuestionPage() {
         });
         
         // 确保answer字段为正确格式
-        let processedAnswer = data.data.answer;
+        let processedAnswer = data.data.correct_answer || data.data.answer;
+        
+        // 如果API没有返回答案数据，设置错误状态而不是默认值
         if (processedAnswer === undefined || processedAnswer === null) {
-          // 如果答案为空，尝试设置默认答案
-          processedAnswer = ['A'];
-          console.warn(`题目 #${questionId} 没有答案数据，使用默认答案`);
-        } else if (typeof processedAnswer === 'string') {
+          console.error(`题目 #${questionId} 没有答案数据，无法进行答题`);
+          setError(`题目数据不完整，缺少正确答案信息`);
+          
+          // 仍然加载题目其他数据，但不设置答案字段
+          setQuestion({
+            ...data.data,
+            options: processedOptions,
+            // 不设置answer字段，确保不会有默认的'A'
+            analysis: data.data.explanation || data.data.analysis || "暂无解析"
+          });
+          setLoading(false);
+          return;
+        }
+        
+        // 正常情况下处理答案格式
+        if (typeof processedAnswer === 'string') {
           // 如果答案是字符串，转换为数组
           processedAnswer = processedAnswer.split('');
         } else if (!Array.isArray(processedAnswer)) {
@@ -589,7 +558,7 @@ export default function QuestionPage() {
         }
         
         // 确保解析文本存在
-        const processedAnalysis = data.data.analysis || "暂无解析";
+        const processedAnalysis = data.data.explanation || data.data.analysis || "暂无解析";
         
         setQuestion({
           ...data.data,
@@ -600,10 +569,9 @@ export default function QuestionPage() {
         setIsFavorite(data.data.is_favorite);
 
         // 检查是否从错题集进入并进行额外处理
-        const source = searchParams.get('source');
-        const isFromWrongCollection = source === 'wrong';
+        const currentMode = getCurrentPageMode(searchParams);
         
-        if (isFromWrongCollection) {
+        if (currentMode === 'wrong') {
           console.log(`从错题集进入题目 #${questionId}，检查错题数据`);
           try {
             // 从错题集获取题目的详细信息
@@ -657,10 +625,9 @@ export default function QuestionPage() {
       
       // 降级策略：尝试从错题集加载数据
       try {
-        const source = searchParams.get('source');
-        const isFromWrongCollection = source === 'wrong';
+        const currentMode = getCurrentPageMode(searchParams);
         
-        if (isFromWrongCollection) {
+        if (currentMode === 'wrong') {
           console.log(`API获取题目失败，尝试从错题集直接加载题目 #${questionId}`);
           const wrongQuestionsStr = localStorage.getItem('wrongQuestions');
           if (wrongQuestionsStr) {
@@ -669,6 +636,14 @@ export default function QuestionPage() {
             
             if (wrongQuestion) {
               console.log(`成功从错题集找到题目数据:`, wrongQuestion);
+              
+              // 确保有正确答案数据
+              if (!wrongQuestion.correct_answer) {
+                console.error(`错题集中的题目 #${questionId} 没有正确答案数据`);
+                setError("错题集中的题目数据不完整，缺少正确答案");
+                setLoading(false);
+                return;
+              }
               
               // 创建一个基本题目对象
               setQuestion({
@@ -717,340 +692,130 @@ export default function QuestionPage() {
 
     setSubmitting(true);
     try {
+      // 获取当前页面模式
+      const currentMode = getCurrentPageMode(searchParams);
+      console.log(`提交答案 - 当前模式: ${currentMode}`);
+      
       // 安全获取和格式化答案
       const formattedAnswer = Array.isArray(selectedAnswer) 
         ? [...selectedAnswer].sort().join('') 
         : selectedAnswer;
 
-      // 安全判断答案是否正确
-      let isCorrect = false;
-      let correctAnswer = "";
+      // 提交答案到服务器
+      const result = await questionApi.submitAnswer(questionId, formattedAnswer);
+      console.log('提交答案结果:', result);
       
-      if (question && question.answer !== undefined) {
-        // 根据答案类型安全处理
-        if (Array.isArray(question.answer)) {
-          correctAnswer = [...question.answer].sort().join('');
-          isCorrect = Array.isArray(selectedAnswer) && 
-                     selectedAnswer.length === question.answer.length && 
-                     [...selectedAnswer].sort().join('') === correctAnswer;
-        } else if (typeof question.answer === 'string') {
-          correctAnswer = question.answer;
-          isCorrect = Array.isArray(selectedAnswer) 
-                     ? selectedAnswer[0] === correctAnswer 
-                     : selectedAnswer === correctAnswer;
-        } else {
-          correctAnswer = String(question.answer);
-          isCorrect = Array.isArray(selectedAnswer) 
-                     ? selectedAnswer[0] === correctAnswer 
-                     : selectedAnswer === correctAnswer;
-        }
-      } else {
-        console.warn("题目答案未定义，无法准确判断正确性");
-        // 默认设为错误
-        correctAnswer = "";
-        isCorrect = false;
-      }
+      if (result.success) {
+        setSubmittedAnswer(formattedAnswer);
+        setAnswerResult({
+          is_correct: result.data.is_correct,
+          correct_answer: result.data.correct_answer,
+          explanation: result.data.explanation || '暂无解析'
+        });
         
-      // 检查是否来自错题集，且答对了题目
-      const source = searchParams.get('source');
-      const isFromWrongCollection = source === 'wrong';
-      
-      if (isFromWrongCollection && isCorrect) {
-        // 如果是从错题集进入，且答对了，则从错题集中移除该题目
+        // 将当前答题结果保存到当前模式的历史记录中
+        const historyKey = getStorageKeyForMode(currentMode);
+        console.log(`保存答题结果到: ${historyKey}`);
+        
+        // 获取当前模式的历史记录
+        const historyString = localStorage.getItem(historyKey) || '{}';
+        let history = { answered: {}, correct: {}, results: {}, timestamp: Date.now() };
+        
         try {
-          // 导入removeFromWrongQuestions函数
-          const removed = removeFromWrongQuestions(question.id);
-          if (removed) {
-            console.log(`题目 #${question.id} 已答对，已从错题集中移除`);
-            
-            // 触发错题列表刷新事件
-            const event = new CustomEvent('wrongQuestionsChanged', {
-              detail: { removedId: question.id }
-            });
-            window.dispatchEvent(event);
-          }
-        } catch (removeErr) {
-          console.error("从错题集移除题目失败:", removeErr);
-        }
-      }
-
-      // 更新本地状态
-      const newAnsweredQuestions = { ...answeredQuestions, [questionId]: true };
-      const newCorrectAnswers = { ...correctAnswers };
-      
-      if (isCorrect) {
-        newCorrectAnswers[questionId] = true;
-      }
-      
-      // 准备本地存储的数据
-      let localAnswerHistory;
-      try {
-        const historyString = localStorage.getItem('answerHistory');
-        localAnswerHistory = historyString ? JSON.parse(historyString) : {};
-      } catch (e) {
-        localAnswerHistory = {};
-      }
-      
-      const localUpdateData = {
-        answered: newAnsweredQuestions,
-        correct: newCorrectAnswers,
-        timestamp: Date.now(),
-        results: {
-          ...(localAnswerHistory.results || {}),
-          [questionId]: {
-            submittedAnswer: selectedAnswer,
-            isCorrect: isCorrect,
-            correctAnswer: correctAnswer,
-            explanation: question?.analysis || "暂无解析",
-            questionType: question?.question_type,
-            answeredAt: new Date().toISOString()
-          }
-        }
-      };
-      
-      // 是否尝试提交到服务器取决于用户是否已登录
-      if (isAuthenticated && !usingLocalStorage) {
-        // 用户登录，尝试提交到服务器
-        try {
-          const result = await questionApi.submitAnswer(questionId, formattedAnswer);
-          
-          if (result.success) {
-            console.log("API返回的答题结果:", result.data);
-            
-            // 确保解析字段存在
-            const answerData = {
-              ...result.data,
-              explanation: result.data.explanation || "暂无解析"
+          const parsedHistory = JSON.parse(historyString);
+          if (parsedHistory && typeof parsedHistory === 'object') {
+            history = {
+              answered: parsedHistory.answered || {},
+              correct: parsedHistory.correct || {},
+              results: parsedHistory.results || {},
+              timestamp: Date.now()
             };
-            
-            setAnswerResult(answerData);
-            setSubmittedAnswer(selectedAnswer);
-            
-            // 判断是否答错，并添加到错题集
-            const isAnswerCorrect = result.data.is_correct;
-            if (!isAnswerCorrect) {
-              console.log("答案错误！准备添加到错题集...");
-              
-              // 准备错题数据
-              const wrongQuestionData = {
-                id: question.id,
-                question_text: question.question_text,
-                question_type: question.question_type,
-                options: question.options,
-                subject: question.subject,
-                year: question.year,
-                correct_answer: result.data.correct_answer,
-                submitted_answer: formattedAnswer,
-                explanation: result.data.explanation || "暂无解析",
-                timestamp: new Date().toISOString()
-              };
-              
-              // 确保添加到错题集
-              try {
-                const added = addToWrongQuestions(wrongQuestionData);
-                if (added) {
-                  console.log(`✅ 题目 #${question.id} 已成功添加到错题集`);
-                } else {
-                  console.log(`题目 #${question.id} 可能已存在于错题集中`);
-                }
-              } catch (err) {
-                console.error("添加错题时发生错误:", err);
-              }
-            }
-            
-            // 更新答题历史状态
-            setAnsweredQuestions(newAnsweredQuestions);
-            setCorrectAnswers(newCorrectAnswers);
-            setTotalAnswered(Object.keys(newAnsweredQuestions).length);
-            setTotalCorrect(Object.keys(newCorrectAnswers).length);
-            
-            // 更新当前会话中的答题状态 - 确保在错题页面也能正确更新
-            setSessionAnswers(prev => {
-              const newSessionAnswers = {
-              ...prev,
-              [questionId]: { isCorrect: isAnswerCorrect }
-              };
-              
-              // 如果是错题页面，立即强制刷新导航
-              const source = searchParams.get('source');
-              const isFromWrongCollection = source === 'wrong';
-              if (isFromWrongCollection) {
-                console.log(`错题页面：强制刷新导航状态，题目${questionId}状态=${isAnswerCorrect ? '正确' : '错误'}`);
-                
-                // 使用setTimeout确保状态已更新后再触发导航刷新
-                setTimeout(() => {
-                  // 重置导航初始化状态
-                  navigationInitializedRef.current = false;
-                  // 直接重新初始化导航
-                  initializeNavigation();
-                  // 强制刷新当前页码，触发重新渲染
-                  setCurrentNavPage(prev => prev);
-                }, 100);
-              }
-              
-              return newSessionAnswers;
-            });
-
-            // 更新本地存储
-            localStorage.setItem('answerHistory', JSON.stringify({
-              answered: newAnsweredQuestions,
-              correct: newCorrectAnswers,
-              timestamp: Date.now(),
-              results: {
-                ...(localAnswerHistory.results || {}),
-                [questionId]: {
-                  submittedAnswer: selectedAnswer,
-                  isCorrect: result.data.is_correct,
-                  correctAnswer: result.data.correct_answer,
-                  explanation: result.data.explanation || "暂无解析",
-                  questionType: question.question_type,
-                  answeredAt: new Date().toISOString()
-                }
-              }
-            }));
-            
-            // 如果是从错题集页面进入，强制刷新导航状态
-            if (isFromWrongCollection) {
-              // 强制重新初始化导航组件，以便正确显示答题状态
-              navigationInitializedRef.current = false;
-              // 延迟执行，确保状态已更新
-              setTimeout(() => {
-                initializeNavigation();
-                // 触发重新渲染
-                setCurrentNavPage(currentNavPage);
-              }, 100);
-            }
-          } else {
-            // 服务器验证失败，切换到本地判断模式
-            console.error("提交答案服务器响应失败:", result.message);
-            useLocalAnswerProcessing();
           }
-        } catch (apiError) {
-          // API请求失败，使用本地判断
-          console.error("提交答案API请求失败:", apiError);
-          useLocalAnswerProcessing();
+        } catch (e) {
+          console.error(`解析${currentMode}模式答题历史失败:`, e);
         }
-      } else {
-        // 用户未登录或已知需要使用本地存储
-        console.log("用户未登录，使用本地存储记录答题结果");
-        useLocalAnswerProcessing();
-      }
-      
-      // 本地答案处理函数
-      function useLocalAnswerProcessing() {
-        // 使用本地计算的结果，确保在错题模式下也能显示正确答案和解析
-        const answerDetails = {
-          is_correct: isCorrect,
-          correct_answer: correctAnswer,
-          explanation: question?.analysis || "暂无解析"
+        
+        // 更新历史记录
+        history.answered[questionId] = true;
+        history.correct[questionId] = result.data.is_correct;
+        history.results[questionId] = {
+          submittedAnswer: formattedAnswer,
+          isCorrect: result.data.is_correct,
+          correctAnswer: result.data.correct_answer,
+          explanation: result.data.explanation || '暂无解析',
+          questionType: question?.question_type || (result.data.correct_answer.length > 1 ? 2 : 1),
+          answeredAt: new Date().toISOString()
         };
         
-        console.log("本地答案处理设置结果:", answerDetails);
-        setAnswerResult(answerDetails);
-        setSubmittedAnswer(selectedAnswer);
+        // 保存更新后的历史记录
+        localStorage.setItem(historyKey, JSON.stringify(history));
         
-        // 检查是否来自错题集，且答对了题目
-        const source = searchParams.get('source');
-        const isFromWrongCollection = source === 'wrong';
-        
-        // 如果是从错题集且答对了，从错题集中移除
-        if (isFromWrongCollection && isCorrect) {
-          try {
-            const removed = removeFromWrongQuestions(question.id);
-            if (removed) {
-              console.log(`本地判断：题目 #${question.id} 已答对，已从错题集中移除`);
-              
-              // 触发错题列表刷新事件
-              const event = new CustomEvent('wrongQuestionsChanged', {
-                detail: { removedId: question.id }
-              });
-              window.dispatchEvent(event);
-            }
-          } catch (removeErr) {
-            console.error("从错题集移除题目失败:", removeErr);
-          }
-        }
-        // 如果本地判断答错，添加到错题集
-        else if (!isCorrect) {
-          addToWrongQuestions({
-            id: question.id,
-            question_text: question.question_text,
-            question_type: question.question_type,
-            options: question.options,
-            subject: question.subject,
-            year: question.year,
-            correct_answer: correctAnswer,
-            submitted_answer: formattedAnswer,
-            explanation: question?.analysis || "暂无解析"
-          });
+        // 如果当前模式是wrong，同时更新原始答题历史，用于错题集计算
+        if (currentMode !== 'normal') {
+          // 保存到常规模式记录中以保持数据一致性
+          updateNormalModeHistory(questionId, formattedAnswer, result.data);
         }
         
-        // 更新答题历史状态
-        setAnsweredQuestions(newAnsweredQuestions);
-        setCorrectAnswers(newCorrectAnswers);
-        setTotalAnswered(Object.keys(newAnsweredQuestions).length);
-        setTotalCorrect(Object.keys(newCorrectAnswers).length);
-        
-        // 更新当前会话中的答题状态 - 确保在错题页面也能正确更新
-        setSessionAnswers(prev => {
-          const newSessionAnswers = {
+        // 更新状态管理
+        setSessionAnswers(prev => ({
           ...prev,
-          [questionId]: { isCorrect: isCorrect }
-          };
-          
-          // 如果是错题页面，立即强制刷新导航
-          const source = searchParams.get('source');
-          const isFromWrongCollection = source === 'wrong';
-          if (isFromWrongCollection) {
-            console.log(`错题页面(本地处理)：强制刷新导航状态，题目${questionId}状态=${isCorrect ? '正确' : '错误'}`);
-            
-            // 使用setTimeout确保状态已更新后再触发导航刷新
-            setTimeout(() => {
-              // 重置导航初始化状态
-              navigationInitializedRef.current = false;
-              // 直接重新初始化导航
-              initializeNavigation();
-              // 强制刷新当前页码，触发重新渲染
-              setCurrentNavPage(prev => prev);
-            }, 100);
+          [questionId]: {
+            submitted: formattedAnswer,
+            correct: result.data.correct_answer,
+            isCorrect: result.data.is_correct
           }
-          
-          return newSessionAnswers;
-        });
-        
-        // 保存到本地存储
-        localStorage.setItem('answerHistory', JSON.stringify(localUpdateData));
-        
-        // 如果是从错题集页面进入，强制刷新导航状态
-        if (isFromWrongCollection) {
-          // 强制重新初始化导航组件，以便正确显示答题状态
-          navigationInitializedRef.current = false;
-          // 延迟执行，确保状态已更新
-          setTimeout(() => {
-            initializeNavigation();
-            // 触发重新渲染
-            setCurrentNavPage(currentNavPage);
-          }, 100);
-        }
+        }));
+      } else {
+        console.error('提交答案失败:', result.message || '未知错误');
+        setError('提交答案失败，请稍后重试');
       }
-    } catch (err) {
-      console.error("处理答案提交出错:", err);
-      setError("处理答案提交时发生错误，答案已保存到本地");
-      
-      // 即使有错误，仍尝试使用最基本的判断
-      try {
-        // 提供最基本的答题结果，避免用户体验中断
-        setAnswerResult({
-          is_correct: false,
-          correct_answer: question?.answer?.toString() || "未知",
-          explanation: "发生错误，无法准确获取解析"
-        });
-        setSubmittedAnswer(selectedAnswer);
-      } catch (finalError) {
-        console.error("提供降级体验时发生错误:", finalError);
-      }
+    } catch (error) {
+      console.error('提交答案出错:', error);
+      setError('提交答案出错，请稍后重试');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // 同步更新普通模式的历史记录（用于错题集统计）
+  const updateNormalModeHistory = (qId, submitted, resultData) => {
+    try {
+      const normalHistoryKey = getStorageKeyForMode('normal');
+      const normalHistoryString = localStorage.getItem(normalHistoryKey) || '{}';
+      let normalHistory = { answered: {}, correct: {}, results: {}, timestamp: Date.now() };
+      
+      try {
+        const parsedHistory = JSON.parse(normalHistoryString);
+        if (parsedHistory && typeof parsedHistory === 'object') {
+          normalHistory = {
+            answered: parsedHistory.answered || {},
+            correct: parsedHistory.correct || {},
+            results: parsedHistory.results || {},
+            timestamp: Date.now()
+          };
+        }
+      } catch (e) {
+        console.error('解析普通模式答题历史失败:', e);
+      }
+      
+      // 更新普通模式历史记录
+      normalHistory.answered[qId] = true;
+      normalHistory.correct[qId] = resultData.is_correct;
+      normalHistory.results[qId] = {
+        submittedAnswer: submitted,
+        isCorrect: resultData.is_correct,
+        correctAnswer: resultData.correct_answer,
+        explanation: resultData.explanation || '暂无解析',
+        questionType: question?.question_type || (resultData.correct_answer.length > 1 ? 2 : 1),
+        answeredAt: new Date().toISOString()
+      };
+      
+      // 保存更新后的普通模式历史记录
+      localStorage.setItem(normalHistoryKey, JSON.stringify(normalHistory));
+      
+      console.log('同步更新了普通模式历史记录');
+    } catch (e) {
+      console.error('更新普通模式历史记录失败:', e);
     }
   };
 
