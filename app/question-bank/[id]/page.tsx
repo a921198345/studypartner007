@@ -444,9 +444,9 @@ export default function QuestionPage() {
               const favorites = JSON.parse(favoritesStr);
               favoriteQuestions = favorites.map(id => id.toString());
               console.log(`[DEBUG] 从favoriteQuestions获取收藏题目ID列表，共${favoriteQuestions.length}道题`);
-            }
           }
-        } catch (e) {
+        }
+      } catch (e) {
           console.error('[DEBUG] 获取收藏题目列表失败:', e);
         }
         
@@ -477,7 +477,7 @@ export default function QuestionPage() {
                   if (fqId === questionId && !shouldResetState) {
                     const qResult = normalHistory.results[fqId];
                     setSubmittedAnswer(qResult.submittedAnswer);
-                    setAnswerResult({
+            setAnswerResult({
                       is_correct: qResult.isCorrect,
                       correct_answer: qResult.correctAnswer,
                       explanation: qResult.explanation || "暂无解析"
@@ -515,23 +515,23 @@ export default function QuestionPage() {
       
       if (historyString) {
         try {
-          const history = JSON.parse(historyString);
-          
+        const history = JSON.parse(historyString);
+        
           // 检查历史记录是否有效且未过期
           if (history && history.timestamp && Date.now() - history.timestamp < 86400000) {
             // 使用历史数据更新状态
-            setAnsweredQuestions(history.answered || {});
-            setCorrectAnswers(history.correct || {});
-            setTotalAnswered(Object.keys(history.answered || {}).length);
-            setTotalCorrect(Object.keys(history.correct || {}).length);
-            
+          setAnsweredQuestions(history.answered || {});
+          setCorrectAnswers(history.correct || {});
+          setTotalAnswered(Object.keys(history.answered || {}).length);
+          setTotalCorrect(Object.keys(history.correct || {}).length);
+          
             // 如果没有重置状态，且有当前题目的答题记录，恢复答题状态
             if (!shouldResetState && history.results && history.results[questionId]) {
               const questionResult = history.results[questionId];
               console.log(`[DEBUG] 恢复题目 #${questionId} 的答题状态:`, questionResult);
               
               setSubmittedAnswer(questionResult.submittedAnswer);
-              setAnswerResult({
+            setAnswerResult({
                 is_correct: questionResult.isCorrect,
                 correct_answer: questionResult.correctAnswer,
                 explanation: questionResult.explanation || "暂无解析"
@@ -550,8 +550,8 @@ export default function QuestionPage() {
             
             console.log(`[DEBUG] 成功加载${currentMode}模式答题历史`);
             return;
-          }
-        } catch (e) {
+      }
+    } catch (e) {
           console.error(`[DEBUG] 解析${currentMode}模式答题历史失败:`, e);
         }
       }
@@ -1194,14 +1194,14 @@ export default function QuestionPage() {
       else if (isFromWrong) {
         if (sessionAnswers && sessionAnswers[qIdStr]) {
           console.log(`错题导航: 题目${qIdStr}使用会话状态：${sessionAnswers[qIdStr].isCorrect ? '正确' : '错误'}`);
-          if (sessionAnswers[qIdStr].isCorrect) {
-            extraStyle = "border-green-500 text-green-500";
-          } else {
-            extraStyle = "border-red-500 text-red-500";
-          }
+        if (sessionAnswers[qIdStr].isCorrect) {
+          extraStyle = "border-green-500 text-green-500";
+        } else {
+          extraStyle = "border-red-500 text-red-500";
+        }
         }
         // 如果没有会话状态，错题页面默认保持未作答状态
-      }
+      } 
       // 收藏页面状态指示使用收藏专用历史
       else if (isFromFavorites) {
         // 首先检查会话状态（实时反映）
@@ -1257,7 +1257,13 @@ export default function QuestionPage() {
             // 如果是从收藏进入，保持source=favorites参数和continue=true
             if (isFromFavorites) {
               currentParams.set('source', 'favorites');
-              currentParams.set('continue', 'true'); // 保持continue=true避免重置状态
+              
+              // 只有当当前URL中包含continue=true参数时，才继续保持该参数
+              const isContinue = searchParams.get('continue') === 'true';
+              if (isContinue) {
+                currentParams.set('continue', 'true');
+              }
+              // 否则不设置continue参数，默认会重置状态
             }
             
             const url = `/question-bank/${q.id}?${currentParams.toString()}`;
