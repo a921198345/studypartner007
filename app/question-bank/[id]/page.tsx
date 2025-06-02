@@ -258,31 +258,85 @@ export default function QuestionPage() {
         // 从收藏页面加载导航数据
         console.log('从收藏页面加载导航数据');
         try {
+          // 首先检查localStorage中的收藏题目列表
           const favoritesListStr = localStorage.getItem('favoriteQuestionsList');
+          
           if (favoritesListStr) {
-            const favoritesList = JSON.parse(favoritesListStr);
-            if (favoritesList && favoritesList.questions && favoritesList.questions.length > 0) {
-              questionsToDisplay = favoritesList.questions.map(q => ({
-                id: q.id,
-                question_code: q.question_code || `收藏${q.id}`
-              }));
-              
-              // 使用index参数或查找当前题目在收藏列表中的位置
-              const favIndex = searchParams.get('index');
-              if (favIndex && !isNaN(parseInt(favIndex))) {
-                currentIndex = parseInt(favIndex);
-              } else {
-                currentIndex = questionsToDisplay.findIndex(q => q.id === currentId);
+            try {
+              const favoritesList = JSON.parse(favoritesListStr);
+              if (favoritesList && favoritesList.questions && favoritesList.questions.length > 0) {
+                // 克隆列表以避免引用问题
+                questionsToDisplay = [...favoritesList.questions].map(q => ({
+                  id: q.id,
+                  question_code: q.question_code || `收藏${q.id}`
+                }));
+                
+                // 保存完整的收藏题目列表到会话存储，确保页面刷新或导航后依然可用
+                sessionStorage.setItem('active_favorites_list', JSON.stringify(questionsToDisplay));
+                
+                console.log(`从localStorage加载的收藏列表导航数据：共${questionsToDisplay.length}题`);
               }
-              
-              console.log(`从收藏列表加载的导航数据：共${questionsToDisplay.length}题，当前索引：${currentIndex}`);
-              
-              // 设置题目来源为收藏页面
-              console.log('设置收藏页面来源');
+            } catch (e) {
+              console.error("解析favoriteQuestionsList失败:", e);
             }
           }
+          
+          // 如果从localStorage未能获取到列表，尝试从会话存储获取
+          if (questionsToDisplay.length === 0) {
+            const sessionFavoritesStr = sessionStorage.getItem('active_favorites_list');
+            if (sessionFavoritesStr) {
+              try {
+                const sessionFavorites = JSON.parse(sessionFavoritesStr);
+                if (Array.isArray(sessionFavorites) && sessionFavorites.length > 0) {
+                  questionsToDisplay = sessionFavorites;
+                  console.log(`从会话存储恢复收藏题目列表：共${questionsToDisplay.length}题`);
+                }
+              } catch (e) {
+                console.error("解析会话存储中的收藏列表失败:", e);
+              }
+            }
+          }
+          
+          // 如果还是没有获取到列表，尝试从favoriteQuestions ID列表生成
+          if (questionsToDisplay.length === 0) {
+            const favoritesStr = localStorage.getItem('favoriteQuestions');
+            if (favoritesStr) {
+              try {
+                const favoriteIds = JSON.parse(favoritesStr);
+                if (Array.isArray(favoriteIds) && favoriteIds.length > 0) {
+                  questionsToDisplay = favoriteIds.map(id => ({ 
+                    id, 
+                    question_code: `收藏${id}` 
+                  }));
+                  
+                  // 同样保存到会话存储
+                  sessionStorage.setItem('active_favorites_list', JSON.stringify(questionsToDisplay));
+                  
+                  console.log(`从favoriteQuestions ID列表生成收藏导航数据：共${questionsToDisplay.length}题`);
+                }
+              } catch (e) {
+                console.error("解析favoriteQuestions失败:", e);
+              }
+            }
+          }
+          
+          // 找到当前题目在列表中的位置
+          // 使用index参数或查找当前题目在收藏列表中的位置
+          const favIndex = searchParams.get('index');
+          if (favIndex && !isNaN(parseInt(favIndex))) {
+            currentIndex = parseInt(favIndex);
+            // 确保index不超出范围
+            if (currentIndex >= questionsToDisplay.length) {
+              currentIndex = 0;
+              console.warn(`收藏题目index ${favIndex} 超出范围，重置为0`);
+            }
+          } else {
+            currentIndex = questionsToDisplay.findIndex(q => q.id === currentId);
+          }
+          
+          console.log(`收藏导航初始化完成：共${questionsToDisplay.length}题，当前索引：${currentIndex}`);
         } catch (e) {
-          console.error("解析收藏列表数据失败:", e);
+          console.error("初始化收藏导航失败:", e);
         }
       } else if (filteredData && filteredData.questions && filteredData.questions.length > 0) {
         console.log(`从localStorage加载筛选后的题目列表，共${filteredData.questions.length}题`);
@@ -323,6 +377,16 @@ export default function QuestionPage() {
         }
       }
       
+      // 确保收藏模式下有一个有效的题目列表
+      if (source === 'favorites' && questionsToDisplay.length === 0) {
+        console.warn('收藏模式但没有找到有效的收藏题目列表，创建包含当前题目的列表');
+        questionsToDisplay = [{ id: currentId, question_code: `收藏${currentId}` }];
+        currentIndex = 0;
+        
+        // 保存到会话存储
+        sessionStorage.setItem('active_favorites_list', JSON.stringify(questionsToDisplay));
+      }
+      
       setFilteredQuestions(questionsToDisplay);
       setFilteredTotalCount(questionsToDisplay.length); // 关键：确保显示的总数与实际列表长度一致
       console.log(`导航初始化完成: 共 ${questionsToDisplay.length} 题可导航, 当前题目索引: ${currentIndex}`);
@@ -349,7 +413,7 @@ export default function QuestionPage() {
       setCurrentNavPage(1);
       navigationInitializedRef.current = true;
     }
-  }, [questionId, searchParams, getFilteredInfo, questionsPerPage, totalAllQuestions]);
+  }, [questionId, searchParams, getFilteredInfo, questionsPerPage, totalAllQuestions, sessionAnswers]);
 
   // 获取题目总数 (此函数现在主要设置 totalAllQuestions)
   const fetchTotalQuestions = async () => {
@@ -973,6 +1037,23 @@ export default function QuestionPage() {
           currentParams.set('wrongIndex', (currentQuestionIndex + 1).toString());
         }
         
+        // 收藏模式特殊处理
+        if (source === 'favorites') {
+          currentParams.set('source', 'favorites');
+          
+          // 确保收藏题目列表被保存到会话存储
+          if (filteredQuestions && filteredQuestions.length > 0) {
+            sessionStorage.setItem('active_favorites_list', JSON.stringify(filteredQuestions));
+            console.log(`已保存收藏题目列表到会话存储：${filteredQuestions.length}题`);
+          }
+          
+          // 保持continue参数
+          const isContinue = searchParams.get('continue') === 'true';
+          if (isContinue) {
+            currentParams.set('continue', 'true');
+          }
+        }
+        
         try {
           const nextUrl = `/question-bank/${nextQuestion.id}?${currentParams.toString()}`;
           router.push(nextUrl);
@@ -1008,6 +1089,23 @@ export default function QuestionPage() {
       if (source === 'wrong') {
         currentParams.set('source', 'wrong');
         currentParams.set('wrongIndex', (currentQuestionIndex - 1).toString());
+      }
+      
+      // 收藏模式特殊处理
+      if (source === 'favorites') {
+        currentParams.set('source', 'favorites');
+        
+        // 确保收藏题目列表被保存到会话存储
+        if (filteredQuestions && filteredQuestions.length > 0) {
+          sessionStorage.setItem('active_favorites_list', JSON.stringify(filteredQuestions));
+          console.log(`已保存收藏题目列表到会话存储：${filteredQuestions.length}题`);
+        }
+        
+        // 保持continue参数
+        const isContinue = searchParams.get('continue') === 'true';
+        if (isContinue) {
+          currentParams.set('continue', 'true');
+        }
       }
       
       try {
