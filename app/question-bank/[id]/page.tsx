@@ -6,12 +6,12 @@ import { MainNav } from "@/components/main-nav"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, ChevronRight, Star } from "lucide-react"
+import { ChevronLeft, ChevronRight, Star, CheckCircle, XCircle } from "lucide-react"
 import Link from "next/link"
 import { Footer } from "@/components/footer"
 import { QuestionDetail } from "@/components/question-bank/question-detail"
 import { AnswerCard } from "@/components/question-bank/answer-card"
-import { questionApi, addToWrongQuestions, isQuestionFavorited, removeFromWrongQuestions } from "@/lib/api/questions"
+import { questionApi, addToWrongQuestions, isQuestionFavorited } from "@/lib/api/questions"
 import { CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 
@@ -170,6 +170,36 @@ export default function QuestionPage() {
           
           console.log(`从错题集加载的导航数据：共${questionsToDisplay.length}题，当前索引：${currentIndex}，重置状态：${resetWrong}`);
         }
+      } else if (source === 'favorites') {
+        // 从收藏页面加载导航数据
+        console.log('从收藏页面加载导航数据');
+        try {
+          const favoritesListStr = localStorage.getItem('favoriteQuestionsList');
+          if (favoritesListStr) {
+            const favoritesList = JSON.parse(favoritesListStr);
+            if (favoritesList && favoritesList.questions && favoritesList.questions.length > 0) {
+              questionsToDisplay = favoritesList.questions.map(q => ({
+                id: q.id,
+                question_code: q.question_code || `收藏${q.id}`
+              }));
+              
+              // 使用index参数或查找当前题目在收藏列表中的位置
+              const favIndex = searchParams.get('index');
+              if (favIndex && !isNaN(parseInt(favIndex))) {
+                currentIndex = parseInt(favIndex);
+              } else {
+                currentIndex = questionsToDisplay.findIndex(q => q.id === currentId);
+              }
+              
+              console.log(`从收藏列表加载的导航数据：共${questionsToDisplay.length}题，当前索引：${currentIndex}`);
+              
+              // 设置题目来源为收藏页面
+              console.log('设置收藏页面来源');
+            }
+          }
+        } catch (e) {
+          console.error("解析收藏列表数据失败:", e);
+        }
       } else if (filteredData && filteredData.questions && filteredData.questions.length > 0) {
         console.log(`从localStorage加载筛选后的题目列表，共${filteredData.questions.length}题`);
         questionsToDisplay = [...filteredData.questions];
@@ -285,19 +315,34 @@ export default function QuestionPage() {
   }, [questionId, initializeNavigation]); // initializeNavigation 现在依赖 totalAllQuestions，所以它会正确地在其更新后运行
 
   const fetchAnswerHistory = async () => {
-    // 检查是否来自错题页面
+    // 检查是否来自错题页面或收藏页面
     const source = searchParams.get('source');
     const isFromWrongCollection = source === 'wrong';
+    const isFromFavorites = source === 'favorites';
     const resetWrong = searchParams.get('resetWrong') === 'true';
+    // 修改：对于收藏模式，默认都是新开始，除非明确标记为continue=true
+    const isContinue = searchParams.get('continue') === 'true';
     
-    // 如果是从错题页进入，且是首次进入或需要重置状态
+    console.log('[DEBUG] fetchAnswerHistory开始执行', {
+      source,
+      isFromWrongCollection,
+      isFromFavorites,
+      resetWrong,
+      isContinue,
+      questionId,
+      currentSessionAnswers: sessionAnswers
+    });
+    
+    // 如果是从错题页进入，保持未答状态
     if (isFromWrongCollection) {
-      console.log("从错题集进入，不恢复之前的答题记录，保持未答状态");
+      console.log("[DEBUG] 从错题集进入，不恢复之前的答题记录，保持未答状态");
       
       // 清空当前题目的答题状态
       setSelectedAnswer("");
       setSubmittedAnswer(null);
       setAnswerResult(null);
+      
+      console.log('[DEBUG] 已清空当前题目状态');
       
       // 仍然加载整体答题统计数据，但不设置当前题目的答案状态
       try {
@@ -305,6 +350,12 @@ export default function QuestionPage() {
         if (historyString) {
           const history = JSON.parse(historyString);
           if (history && history.timestamp && Date.now() - history.timestamp < 86400000) {
+            console.log('[DEBUG] 从localStorage加载答题历史', {
+              totalAnswered: Object.keys(history.answered || {}).length,
+              totalCorrect: Object.keys(history.correct || {}).length,
+              hasCurrentQuestion: history.answered && history.answered[questionId]
+            });
+            
             setAnsweredQuestions(history.answered || {});
             setCorrectAnswers(history.correct || {});
             setTotalAnswered(Object.keys(history.answered || {}).length);
@@ -312,9 +363,45 @@ export default function QuestionPage() {
           }
         }
       } catch (e) {
-        console.error("加载答题统计数据失败:", e);
+        console.error("[DEBUG] 加载答题统计数据失败:", e);
       }
       return;
+    }
+    
+    // 收藏模式的处理
+    if (isFromFavorites) {
+      // 只有明确标记为"继续练习"才恢复答题状态，否则都重置为未作答
+      if (isContinue) {
+        // "继续练习收藏" - 应恢复之前的答题记录
+        console.log("[DEBUG] 继续练习收藏：恢复之前的答题记录");
+        // 继续执行正常的历史记录恢复流程
+      } else {
+        // "开始练习收藏"或直接点击题目 - 保持所有题目为未作答状态
+        console.log("[DEBUG] 收藏模式：重置所有收藏题目为未作答状态");
+        
+        // 清空当前题目的答题状态
+        setSelectedAnswer("");
+        setSubmittedAnswer(null);
+        setAnswerResult(null);
+        
+        // 仍然加载整体答题统计数据
+        try {
+          const historyString = localStorage.getItem('answerHistory');
+          if (historyString) {
+            const history = JSON.parse(historyString);
+            if (history && history.timestamp && Date.now() - history.timestamp < 86400000) {
+              // 只设置全局统计数据，不设置具体题目状态
+              setAnsweredQuestions(history.answered || {});
+              setCorrectAnswers(history.correct || {});
+              setTotalAnswered(Object.keys(history.answered || {}).length);
+              setTotalCorrect(Object.keys(history.correct || {}).length);
+            }
+          }
+        } catch (e) {
+          console.error("[DEBUG] 加载答题统计数据失败:", e);
+        }
+        return;
+      }
     }
     
     // 原有逻辑：如果已知用户未登录，直接使用localStorage
@@ -398,10 +485,12 @@ export default function QuestionPage() {
           // 检查当前题目是否有本地缓存的答题记录
           const qId = questionId.toString();
           
-          // 检查是否来自错题集
+          // 检查是否来自错题集或收藏，以及是否是继续练习
           const source = searchParams.get('source');
           const isFromWrongCollection = source === 'wrong';
+          const isFromFavorites = source === 'favorites';
           const resetWrong = searchParams.get('resetWrong') === 'true';
+          const isContinue = searchParams.get('continue') === 'true';
           
           // 如果来源是错题集，不恢复当前题目的答案状态
           if (isFromWrongCollection) {
@@ -409,8 +498,18 @@ export default function QuestionPage() {
             setSelectedAnswer("");
             setSubmittedAnswer(null);
             setAnswerResult(null);
-          } else if (history.results && history.results[qId]) {
-            // 正常模式：恢复缓存的答题状态
+          }
+          // 如果是收藏模式但不是继续练习，不恢复答题状态
+          else if (isFromFavorites && !isContinue) {
+            console.log("收藏模式(非继续练习)，不恢复缓存的答题记录，保持未答状态");
+            setSelectedAnswer("");
+            setSubmittedAnswer(null);
+            setAnswerResult(null);
+          }
+          // 如果是继续收藏练习或正常模式，恢复答题状态
+          else if (history.results && history.results[qId]) {
+            // 正常模式或继续收藏模式：恢复缓存的答题状态
+            console.log(`恢复题目 #${qId} 的缓存答题状态，模式: ${isFromFavorites && isContinue ? '继续收藏' : '正常'}`);
             const result = history.results[qId];
             setSelectedAnswer(result.submittedAnswer);
             setSubmittedAnswer(result.submittedAnswer);
@@ -768,8 +867,8 @@ export default function QuestionPage() {
             // 更新当前会话中的答题状态 - 确保在错题页面也能正确更新
             setSessionAnswers(prev => {
               const newSessionAnswers = {
-                ...prev,
-                [questionId]: { isCorrect: isAnswerCorrect }
+              ...prev,
+              [questionId]: { isCorrect: isAnswerCorrect }
               };
               
               // 如果是错题页面，立即强制刷新导航
@@ -849,7 +948,7 @@ export default function QuestionPage() {
         console.log("本地答案处理设置结果:", answerDetails);
         setAnswerResult(answerDetails);
         setSubmittedAnswer(selectedAnswer);
-
+        
         // 检查是否来自错题集，且答对了题目
         const source = searchParams.get('source');
         const isFromWrongCollection = source === 'wrong';
@@ -895,8 +994,8 @@ export default function QuestionPage() {
         // 更新当前会话中的答题状态 - 确保在错题页面也能正确更新
         setSessionAnswers(prev => {
           const newSessionAnswers = {
-            ...prev,
-            [questionId]: { isCorrect: isCorrect }
+          ...prev,
+          [questionId]: { isCorrect: isCorrect }
           };
           
           // 如果是错题页面，立即强制刷新导航
@@ -1242,11 +1341,11 @@ export default function QuestionPage() {
       else if (isFromWrong) {
         if (sessionAnswers && sessionAnswers[qIdStr]) {
           console.log(`错题导航: 题目${qIdStr}使用会话状态：${sessionAnswers[qIdStr].isCorrect ? '正确' : '错误'}`);
-          if (sessionAnswers[qIdStr].isCorrect) {
-            extraStyle = "border-green-500 text-green-500";
-          } else {
-            extraStyle = "border-red-500 text-red-500";
-          }
+        if (sessionAnswers[qIdStr].isCorrect) {
+          extraStyle = "border-green-500 text-green-500";
+        } else {
+          extraStyle = "border-red-500 text-red-500";
+        }
         }
         // 如果没有会话状态，错题页面默认保持未作答状态
       } 
@@ -1362,7 +1461,7 @@ export default function QuestionPage() {
           answerResult && 
           answerResult.is_correct) {
         console.log(`页面退出：检测到题目 #${question.id} 已答对，自动从错题集中移除`);
-        const removed = removeFromWrongQuestions(question.id);
+        const removed = questionApi.removeFromWrongQuestions(question.id);
         if (removed) {
           console.log(`页面退出：题目 #${question.id} 已从错题集中移除`);
           
@@ -1580,6 +1679,51 @@ export default function QuestionPage() {
     ensureWrongQuestionsValidity();
   }, [ensureWrongQuestionsValidity]);
 
+  // 在组件内部添加页面退出监听器
+  useEffect(() => {
+    const handleBeforeUnload = async () => {
+      // 获取source值
+      const source = searchParams.get('source');
+      // 获取isCorrect值
+      const isCorrect = answerResult?.is_correct;
+      
+      // 检查是否从错题集进入且已正确答题
+      if (source === 'wrong' && 
+          submittedAnswer && 
+          isCorrect && 
+          questionId) {
+        
+        console.log('页面退出检测：从错题集进入且答对了，准备移除题目', {
+          questionId,
+          submittedAnswer,
+          isCorrect
+        });
+        
+        try {
+          // 从错题集移除该题目
+          const result = await questionApi.removeFromWrongQuestions(questionId);
+          if (result.success) {
+            console.log(`题目 ${questionId} 已从错题集移除`);
+          } else {
+            console.error('从错题集移除失败:', result.error);
+          }
+        } catch (error) {
+          console.error('页面退出时移除错题失败:', error);
+        }
+      }
+    };
+
+    // 添加页面退出监听器
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    // 组件卸载时清除监听器
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      // 同样在组件卸载时执行移除逻辑
+      handleBeforeUnload();
+    };
+  }, [searchParams, submittedAnswer, answerResult, questionId]);
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -1624,7 +1768,7 @@ export default function QuestionPage() {
                   >
                     重试
                   </Button>
-                </div>
+                    </div>
               ) : question ? (
                 <>
                   <QuestionDetail
@@ -1718,12 +1862,12 @@ export default function QuestionPage() {
                       </Card>
                     </div>
                   )}
-                </>
+                            </>
                           ) : (
                 <div className="p-10 border rounded-lg text-center">
                   <p>未找到题目</p>
-                </div>
-              )}
+                    </div>
+                  )}
             </div>
 
             <div className="lg:col-span-1">

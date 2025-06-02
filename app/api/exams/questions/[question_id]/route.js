@@ -59,7 +59,9 @@ export async function GET(request, { params }) {
           year, 
           question_type, 
           question_text, 
-          options_json
+          options_json,
+          correct_answer,
+          explanation_text
         FROM questions 
         WHERE id = ?
         `,
@@ -152,6 +154,8 @@ export async function GET(request, { params }) {
           question_type: questionData.question_type,
           question_text: questionData.question_text,
           options: options,
+          answer: questionData.correct_answer,
+          analysis: questionData.explanation_text || "暂无解析",
           is_favorite: isFavorite
         }
       });

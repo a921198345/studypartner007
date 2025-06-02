@@ -30,7 +30,7 @@
          contentColumnName
        };
      } catch (error) {
-       console.error('获取表结构失败:', error);
+       console.error('获取表结构失败，使用默认值:', error.message);
        // 返回默认值
        return {
          subjectColumnName: 'subject_name',
@@ -94,31 +94,40 @@
        
        // 循环处理每个学科
        for (const subject of subjects) {
-         console.log(`正在加载 ${subject} 知识导图...`);
-         
-         // 从数据库获取知识导图
-         const mindmapData = await db.query(
-           `SELECT * FROM mind_maps WHERE ${subjectColumnName} = ?`,
-           [subject]
-         );
-         
-         // 处理数据
-         const formattedData = formatMindmapData(mindmapData, contentColumnName);
-         
-         // 保存到缓存(缓存24小时)
-         if (formattedData.success) {
-           await cache.set(`mindmap:${subject}`, formattedData, 86400);
-           console.log(`✅ ${subject} 知识导图已加入缓存`);
-         } else {
-           console.log(`❌ ${subject} 知识导图加载失败: ${formattedData.error}`);
+         try {
+           console.log(`正在加载 ${subject} 知识导图...`);
+           
+           // 从数据库获取知识导图
+           const mindmapData = await db.query(
+             `SELECT * FROM mind_maps WHERE ${subjectColumnName} = ?`,
+             [subject]
+           );
+           
+           // 处理数据
+           const formattedData = formatMindmapData(mindmapData, contentColumnName);
+           
+           // 保存到缓存(缓存24小时)
+           if (formattedData.success) {
+             await cache.set(`mindmap:${subject}`, formattedData, 86400);
+             console.log(`✅ ${subject} 知识导图已加入缓存`);
+           } else {
+             console.log(`❌ ${subject} 知识导图加载失败: ${formattedData.error}`);
+           }
+         } catch (subjectError) {
+           console.error(`处理 ${subject} 知识导图时出错:`, subjectError.message);
+           // 继续处理下一个学科
+           continue;
          }
        }
        
        console.log('缓存预热完成!');
+       return { success: true };
      } catch (error) {
-       console.error('缓存预热失败:', error);
+       console.error('缓存预热失败:', error.message);
+       // 失败不影响应用运行
+       return { success: false, error: error.message };
      }
    }
 
-   // 执行缓存预热
-   warmupCache();
+   // 导出但不立即执行，由next.config.mjs控制调用
+   module.exports = warmupCache;

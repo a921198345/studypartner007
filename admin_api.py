@@ -5,6 +5,9 @@ import json # 用于处理JSON数据
 import traceback # 用于详细错误追踪
 import sqlite3 # 用于SQLite数据库
 import datetime # 用于处理日期时间
+from werkzeug.utils import secure_filename
+import uuid
+from flask_cors import CORS  # 导入CORS模块
 
 # 尝试导入MySQL连接器，如果不可用则跳过
 try:
@@ -14,6 +17,34 @@ try:
 except ImportError:
     MYSQL_AVAILABLE = False
     MySQLError = Exception  # 定义一个占位符
+
+# 导入文本提取函数
+try:
+    from parse_docx import extract_text_from_word
+    DOCX_PARSER_AVAILABLE = True
+    print("成功导入 extract_text_from_word 函数")
+except ImportError as e:
+    DOCX_PARSER_AVAILABLE = False
+    print(f"无法导入 extract_text_from_word 函数: {str(e)}")
+    # 创建一个简单的占位函数，在无法导入时使用
+    def extract_text_from_word(file_path):
+        raise Exception("文本提取模块未正确加载，无法处理Word文档")
+
+# 导入文本分段函数
+try:
+    from text_segmentation import segment_text, segment_text_combined, segment_text_smart, segment_text_legal_structure
+    TEXT_SEGMENTATION_AVAILABLE = True
+    print("成功导入文本分段函数")
+except ImportError as e:
+    TEXT_SEGMENTATION_AVAILABLE = False
+    print(f"无法导入文本分段函数: {str(e)}")
+    # 创建一个简单的占位函数，在无法导入时使用
+    def segment_text(full_text, strategy='fixed_length', chunk_size=500, overlap=50):
+        raise Exception("文本分段模块未正确加载，无法处理文本分段")
+    def segment_text_combined(full_text, max_chunk_size=1000, overlap=100):
+        raise Exception("文本分段模块未正确加载，无法处理文本分段")
+    def segment_text_smart(full_text, max_chunk_size=1000, overlap=100):
+        raise Exception("文本分段模块未正确加载，无法处理文本分段")
 
 # =================================================================
 # ======================== 数据库配置区域 ==========================
@@ -48,6 +79,8 @@ except ImportError as e:
     imported_parse_function_info = f"导入错误: {str(e)}"
 
 app = Flask(__name__) # 创建一个Flask应用实例
+# 修改CORS配置，允许所有来源，包括null来源
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)  # 修改CORS配置
 
 # 确保数据目录存在
 os.makedirs(os.path.dirname(SQLITE_DB_PATH), exist_ok=True)
@@ -239,7 +272,7 @@ if parse_opml_function_to_use:
     elif parse_opml_function_to_use.__name__ == 'parse_opml_to_json_tree':
         print("注意：当前看起来是导入了名为 parse_opml_to_json_tree 的函数。")
 else:
-    print("错误：没有任何解析函数被赋值给 parse_opml_function_to_use。")
+    print("警告：未能成功导入 parse_opml_to_json_tree 函数。")
 print("--------------------------")
 
 # 设置允许上传的文件大小 (例如，10MB)
@@ -254,6 +287,13 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 # 确保上传文件夹存在
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
+
+# 设置允许上传的文件类型
+ALLOWED_EXTENSIONS = {'doc', 'docx'}
+
+# 检查文件扩展名是否允许
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # 添加根路径处理
 @app.route('/')
@@ -645,18 +685,509 @@ def get_mindmap_endpoint(subject):
             'database_type': DATABASE_TYPE
         }), 500
 
-if __name__ == '__main__':
-    import logging
-    logging.basicConfig(level=logging.INFO)
-    # 注意：Flask应用启动时的诊断打印会在这里执行，因为模块在运行前会被加载
-    app.logger.info("Flask Admin API 服务准备启动 (主程序块)...")
-    # 初始化数据库
-    if DATABASE_TYPE == "sqlite":
-        init_sqlite_db()
+@app.route('/admin/api/upload_word', methods=['POST'])
+def upload_word():
+    # 检查是否有文件被上传
+    if 'file' not in request.files:
+        return jsonify({
+            'success': False,
+            'message': '没有选择文件'
+        }), 400
     
-    print(f"使用 {DATABASE_TYPE.upper()} 数据库")
-    # 启动Flask开发服务器
-    # debug=True 表示开启调试模式，这样修改代码后服务器会自动重启
-    # 在生产环境中，你应该使用更专业的WSGI服务器，而不是Flask自带的开发服务器
-    app.run(debug=True, port=5002) # 使用端口5002
-    app.logger.info("Flask Admin API 服务已停止。")
+    # 获取学科分类（如果提供）
+    subject_area = request.form.get('subject_area', '')
+    
+    file = request.files['file']
+    
+    # 检查文件名是否为空
+    if file.filename == '':
+        return jsonify({
+            'success': False,
+            'message': '没有选择文件'
+        }), 400
+    
+    # 检查文件类型是否允许
+    if not allowed_file(file.filename):
+        return jsonify({
+            'success': False,
+            'message': '只允许上传.doc或.docx格式的文件'
+        }), 400
+    
+    # 生成安全的文件名并保存文件
+    filename = secure_filename(file.filename)
+    # 添加唯一标识符，避免文件名冲突
+    file_id = str(uuid.uuid4())
+    
+    # 修复文件扩展名处理逻辑
+    try:
+        file_extension = filename.rsplit('.', 1)[1].lower()
+    except IndexError:
+        # 如果文件名没有扩展名，默认为docx
+        file_extension = 'docx'
+        
+    new_filename = f"{file_id}.{file_extension}"
+    
+    # 确保上传文件夹存在
+    UPLOAD_FOLDER = 'uploads'
+    if not os.path.exists(UPLOAD_FOLDER):
+        os.makedirs(UPLOAD_FOLDER)
+    
+    file_path = os.path.join(UPLOAD_FOLDER, new_filename)
+    
+    try:
+        # 保存文件
+        file.save(file_path)
+        
+        # 确定文档类型代码
+        doc_type = 1 if file_extension == 'doc' else 3 if file_extension == 'docx' else 4
+        
+        # 创建knowledge_documents表（如果不存在）
+        if DATABASE_TYPE == "mysql" and MYSQL_AVAILABLE:
+            try:
+                conn = mysql.connector.connect(**MYSQL_CONFIG)
+                cursor = conn.cursor()
+                
+                # 检查表是否存在
+                cursor.execute("""
+                CREATE TABLE IF NOT EXISTS knowledge_documents (
+                    doc_id VARCHAR(36) PRIMARY KEY,
+                    doc_name VARCHAR(80) NOT NULL,
+                    doc_type TINYINT NOT NULL COMMENT '1: doc, 2: text, 3: docx, 4: other',
+                    file_path VARCHAR(150) NOT NULL,
+                    subject_area VARCHAR(50),
+                    upload_date DATETIME NOT NULL,
+                    is_active TINYINT(1) NOT NULL DEFAULT 1
+                )
+                """)
+                conn.commit()
+                
+                # 记录到MySQL数据库
+                cursor.execute(
+                    "INSERT INTO knowledge_documents (doc_id, doc_name, doc_type, file_path, subject_area, upload_date) VALUES (%s, %s, %s, %s, %s, %s)",
+                    (file_id, filename, doc_type, file_path, subject_area, datetime.datetime.now())
+                )
+                conn.commit()
+                cursor.close()
+                conn.close()
+            except Exception as e:
+                print(f"MySQL数据库操作失败: {str(e)}")
+                # 如果MySQL失败，则使用SQLite作为备份
+                conn = sqlite3.connect(SQLITE_DB_PATH)
+                cursor = conn.cursor()
+                
+                # 创建表（如果不存在）
+                cursor.execute('''
+                CREATE TABLE IF NOT EXISTS knowledge_documents (
+                    doc_id TEXT PRIMARY KEY,
+                    doc_name TEXT NOT NULL,
+                    doc_type INTEGER NOT NULL,
+                    file_path TEXT NOT NULL,
+                    subject_area TEXT,
+                    upload_date TEXT NOT NULL,
+                    is_active INTEGER DEFAULT 1
+                )
+                ''')
+                conn.commit()
+                
+                # 记录到SQLite数据库
+                cursor.execute(
+                    "INSERT INTO knowledge_documents (doc_id, doc_name, doc_type, file_path, subject_area, upload_date) VALUES (?, ?, ?, ?, ?, ?)",
+                    (file_id, filename, doc_type, file_path, subject_area, datetime.datetime.now().isoformat())
+                )
+                conn.commit()
+                cursor.close()
+                conn.close()
+        else:
+            # 直接使用SQLite
+            conn = sqlite3.connect(SQLITE_DB_PATH)
+            cursor = conn.cursor()
+            
+            # 创建表（如果不存在）
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS knowledge_documents (
+                doc_id TEXT PRIMARY KEY,
+                doc_name TEXT NOT NULL,
+                doc_type INTEGER NOT NULL,
+                file_path TEXT NOT NULL,
+                subject_area TEXT,
+                upload_date TEXT NOT NULL,
+                is_active INTEGER DEFAULT 1
+            )
+            ''')
+            conn.commit()
+            
+            # 记录到SQLite数据库
+            cursor.execute(
+                "INSERT INTO knowledge_documents (doc_id, doc_name, doc_type, file_path, subject_area, upload_date) VALUES (?, ?, ?, ?, ?, ?)",
+                (file_id, filename, doc_type, file_path, subject_area, datetime.datetime.now().isoformat())
+            )
+            conn.commit()
+            cursor.close()
+            conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': '文件上传成功',
+            'data': {
+                'file_id': file_id,
+                'original_filename': filename,
+                'file_path': file_path,
+                'subject_area': subject_area
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'文件上传失败: {str(e)}'
+        }), 500
+
+# 获取已上传文档列表的API
+@app.route('/admin/api/documents', methods=['GET'])
+def get_documents():
+    try:
+        if DATABASE_TYPE == "mysql" and MYSQL_AVAILABLE:
+            try:
+                conn = mysql.connector.connect(**MYSQL_CONFIG)
+                cursor = conn.cursor(dictionary=True)  # 使结果可以通过列名访问
+                
+                # 确保表存在
+                cursor.execute("""
+                CREATE TABLE IF NOT EXISTS knowledge_documents (
+                    doc_id VARCHAR(36) PRIMARY KEY,
+                    doc_name VARCHAR(80) NOT NULL,
+                    doc_type TINYINT NOT NULL COMMENT '1: doc, 2: text, 3: docx, 4: other',
+                    file_path VARCHAR(150) NOT NULL,
+                    subject_area VARCHAR(50),
+                    upload_date DATETIME NOT NULL,
+                    is_active TINYINT(1) NOT NULL DEFAULT 1
+                )
+                """)
+                conn.commit()
+                
+                cursor.execute("SELECT * FROM knowledge_documents WHERE is_active = 1 ORDER BY upload_date DESC")
+                documents = cursor.fetchall()
+                cursor.close()
+                conn.close()
+            except Exception as e:
+                print(f"MySQL查询失败: {str(e)}，尝试使用SQLite")
+                # 如果MySQL失败，则使用SQLite作为备份
+                conn = sqlite3.connect(SQLITE_DB_PATH)
+                conn.row_factory = sqlite3.Row  # 这使结果可以通过列名访问
+                cursor = conn.cursor()
+                
+                # 确保SQLite表存在
+                cursor.execute('''
+                CREATE TABLE IF NOT EXISTS knowledge_documents (
+                    doc_id TEXT PRIMARY KEY,
+                    doc_name TEXT NOT NULL,
+                    doc_type INTEGER NOT NULL,
+                    file_path TEXT NOT NULL,
+                    subject_area TEXT,
+                    upload_date TEXT NOT NULL,
+                    is_active INTEGER DEFAULT 1
+                )
+                ''')
+                conn.commit()
+                
+                cursor.execute("SELECT * FROM knowledge_documents WHERE is_active = 1 ORDER BY upload_date DESC")
+                documents = [dict(row) for row in cursor.fetchall()]
+                cursor.close()
+                conn.close()
+        else:
+            # 直接使用SQLite
+            conn = sqlite3.connect(SQLITE_DB_PATH)
+            conn.row_factory = sqlite3.Row  # 这使结果可以通过列名访问
+            cursor = conn.cursor()
+            
+            # 确保SQLite表存在
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS knowledge_documents (
+                doc_id TEXT PRIMARY KEY,
+                doc_name TEXT NOT NULL,
+                doc_type INTEGER NOT NULL,
+                file_path TEXT NOT NULL,
+                subject_area TEXT,
+                upload_date TEXT NOT NULL,
+                is_active INTEGER DEFAULT 1
+            )
+            ''')
+            conn.commit()
+            
+            cursor.execute("SELECT * FROM knowledge_documents WHERE is_active = 1 ORDER BY upload_date DESC")
+            documents = [dict(row) for row in cursor.fetchall()]
+            cursor.close()
+            conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': '获取文档列表成功',
+            'data': {
+                'documents': documents
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'获取文档列表失败: {str(e)}'
+        }), 500
+
+@app.route('/admin/api/extract_text', methods=['GET'])
+def extract_document_text():
+    """
+    从数据库中获取文档信息并提取其中的文本
+    请求参数：
+        doc_id: 文档ID
+    返回：
+        包含提取文本的JSON响应
+    """
+    doc_id = request.args.get('doc_id')
+    
+    if not doc_id:
+        return jsonify({
+            'success': False,
+            'message': '缺少文档ID参数'
+        }), 400
+    
+    try:
+        # 从数据库查询文档信息
+        file_path = None
+        doc_name = None
+        
+        if DATABASE_TYPE == "mysql" and MYSQL_AVAILABLE:
+            try:
+                conn = mysql.connector.connect(**MYSQL_CONFIG)
+                cursor = conn.cursor(dictionary=True)
+                cursor.execute("SELECT file_path, doc_name FROM knowledge_documents WHERE doc_id = %s AND is_active = 1", (doc_id,))
+                document = cursor.fetchone()
+                cursor.close()
+                conn.close()
+                
+                if document:
+                    file_path = document['file_path']
+                    doc_name = document['doc_name']
+            except Exception as e:
+                print(f"MySQL查询失败: {str(e)}，尝试使用SQLite")
+                # 如果MySQL失败，使用SQLite作为备份
+                conn = sqlite3.connect(SQLITE_DB_PATH)
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute("SELECT file_path, doc_name FROM knowledge_documents WHERE doc_id = ? AND is_active = 1", (doc_id,))
+                document = cursor.fetchone()
+                cursor.close()
+                conn.close()
+                
+                if document:
+                    file_path = document['file_path']
+                    doc_name = document['doc_name']
+        else:
+            # 直接使用SQLite
+            conn = sqlite3.connect(SQLITE_DB_PATH)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT file_path, doc_name FROM knowledge_documents WHERE doc_id = ? AND is_active = 1", (doc_id,))
+            document = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            
+            if document:
+                file_path = document['file_path']
+                doc_name = document['doc_name']
+        
+        # 如果数据库中找不到文档，尝试直接从文件系统中查找
+        if not file_path:
+            # 检查uploads目录中是否有该ID的文件
+            for ext in ['docx', 'doc']:
+                possible_path = os.path.join('uploads', f"{doc_id}.{ext}")
+                if os.path.exists(possible_path):
+                    file_path = possible_path
+                    doc_name = f"{doc_id}.{ext}"
+                    print(f"在文件系统中找到文档: {file_path}")
+                    break
+            
+            if not file_path:
+                return jsonify({
+                    'success': False,
+                    'message': f'未找到ID为{doc_id}的文档'
+                }), 404
+        
+        # 检查文件是否存在
+        if not os.path.exists(file_path):
+            return jsonify({
+                'success': False,
+                'message': f'文件不存在: {file_path}'
+            }), 404
+        
+        # 提取文本
+        if not DOCX_PARSER_AVAILABLE:
+            return jsonify({
+                'success': False,
+                'message': '文本提取模块未正确加载，无法处理Word文档'
+            }), 500
+        
+        try:
+            extracted_text = extract_text_from_word(file_path)
+            text_length = len(extracted_text)
+            
+            return jsonify({
+                'success': True,
+                'message': '文本提取成功',
+                'data': {
+                    'doc_id': doc_id,
+                    'doc_name': doc_name,
+                    'text': extracted_text,  # 返回完整文本，而不是预览
+                    'text_length': text_length,
+                    'file_path': file_path
+                }
+            }), 200
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f'文本提取失败: {str(e)}'
+            }), 500
+    
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'服务器错误: {str(e)}'
+        }), 500
+
+@app.route('/admin/api/segment_text', methods=['POST'])
+def segment_document_text():
+    """
+    接收一段文本并进行分段处理
+    请求参数：
+    - text: 要分段的文本
+    - strategy: 分段策略，可选值有 fixed_length（固定长度）、paragraph（段落）、combined（组合）、
+               smart（智能混合）、legal_structure（法律结构）
+    - chunk_size: 文本块大小，当strategy=fixed_length/combined/smart/legal_structure时使用
+    - overlap: 重叠长度，当strategy=fixed_length/combined/smart时使用
+    """
+    if not TEXT_SEGMENTATION_AVAILABLE:
+        return jsonify({
+            "success": False,
+            "message": "文本分段模块未加载，无法处理请求",
+            "chunks": []
+        })
+    
+    try:
+        # 获取请求参数
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                "success": False,
+                "message": "请求缺少必要的JSON数据",
+                "chunks": []
+            })
+        
+        text = data.get('text', '')
+        strategy = data.get('strategy', 'fixed_length')
+        chunk_size = int(data.get('chunk_size', 500))
+        overlap = int(data.get('overlap', 50))
+        
+        if not text:
+            return jsonify({
+                "success": False,
+                "message": "未提供文本内容",
+                "chunks": []
+            })
+        
+        print(f"接收到分段请求，策略：{strategy}，块大小：{chunk_size}，重叠：{overlap}")
+        
+        # 根据不同策略调用分段函数
+        if strategy == 'fixed_length' or strategy == 'paragraph':
+            chunks = segment_text(text, strategy, chunk_size, overlap)
+            # 返回分段结果（普通格式）
+            return jsonify({
+                "success": True,
+                "message": f"文本已使用 {strategy} 策略成功分段为 {len(chunks)} 块",
+                "chunks": chunks,
+                "total_chunks": len(chunks),
+                "strategy": strategy,
+                "chunk_size": chunk_size,
+                "overlap": overlap
+            })
+        elif strategy == 'combined':
+            chunks = segment_text_combined(text, chunk_size, overlap)
+            # 返回分段结果（普通格式）
+            return jsonify({
+                "success": True,
+                "message": f"文本已使用 {strategy} 策略成功分段为 {len(chunks)} 块",
+                "chunks": chunks,
+                "total_chunks": len(chunks),
+                "strategy": strategy,
+                "chunk_size": chunk_size,
+                "overlap": overlap
+            })
+        elif strategy == 'smart':
+            chunks = segment_text_smart(text, chunk_size, overlap)
+            # 返回分段结果（普通格式）
+            return jsonify({
+                "success": True,
+                "message": f"文本已使用 {strategy} 策略成功分段为 {len(chunks)} 块",
+                "chunks": chunks,
+                "total_chunks": len(chunks),
+                "strategy": strategy,
+                "chunk_size": chunk_size,
+                "overlap": overlap
+            })
+        elif strategy == 'legal_structure':
+            # 法律结构分段返回文本段落和元数据
+            segments, metadata = segment_text_legal_structure(text, chunk_size)
+            
+            # 组合段落和元数据为结构化结果
+            structured_chunks = []
+            for i, (segment, meta) in enumerate(zip(segments, metadata)):
+                structured_chunks.append({
+                    "content": segment,
+                    "metadata": meta
+                })
+            
+            # 返回带有结构化元数据的分段结果
+            return jsonify({
+                "success": True,
+                "message": f"文本已使用 {strategy} 策略成功分段为 {len(segments)} 块",
+                "chunks": structured_chunks,  # 带有元数据的结构化文本块
+                "total_chunks": len(segments),
+                "strategy": strategy,
+                "chunk_size": chunk_size
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "message": f"不支持的分段策略: {strategy}",
+                "chunks": []
+            })
+        
+    except Exception as e:
+        error_message = f"文本分段处理失败: {str(e)}"
+        print(error_message)
+        print(traceback.format_exc())
+        
+        return jsonify({
+            "success": False,
+            "message": error_message,
+            "chunks": []
+        })
+
+if __name__ == '__main__':
+    # 应用启动诊断信息
+    print("--- Flask 应用启动诊断 ---")
+    print(f"试图导入的函数信息: {imported_parse_function_info}")
+    if parse_opml_function_to_use:
+        print(f"将要使用的解析函数来源模块: {inspect.getmodule(parse_opml_function_to_use)}")
+        print(f"将要使用的解析函数名称: {parse_opml_function_to_use.__name__}")
+        print("注意：当前看起来是导入了名为 parse_opml_to_json_tree 的函数。")
+    else:
+        print("警告：未能成功导入 parse_opml_to_json_tree 函数。")
+    print("--------------------------")
+    app.logger.info("Flask Admin API 服务准备启动 (主程序块)...")
+    
+    # 测试数据库连接
+    success, message, db_type = test_db_connection()
+    if success:
+        print(f"使用 {db_type.upper()} 数据库")
+    else:
+        print(f"警告: {message}")
+    
+    # 启动应用
+    app.run(host='0.0.0.0', port=5003, debug=True)

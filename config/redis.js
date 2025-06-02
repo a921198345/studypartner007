@@ -42,56 +42,10 @@ class MockRedisClient {
   async disconnect() { return true; }
 }
 
-// Redis客户端配置
-const config = {
-  url: process.env.REDIS_URL || 'redis://localhost:6379',  // Redis服务器地址
-  socket: {
-    reconnectStrategy: (retries) => {
-      // 最多尝试5次重连，每次间隔增加
-      if (retries > 5) {
-        console.log('⚠️ Redis连接失败次数过多，切换到模拟模式');
-        return false; // 停止尝试重连
-      }
-      return Math.min(retries * 1000, 3000); // 1s, 2s, 3s, ...，最多3秒
-    }
-  }
-};
-
-// 只有环境变量中设置了密码才添加密码配置
-if (process.env.REDIS_PASSWORD) {
-  config.password = process.env.REDIS_PASSWORD;
-}
-
-// 创建Redis客户端
-let redisClient;
-let isUsingMock = false;
-
-try {
-  redisClient = createClient(config);
-
-// 连接事件
-  redisClient.on('error', (err) => {
-    console.log('Redis连接错误', err);
-  });
-redisClient.on('connect', () => console.log('Redis已连接'));
-redisClient.on('reconnecting', () => console.log('Redis重新连接中...'));
-redisClient.on('ready', () => console.log('Redis准备就绪!'));
-
-// 连接Redis
-(async () => {
-    try {
-  await redisClient.connect();
-    } catch (err) {
-      console.log('⚠️ Redis连接失败，切换到内存模拟模式:', err.message);
-      isUsingMock = true;
-      redisClient = new MockRedisClient();
-    }
-})();
-} catch (err) {
-  console.log('⚠️ Redis初始化失败，使用内存模拟模式:', err.message);
-  isUsingMock = true;
-  redisClient = new MockRedisClient();
-}
+// 默认使用内存模拟模式，不尝试连接Redis
+console.log('⚠️ 当前配置为默认使用内存模拟Redis模式');
+let redisClient = new MockRedisClient();
+let isUsingMock = true;
 
 // 导出增强的Redis客户端
 const enhancedClient = {

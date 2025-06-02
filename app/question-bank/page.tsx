@@ -410,18 +410,32 @@ export default function QuestionBankPage() {
     }
   };
   
-  // 初始加载错题集
+  // 初始加载错题集和添加监听器
   useEffect(() => {
     loadWrongQuestions();
     
     // 添加错题集变化事件的监听器
     const handleWrongQuestionsChange = (event: Event) => {
       // 将event转换为CustomEvent以访问detail属性
-      const customEvent = event as CustomEvent<{removedId?: number}>;
+      const customEvent = event as CustomEvent<{
+        removed?: number;
+        removedId?: number;
+        action?: string;
+      }>;
+      
       console.log("检测到错题集变化事件:", customEvent.detail);
-      if (customEvent.detail && customEvent.detail.removedId) {
-        console.log(`题目 #${customEvent.detail.removedId} 已从错题集中移除，刷新错题列表`);
-        loadWrongQuestions(); // 重新加载错题集
+      
+      // 立即重新加载错题集，无论是哪种操作
+      loadWrongQuestions();
+      
+      // 如果当前正在错题标签页，确保UI立即更新
+      if (activeTab === "wrong") {
+        console.log("当前在错题标签页，强制刷新显示");
+        // 强制重新渲染
+        setWrongQuestions(prev => [...prev]); // 触发重新渲染
+        setTimeout(() => {
+          loadWrongQuestions(); // 再次加载确保数据最新
+        }, 100);
       }
     };
     
@@ -434,7 +448,7 @@ export default function QuestionBankPage() {
       window.removeEventListener('wrongQuestionsChanged', handleWrongQuestionsChange);
       window.removeEventListener('wrongQuestionsUpdated', handleWrongQuestionsChange);
     };
-  }, []);
+  }, [activeTab]); // 添加activeTab作为依赖，确保监听器能获取最新的标签状态
 
   // 处理标签切换
   const handleTabChange = (value: string) => {
@@ -442,6 +456,7 @@ export default function QuestionBankPage() {
     
     if (value === "wrong") {
       // 每次进入错题标签时都重新加载错题列表
+      console.log("切换到错题标签，重新加载错题列表");
       loadWrongQuestions();
     } else if (value === "favorite" && favoriteQuestions.length === 0) {
       loadFavoriteQuestions();
@@ -872,14 +887,80 @@ export default function QuestionBankPage() {
                   {activeTab === "favorite" && favoriteQuestions.length > 0 && (
                     <div className="flex space-x-4">
                       <Button 
-                        onClick={() => lastQuestionId && router.push(`/question-bank/${lastQuestionId}`)}
-                        className={`${hasLastProgress ? "bg-green-600 hover:bg-green-700" : "bg-gray-400 opacity-70 cursor-not-allowed"}`}
-                        disabled={!hasLastProgress}
+                        onClick={() => {
+                          // 保存收藏题目列表到localStorage
+                          const favoritesList = {
+                            questions: favoriteQuestions.map(q => ({
+                              id: q.id,
+                              question_code: q.question_code || null,
+                              year: q.year,
+                              subject: q.subject,
+                              question_type: q.question_type
+                            })),
+                            total: favoriteQuestions.length,
+                            timestamp: Date.now(),
+                            source: "favorites"
+                          };
+                          localStorage.setItem('favoriteQuestionsList', JSON.stringify(favoritesList));
+                          
+                          // 查找收藏列表中上次练习的题目
+                          const historyString = localStorage.getItem('answerHistory');
+                          let lastFavoriteQuestion = null;
+                          
+                          if (historyString) {
+                            try {
+                              const history = JSON.parse(historyString);
+                              // 如果本地有答题历史且不超过1天
+                              if (history && history.timestamp && Date.now() - history.timestamp < 86400000) {
+                                // 找出最近回答的收藏题目ID
+                                const answeredIds = Object.keys(history.answered || {}).map(Number);
+                                // 过滤出收藏列表中的题目ID
+                                const favoriteIds = favoriteQuestions.map(q => q.id);
+                                // 取交集，找出已回答的收藏题目
+                                const answeredFavorites = answeredIds.filter(id => favoriteIds.includes(id));
+                                
+                                if (answeredFavorites.length > 0) {
+                                  // 找出最大ID或最后做的一道题
+                                  lastFavoriteQuestion = Math.max(...answeredFavorites);
+                                }
+                              }
+                            } catch (e) {
+                              console.error("解析本地答题历史失败:", e);
+                            }
+                          }
+                          
+                          // 如果找到上次练习的收藏题目，跳转到该题
+                          if (lastFavoriteQuestion) {
+                            router.push(`/question-bank/${lastFavoriteQuestion}?source=favorites&continue=true`);
+                          } else {
+                            // 否则提示没有最近练习记录
+                            alert("没有找到收藏题目的最近练习记录");
+                          }
+                        }}
+                        className="bg-green-600 hover:bg-green-700"
                       >
-                        继续练习
+                        继续练习收藏
                       </Button>
-                      <Button onClick={() => favoriteQuestions.length > 0 && router.push(`/question-bank/${favoriteQuestions[0].id}`)}>
-                        开始练习
+                      <Button onClick={() => {
+                        // 保存收藏题目列表到localStorage
+                        const favoritesList = {
+                          questions: favoriteQuestions.map(q => ({
+                            id: q.id,
+                            question_code: q.question_code || null,
+                            year: q.year,
+                            subject: q.subject,
+                            question_type: q.question_type
+                          })),
+                          total: favoriteQuestions.length,
+                          timestamp: Date.now(),
+                          source: "favorites"
+                        };
+                        localStorage.setItem('favoriteQuestionsList', JSON.stringify(favoritesList));
+                        
+                        // 跳转到第一个收藏题目
+                        router.push(`/question-bank/${favoriteQuestions[0].id}?source=favorites&index=0`);
+                      }}>
+                        开始练习收藏
                       </Button>
                     </div>
                   )}
@@ -1074,7 +1155,7 @@ export default function QuestionBankPage() {
                         
                         {favoriteQuestions.map((question) => (
                           <Link 
-                            href={`/question-bank/${question.id}`} 
+                            href={`/question-bank/${question.id}?source=favorites&index=0`} 
                             key={question.id}
                           >
                             <div 
@@ -1083,17 +1164,17 @@ export default function QuestionBankPage() {
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center space-x-2">
                                   <Badge variant="outline">
-                                    {typeof question.year === 'string' ? question.year : '未知年份'}
+                                    {question.year ? question.year : '未知年份'}
                                   </Badge>
                                   <Badge variant="secondary">
-                                    {typeof question.subject === 'string' ? question.subject : '未分类'}
-                                </Badge>
+                                    {question.subject || '未分类'}
+                                  </Badge>
                                   <Badge>
                                     {question.question_type === 1 || question.question_type === '单选题' ? 
                                       "单选题" : (question.question_type === 2 || question.question_type === '多选题' ? 
                                         "多选题" : "未知类型")}
-                                </Badge>
-                              </div>
+                                  </Badge>
+                                </div>
                                 <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                               </div>
                               <p className="text-sm">{question.question_text || '题目内容未加载'}</p>

@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>法律结构化文本查看器</title>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2c3e50;
+            --bg-color: #f8f9fa;
+            --border-color: #dee2e6;
+            --law-title-color: #004085;
+            --part-color: #155724;
+            --chapter-color: #0c5460;
+            --section-color: #721c24;
+            --article-color: #856404;
+            --text-color: #343a40;
+        }
+        
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg-color);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            grid-gap: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        h1 {
+            color: var(--secondary-color);
+            margin-top: 0;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+            grid-column: 1 / -1;
+        }
+        
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .sidebar {
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            height: fit-content;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            position: sticky;
+            top: 20px;
+        }
+        
+        .sidebar h2 {
+            color: var(--secondary-color);
+            font-size: 1.2rem;
+            margin-top: 0;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+        
+        .nav-tree {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+        
+        .nav-tree details {
+            margin-bottom: 5px;
+        }
+        
+        .nav-tree summary {
+            cursor: pointer;
+            padding: 5px 0;
+            color: var(--primary-color);
+            font-weight: bold;
+        }
+        
+        .nav-tree ul {
+            margin: 0;
+            padding-left: 20px;
+            list-style: none;
+        }
+        
+        .nav-tree li {
+            margin: 5px 0;
+        }
+        
+        .nav-link {
+            text-decoration: none;
+            color: var(--text-color);
+            display: block;
+            padding: 5px;
+            border-radius: 3px;
+            transition: background-color 0.2s;
+        }
+        
+        .nav-link:hover {
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+        
+        .nav-link.active {
+            background-color: rgba(52, 152, 219, 0.2);
+            font-weight: bold;
+        }
+        
+        .structure-segment {
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 15px;
+            overflow: hidden;
+            transition: transform 0.2s;
+        }
+        
+        .structure-segment:hover {
+            transform: translateY(-2px);
+        }
+        
+        .structure-header {
+            padding: 10px 15px;
+            font-weight: bold;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .structure-header.law_title {
+            background-color: #cce5ff;
+            color: var(--law-title-color);
+        }
+        
+        .structure-header.part {
+            background-color: #d4edda;
+            color: var(--part-color);
+        }
+        
+        .structure-header.chapter {
+            background-color: #d1ecf1;
+            color: var(--chapter-color);
+        }
+        
+        .structure-header.section {
+            background-color: #f8d7da;
+            color: var(--section-color);
+        }
+        
+        .structure-header.article {
+            background-color: #fff3cd;
+            color: var(--article-color);
+        }
+        
+        .structure-header.plain_text {
+            background-color: #f8f9fa;
+            color: var(--text-color);
+        }
+        
+        .structure-content {
+            padding: 15px;
+            white-space: pre-wrap;
+        }
+        
+        .structure-metadata {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 5px;
+            font-size: 0.8rem;
+        }
+        
+        .meta-tag {
+            background-color: rgba(52, 152, 219, 0.1);
+            padding: 2px 5px;
+            border-radius: 3px;
+            color: var(--primary-color);
+        }
+        
+        .controls {
+            grid-column: 1 / -1;
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .controls label {
+            margin-right: 5px;
+        }
+        
+        .form-group {
+            margin-bottom: 10px;
+        }
+        
+        textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            resize: vertical;
+            font-family: inherit;
+            font-size: inherit;
+        }
+        
+        .btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.2s;
+        }
+        
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .file-label {
+            display: inline-block;
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.2s;
+        }
+        
+        .file-label:hover {
+            background-color: #1a252f;
+        }
+        
+        .nav-controls {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+        
+        .nav-btn {
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background-color 0.2s;
+        }
+        
+        .nav-btn:hover {
+            background-color: #1a252f;
+        }
+        
+        .nav-btn:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        
+        .loading-indicator {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            font-style: italic;
+            color: #6c757d;
+        }
+        
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+        
+        .status-badge {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: #28a745;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .status-badge.offline {
+            background-color: #dc3545;
+        }
+        
+        .status-badge:before {
+            content: "";
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: white;
+        }
+        
+        .results-summary {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+        }
+        
+        .results-summary ul {
+            margin: 5px 0;
+            padding-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>法律结构化文本查看器</h1>
+        
+        <div id="status-badge" class="status-badge offline">
+            正在连接服务器...
+        </div>
+        
+        <div class="controls">
+            <div class="form-group">
+                <label for="fileInput" class="file-label">选择文件</label>
+                <input type="file" id="fileInput" class="file-input" accept=".txt,.doc,.docx">
+            </div>
+            
+            <div class="form-group">
+                <button id="processTextBtn" class="btn">处理文本</button>
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="includeMetadata" checked>
+                    包含详细元数据
+                </label>
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="includeNavigation" checked>
+                    包含导航信息
+                </label>
+            </div>
+        </div>
+        
+        <div class="sidebar">
+            <h2>结构导航</h2>
+            <div id="navTree" class="nav-tree">
+                <p>尚未加载文档结构...</p>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="form-group">
+                <textarea id="inputText" placeholder="请输入法律文本，或者上传文件..."></textarea>
+            </div>
+            
+            <div id="errorMessage" class="error-message" style="display: none;"></div>
+            
+            <div id="resultsSummary" class="results-summary" style="display: none;"></div>
+            
+            <div id="loadingIndicator" class="loading-indicator" style="display: none;">
+                正在处理文本，请稍候...
+            </div>
+            
+            <div id="structureContent"></div>
+            
+            <div id="navControls" class="nav-controls" style="display: none;">
+                <button id="prevBtn" class="nav-btn" disabled>&larr; 上一节</button>
+                <button id="nextBtn" class="nav-btn" disabled>下一节 &rarr;</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量，存储当前分段数据
+        let currentSegments = [];
+        let currentIndex = -1;
+        let apiUrl = 'http://localhost:5004';
+        
+        // 检查API服务是否在线
+        async function checkApiStatus() {
+            const statusBadge = document.getElementById('status-badge');
+            
+            try {
+                const response = await fetch(`${apiUrl}/health`);
+                if (response.ok) {
+                    const data = await response.json();
+                    statusBadge.textContent = '服务在线';
+                    statusBadge.classList.remove('offline');
+                    
+                    // 检查模块状态
+                    const structureModule = data.modules.structure_recognition;
+                    const docxModule = data.modules.docx_parser;
+                    
+                    if (!structureModule) {
+                        showError('结构识别模块未加载，部分功能可能不可用');
+                    }
+                    
+                    if (!docxModule) {
+                        showError('Word文档解析模块未加载，无法处理.doc和.docx文件');
+                    }
+                    
+                    return true;
+                } else {
+                    throw new Error('服务响应异常');
+                }
+            } catch (error) {
+                statusBadge.textContent = '服务离线';
+                statusBadge.classList.add('offline');
+                showError('无法连接到API服务，请确保服务正在运行');
+                return false;
+            }
+        }
+        
+        // 显示错误消息
+        function showError(message) {
+            const errorElement = document.getElementById('errorMessage');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+            
+            // 3秒后自动隐藏
+            setTimeout(() => {
+                errorElement.style.display = 'none';
+            }, 5000);
+        }
+        
+        // 处理文本
+        async function processText() {
+            const text = document.getElementById('inputText').value.trim();
+            if (!text) {
+                showError('请输入文本或上传文件');
+                return;
+            }
+            
+            const includeMetadata = document.getElementById('includeMetadata').checked;
+            const includeNavigation = document.getElementById('includeNavigation').checked;
+            
+            // 显示加载指示器
+            document.getElementById('loadingIndicator').style.display = 'flex';
+            document.getElementById('structureContent').innerHTML = '';
+            document.getElementById('navTree').innerHTML = '<p>正在分析文档结构...</p>';
+            document.getElementById('resultsSummary').style.display = 'none';
+            
+            try {
+                const response = await fetch(`${apiUrl}/process_text`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: text,
+                        include_metadata: includeMetadata,
+                        include_navigation: includeNavigation
+                    })
+                });
+                
+                const result = await response.json();
+                
+                // 隐藏加载指示器
+                document.getElementById('loadingIndicator').style.display = 'none';
+                
+                if (result.success) {
+                    // 保存分段数据
+                    currentSegments = result.segments;
+                    
+                    // 显示分析结果摘要
+                    showResultsSummary(result);
+                    
+                    // 生成导航树
+                    generateNavTree(result.segments);
+                    
+                    // 渲染结构化内容
+                    if (currentSegments.length > 0) {
+                        // 默认显示第一个分段
+                        currentIndex = 0;
+                        updateContentView();
+                        
+                        // 显示导航控件
+                        document.getElementById('navControls').style.display = 'flex';
+                        updateNavButtons();
+                    }
+                } else {
+                    showError(result.message || '处理文本时出错');
+                }
+            } catch (error) {
+                document.getElementById('loadingIndicator').style.display = 'none';
+                showError(`请求失败: ${error.message}`);
+            }
+        }
+        
+        // 处理文件上传
+        async function processFile(file) {
+            if (!file) {
+                showError('请选择文件');
+                return;
+            }
+            
+            const includeMetadata = document.getElementById('includeMetadata').checked;
+            const includeNavigation = document.getElementById('includeNavigation').checked;
+            
+            // 显示加载指示器
+            document.getElementById('loadingIndicator').style.display = 'flex';
+            document.getElementById('structureContent').innerHTML = '';
+            document.getElementById('navTree').innerHTML = '<p>正在分析文档结构...</p>';
+            document.getElementById('resultsSummary').style.display = 'none';
+            
+            // 清空文本输入框
+            document.getElementById('inputText').value = '';
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('include_metadata', includeMetadata);
+                formData.append('include_navigation', includeNavigation);
+                
+                const response = await fetch(`${apiUrl}/process_file`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                // 隐藏加载指示器
+                document.getElementById('loadingIndicator').style.display = 'none';
+                
+                if (result.success) {
+                    // 保存分段数据
+                    currentSegments = result.segments;
+                    
+                    // 显示分析结果摘要
+                    showResultsSummary(result);
+                    
+                    // 生成导航树
+                    generateNavTree(result.segments);
+                    
+                    // 渲染结构化内容
+                    if (currentSegments.length > 0) {
+                        // 默认显示第一个分段
+                        currentIndex = 0;
+                        updateContentView();
+                        
+                        // 显示导航控件
+                        document.getElementById('navControls').style.display = 'flex';
+                        updateNavButtons();
+                    }
+                } else {
+                    showError(result.message || '处理文件时出错');
+                }
+            } catch (error) {
+                document.getElementById('loadingIndicator').style.display = 'none';
+                showError(`请求失败: ${error.message}`);
+            }
+        }
+        
+        // 显示分析结果摘要
+        function showResultsSummary(result) {
+            const summaryElement = document.getElementById('resultsSummary');
+            
+            let summaryHtml = `<strong>分析结果:</strong> 共 ${result.total_segments} 个分段`;
+            
+            if (result.statistics && result.statistics.structure_types) {
+                summaryHtml += '<ul>';
+                for (const [type, count] of Object.entries(result.statistics.structure_types)) {
+                    const typeName = getStructureTypeName(type);
+                    summaryHtml += `<li>${typeName}: ${count} 个</li>`;
+                }
+                summaryHtml += '</ul>';
+            }
+            
+            if (result.filename) {
+                summaryHtml = `<strong>文件:</strong> ${result.filename}<br>` + summaryHtml;
+            }
+            
+            summaryElement.innerHTML = summaryHtml;
+            summaryElement.style.display = 'block';
+        }
+        
+        // 获取结构类型的中文名称
+        function getStructureTypeName(type) {
+            const typeNames = {
+                'law_title': '法律标题',
+                'part': '编',
+                'chapter': '章',
+                'section': '节',
+                'article': '条款',
+                'plain_text': '普通文本'
+            };
+            
+            return typeNames[type] || type;
+        }
+        
+        // 生成导航树
+        function generateNavTree(segments) {
+            const navTreeElement = document.getElementById('navTree');
+            navTreeElement.innerHTML = '';
+            
+            // 提取结构信息，用于构建树状导航
+            const lawTitles = new Map();
+            const parts = new Map();
+            const chapters = new Map();
+            const sections = new Map();
+            
+            segments.forEach((segment, index) => {
+                const metadata = segment.metadata;
+                const structureType = metadata.structure_type;
+                
+                if (structureType === 'law_title' && metadata.law_name) {
+                    lawTitles.set(metadata.law_name, index);
+                }
+                else if (structureType === 'part' && metadata.part) {
+                    const key = metadata.part.original_text || `第${metadata.part.number}编`;
+                    parts.set(key, index);
+                }
+                else if (structureType === 'chapter' && metadata.chapter) {
+                    const key = metadata.chapter.original_text || `第${metadata.chapter.number}章`;
+                    chapters.set(key, index);
+                }
+                else if (structureType === 'section' && metadata.section) {
+                    const key = metadata.section.original_text || `第${metadata.section.number}节`;
+                    sections.set(key, index);
+                }
+            });
+            
+            // 创建顶层结构
+            // 法律标题
+            lawTitles.forEach((index, title) => {
+                const lawElement = document.createElement('details');
+                lawElement.open = true;
+                
+                const summary = document.createElement('summary');
+                summary.textContent = title;
+                lawElement.appendChild(summary);
+                
+                const lawContent = document.createElement('ul');
+                lawElement.appendChild(lawContent);
+                
+                navTreeElement.appendChild(lawElement);
+                
+                // 添加编
+                const partsElement = document.createElement('ul');
+                let hasChildren = false;
+                
+                parts.forEach((partIndex, partTitle) => {
+                    const partMetadata = segments[partIndex].metadata;
+                    const partElement = document.createElement('details');
+                    
+                    const partSummary = document.createElement('summary');
+                    partSummary.textContent = partTitle;
+                    partElement.appendChild(partSummary);
+                    
+                    const partLink = document.createElement('a');
+                    partLink.href = '#';
+                    partLink.textContent = partTitle;
+                    partLink.className = 'nav-link';
+                    partLink.dataset.index = partIndex;
+                    partLink.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        currentIndex = parseInt(e.target.dataset.index);
+                        updateContentView();
+                        updateNavButtons();
+                    });
+                    
+                    partSummary.addEventListener('click', (e) => {
+                        if (e.target === partSummary) {
+                            currentIndex = partIndex;
+                            updateContentView();
+                            updateNavButtons();
+                        }
+                    });
+                    
+                    const chaptersUl = document.createElement('ul');
+                    let hasChapters = false;
+                    
+                    // 添加章
+                    chapters.forEach((chapterIndex, chapterTitle) => {
+                        const chapterMetadata = segments[chapterIndex].metadata;
+                        if (chapterMetadata.part && chapterMetadata.part.number === partMetadata.part.number) {
+                            hasChapters = true;
+                            
+                            const chapterElement = document.createElement('details');
+                            
+                            const chapterSummary = document.createElement('summary');
+                            chapterSummary.textContent = chapterTitle;
+                            chapterElement.appendChild(chapterSummary);
+                            
+                            chapterSummary.addEventListener('click', (e) => {
+                                if (e.target === chapterSummary) {
+                                    currentIndex = chapterIndex;
+                                    updateContentView();
+                                    updateNavButtons();
+                                }
+                            });
+                            
+                            const sectionsUl = document.createElement('ul');
+                            let hasSections = false;
+                            
+                            // 添加节
+                            sections.forEach((sectionIndex, sectionTitle) => {
+                                const sectionMetadata = segments[sectionIndex].metadata;
+                                if (sectionMetadata.part && sectionMetadata.part.number === partMetadata.part.number &&
+                                    sectionMetadata.chapter && sectionMetadata.chapter.number === chapterMetadata.chapter.number) {
+                                    hasSections = true;
+                                    
+                                    const sectionLi = document.createElement('li');
+                                    const sectionLink = document.createElement('a');
+                                    sectionLink.href = '#';
+                                    sectionLink.textContent = sectionTitle;
+                                    sectionLink.className = 'nav-link';
+                                    sectionLink.dataset.index = sectionIndex;
+                                    sectionLink.addEventListener('click', (e) => {
+                                        e.preventDefault();
+                                        currentIndex = parseInt(e.target.dataset.index);
+                                        updateContentView();
+                                        updateNavButtons();
+                                    });
+                                    
+                                    sectionLi.appendChild(sectionLink);
+                                    sectionsUl.appendChild(sectionLi);
+                                }
+                            });
+                            
+                            if (hasSections) {
+                                chapterElement.appendChild(sectionsUl);
+                            }
+                            
+                            chaptersUl.appendChild(chapterElement);
+                        }
+                    });
+                    
+                    if (hasChapters) {
+                        partElement.appendChild(chaptersUl);
+                    }
+                    
+                    partsElement.appendChild(partElement);
+                    hasChildren = true;
+                });
+                
+                if (hasChildren) {
+                    lawContent.appendChild(partsElement);
+                }
+                
+                // 如果没有子结构，直接显示一个文章列表
+                if (!hasChildren) {
+                    const articlesElement = document.createElement('ul');
+                    
+                    // 遍历所有条款
+                    segments.forEach((segment, index) => {
+                        if (segment.metadata.structure_type === 'article') {
+                            const articleLi = document.createElement('li');
+                            const articleLink = document.createElement('a');
+                            articleLink.href = '#';
+                            articleLink.textContent = segment.metadata.article || `条款 #${index}`;
+                            articleLink.className = 'nav-link';
+                            articleLink.dataset.index = index;
+                            articleLink.addEventListener('click', (e) => {
+                                e.preventDefault();
+                                currentIndex = parseInt(e.target.dataset.index);
+                                updateContentView();
+                                updateNavButtons();
+                            });
+                            
+                            articleLi.appendChild(articleLink);
+                            articlesElement.appendChild(articleLi);
+                        }
+                    });
+                    
+                    lawContent.appendChild(articlesElement);
+                }
+            });
+            
+            // 如果没有结构化的内容，显示简单列表
+            if (navTreeElement.childElementCount === 0) {
+                const simpleList = document.createElement('ul');
+                
+                segments.forEach((segment, index) => {
+                    const structureType = segment.metadata.structure_type;
+                    
+                    // 只添加结构节点，而不是所有分段
+                    if (['law_title', 'part', 'chapter', 'section', 'article'].includes(structureType)) {
+                        const li = document.createElement('li');
+                        const link = document.createElement('a');
+                        link.href = '#';
+                        link.className = 'nav-link';
+                        link.dataset.index = index;
+                        
+                        // 根据结构类型设置显示文本
+                        if (structureType === 'law_title') {
+                            link.textContent = segment.metadata.law_name || segment.content;
+                        } else if (structureType === 'part') {
+                            link.textContent = segment.metadata.part?.original_text || segment.content;
+                        } else if (structureType === 'chapter') {
+                            link.textContent = segment.metadata.chapter?.original_text || segment.content;
+                        } else if (structureType === 'section') {
+                            link.textContent = segment.metadata.section?.original_text || segment.content;
+                        } else if (structureType === 'article') {
+                            link.textContent = segment.metadata.article || segment.content.slice(0, 20);
+                        }
+                        
+                        link.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            currentIndex = parseInt(e.target.dataset.index);
+                            updateContentView();
+                            updateNavButtons();
+                        });
+                        
+                        li.appendChild(link);
+                        simpleList.appendChild(li);
+                    }
+                });
+                
+                navTreeElement.appendChild(simpleList);
+            }
+            
+            // 如果没有任何导航项
+            if (navTreeElement.childElementCount === 0) {
+                navTreeElement.innerHTML = '<p>未能提取文档结构</p>';
+            }
+        }
+        
+        // 更新内容视图
+        function updateContentView() {
+            if (currentIndex < 0 || currentIndex >= currentSegments.length) {
+                return;
+            }
+            
+            const contentElement = document.getElementById('structureContent');
+            contentElement.innerHTML = '';
+            
+            // 高亮当前活动的导航链接
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+                if (parseInt(link.dataset.index) === currentIndex) {
+                    link.classList.add('active');
+                }
+            });
+            
+            // 获取当前分段
+            const segment = currentSegments[currentIndex];
+            
+            // 创建分段元素
+            const segmentElement = document.createElement('div');
+            segmentElement.className = 'structure-segment';
+            
+            // 创建标题
+            const headerElement = document.createElement('div');
+            headerElement.className = `structure-header ${segment.metadata.structure_type}`;
+            
+            let headerText = '';
+            switch (segment.metadata.structure_type) {
+                case 'law_title':
+                    headerText = segment.metadata.law_name || '法律标题';
+                    break;
+                case 'part':
+                    headerText = segment.metadata.part?.original_text || `第${segment.metadata.part?.number}编`;
+                    break;
+                case 'chapter':
+                    headerText = segment.metadata.chapter?.original_text || `第${segment.metadata.chapter?.number}章`;
+                    break;
+                case 'section':
+                    headerText = segment.metadata.section?.original_text || `第${segment.metadata.section?.number}节`;
+                    break;
+                case 'article':
+                    headerText = segment.metadata.article || '条款';
+                    break;
+                default:
+                    headerText = `普通文本 #${segment.metadata.index + 1}`;
+            }
+            
+            headerElement.textContent = headerText;
+            segmentElement.appendChild(headerElement);
+            
+            // 创建内容
+            const contentTextElement = document.createElement('div');
+            contentTextElement.className = 'structure-content';
+            contentTextElement.textContent = segment.content;
+            segmentElement.appendChild(contentTextElement);
+            
+            // 添加元数据标签
+            if (document.getElementById('includeMetadata').checked) {
+                const metadataElement = document.createElement('div');
+                metadataElement.className = 'structure-metadata';
+                
+                const metadata = segment.metadata;
+                
+                // 添加索引标签
+                const indexTag = document.createElement('span');
+                indexTag.className = 'meta-tag';
+                indexTag.textContent = `索引: ${metadata.index}`;
+                metadataElement.appendChild(indexTag);
+                
+                // 添加类型标签
+                const typeTag = document.createElement('span');
+                typeTag.className = 'meta-tag';
+                typeTag.textContent = `类型: ${getStructureTypeName(metadata.structure_type)}`;
+                metadataElement.appendChild(typeTag);
+                
+                // 如果有法律名称
+                if (metadata.law_name) {
+                    const lawTag = document.createElement('span');
+                    lawTag.className = 'meta-tag';
+                    lawTag.textContent = `法律: ${metadata.law_name}`;
+                    metadataElement.appendChild(lawTag);
+                }
+                
+                contentTextElement.appendChild(metadataElement);
+            }
+            
+            contentElement.appendChild(segmentElement);
+        }
+        
+        // 更新导航按钮状态
+        function updateNavButtons() {
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            
+            prevBtn.disabled = currentIndex <= 0;
+            nextBtn.disabled = currentIndex >= currentSegments.length - 1;
+        }
+        
+        // 初始化页面
+        document.addEventListener('DOMContentLoaded', async () => {
+            // 检查API状态
+            await checkApiStatus();
+            
+            // 绑定处理文本按钮
+            document.getElementById('processTextBtn').addEventListener('click', processText);
+            
+            // 绑定文件输入事件
+            document.getElementById('fileInput').addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    processFile(e.target.files[0]);
+                }
+            });
+            
+            // 绑定导航按钮
+            document.getElementById('prevBtn').addEventListener('click', () => {
+                if (currentIndex > 0) {
+                    currentIndex--;
+                    updateContentView();
+                    updateNavButtons();
+                }
+            });
+            
+            document.getElementById('nextBtn').addEventListener('click', () => {
+                if (currentIndex < currentSegments.length - 1) {
+                    currentIndex++;
+                    updateContentView();
+                    updateNavButtons();
+                }
+            });
+            
+            // 每30秒检查一次API状态
+            setInterval(checkApiStatus, 30000);
+        });
+    </script>
+</body>
+</html> 

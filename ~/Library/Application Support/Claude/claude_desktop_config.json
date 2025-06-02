@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "context7-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@smithery/cli@latest",
+        "run",
+        "@upstash/context7-mcp",
+        "--key",
+        "fe61787a-0607-4bdf-b487-897bf827b9dc"
+      ]
+    },
+    "mcp-feedback-collector": {
+      "command": "/Users/acheng/.local/bin/mcp-feedback-collector",
+      "env": {
+        "PYTHONIOENCODING": "utf-8",
+        "MCP_DIALOG_TIMEOUT": "600"
+      }
+    }
+  }
+} 

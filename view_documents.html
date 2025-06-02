@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>法考资料查看</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .document-list {
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+        .document-type {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            color: white;
+        }
+        .type-doc {
+            background-color: #007bff;
+        }
+        .type-docx {
+            background-color: #28a745;
+        }
+        .empty-message {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            margin-top: 20px;
+            display: none;
+        }
+        .upload-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .upload-link a {
+            display: inline-block;
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+        .upload-link a:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>法考资料文档列表</h1>
+    
+    <div class="upload-link">
+        <a href="upload_test.html">上传新文档</a>
+    </div>
+    
+    <div class="document-list">
+        <div id="errorMessage" class="error-message"></div>
+        
+        <table id="documentsTable">
+            <thead>
+                <tr>
+                    <th>文档名称</th>
+                    <th>类型</th>
+                    <th>法典分类</th>
+                    <th>上传时间</th>
+                    <th>文件路径</th>
+                </tr>
+            </thead>
+            <tbody id="documentsBody">
+                <!-- 文档将动态加载到这里 -->
+            </tbody>
+        </table>
+        
+        <div id="emptyMessage" class="empty-message" style="display: none;">
+            暂无上传的文档。请点击上方的"上传新文档"按钮添加文档。
+        </div>
+    </div>
+    
+    <script>
+        // 页面加载完成后获取文档列表
+        document.addEventListener('DOMContentLoaded', fetchDocuments);
+        
+        // 获取文档列表函数
+        async function fetchDocuments() {
+            try {
+                const response = await fetch('http://localhost:5003/admin/api/documents');
+                const result = await response.json();
+                
+                if (result.success) {
+                    displayDocuments(result.data.documents);
+                } else {
+                    showError(result.message);
+                }
+            } catch (error) {
+                showError('获取文档列表失败: ' + error.message);
+            }
+        }
+        
+        // 显示文档列表
+        function displayDocuments(documents) {
+            const tbody = document.getElementById('documentsBody');
+            const emptyMessage = document.getElementById('emptyMessage');
+            
+            // 清空当前表格内容
+            tbody.innerHTML = '';
+            
+            if (documents && documents.length > 0) {
+                // 有文档数据，显示表格
+                emptyMessage.style.display = 'none';
+                
+                documents.forEach(doc => {
+                    const row = document.createElement('tr');
+                    
+                    // 确定文档类型标签
+                    let typeClass = '';
+                    let typeText = '';
+                    switch(doc.doc_type) {
+                        case 1:
+                        case '1':
+                            typeClass = 'type-doc';
+                            typeText = 'DOC';
+                            break;
+                        case 3:
+                        case '3':
+                            typeClass = 'type-docx';
+                            typeText = 'DOCX';
+                            break;
+                        default:
+                            typeClass = '';
+                            typeText = '其他';
+                    }
+                    
+                    // 格式化日期
+                    let uploadDate = '未知时间';
+                    if (doc.upload_date) {
+                        try {
+                            // 尝试格式化日期，可能是ISO字符串或Date对象
+                            uploadDate = new Date(doc.upload_date).toLocaleString('zh-CN');
+                        } catch (e) {
+                            uploadDate = doc.upload_date;
+                        }
+                    }
+                    
+                    // 设置行内容
+                    row.innerHTML = `
+                        <td>${doc.doc_name || '未命名'}</td>
+                        <td><span class="document-type ${typeClass}">${typeText}</span></td>
+                        <td>${doc.subject_area || '未分类'}</td>
+                        <td>${uploadDate}</td>
+                        <td>${doc.file_path || ''}</td>
+                    `;
+                    
+                    tbody.appendChild(row);
+                });
+            } else {
+                // 没有文档，显示空消息
+                emptyMessage.style.display = 'block';
+            }
+        }
+        
+        // 显示错误消息
+        function showError(message) {
+            const errorElement = document.getElementById('errorMessage');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+        }
+    </script>
+</body>
+</html> 

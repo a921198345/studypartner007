@@ -242,9 +242,9 @@ export function QuestionDetail({
       return question.answer;
     }
     
-    // 最后兜底返回默认答案
-    console.warn(`题目 #${question.id} 没有可用的正确答案，使用默认值A`);
-    return ['A'];
+    // 最后兜底：没有答案数据
+    console.warn(`题目 #${question.id} 没有可用的正确答案，返回空数组`);
+    return [];
   };
   
   // 获取解析文本
@@ -281,10 +281,20 @@ export function QuestionDetail({
   return (
     <div className="w-full">
       <div className="mb-4">
-        <h2 className="text-lg font-medium">
+        <h2 className="text-lg font-medium flex items-center">
           {question.question_code ? 
             `题号: ${question.question_code}` : 
             `题号: ${question.id}`}
+          
+          {/* 添加题目类型标签 */}
+          <Badge 
+            className="ml-3" 
+            variant={question.type === "multiple" ? "outline" : "default"}
+          >
+            {question.type === "single" && "单选题"}
+            {question.type === "multiple" && "多选题"}
+            {question.type === "judgment" && "判断题"}
+          </Badge>
         </h2>
       </div>
       
@@ -356,7 +366,7 @@ export function QuestionDetail({
             </div>
           );
         })}
-      </div>
+        </div>
 
       {!hideSubmitButton && !submittedAnswer && (
         <Button
@@ -396,32 +406,32 @@ export function QuestionDetail({
                 </Badge>
               ))}
             </div>
-          </div>
-          
+            </div>
+
           {/* 解析显示 - 使用新的获取方法 */}
           <div>
             <div className="font-medium mb-2">解析：</div>
             <div className="mt-1 whitespace-pre-wrap text-gray-700">
               {getExplanationText()}
             </div>
-          </div>
-          
+            </div>
+
           {/* 操作按钮 */}
           <div className="flex justify-between mt-6">
-            <Button variant="outline" onClick={handleReset}>
-              重新作答
-            </Button>
-            <Link href={`/knowledge-map?point=related-to-${question.id}`}>
-              <Button className="flex items-center">
-                <Brain className="mr-2 h-4 w-4" />
-                查看相关知识导图
+              <Button variant="outline" onClick={handleReset}>
+                重新作答
               </Button>
-            </Link>
+              <Link href={`/knowledge-map?point=related-to-${question.id}`}>
+                <Button className="flex items-center">
+                  <Brain className="mr-2 h-4 w-4" />
+                  查看相关知识导图
+                </Button>
+              </Link>
+            </div>
           </div>
+        )}
+
         </div>
-      )}
-      
-    </div>
   )
 }
 
