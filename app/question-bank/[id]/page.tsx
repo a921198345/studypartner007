@@ -258,85 +258,31 @@ export default function QuestionPage() {
         // 从收藏页面加载导航数据
         console.log('从收藏页面加载导航数据');
         try {
-          // 首先检查localStorage中的收藏题目列表
           const favoritesListStr = localStorage.getItem('favoriteQuestionsList');
-          
           if (favoritesListStr) {
-            try {
-              const favoritesList = JSON.parse(favoritesListStr);
-              if (favoritesList && favoritesList.questions && favoritesList.questions.length > 0) {
-                // 克隆列表以避免引用问题
-                questionsToDisplay = [...favoritesList.questions].map(q => ({
-                  id: q.id,
-                  question_code: q.question_code || `收藏${q.id}`
-                }));
-                
-                // 保存完整的收藏题目列表到会话存储，确保页面刷新或导航后依然可用
-                sessionStorage.setItem('active_favorites_list', JSON.stringify(questionsToDisplay));
-                
-                console.log(`从localStorage加载的收藏列表导航数据：共${questionsToDisplay.length}题`);
+            const favoritesList = JSON.parse(favoritesListStr);
+            if (favoritesList && favoritesList.questions && favoritesList.questions.length > 0) {
+              questionsToDisplay = favoritesList.questions.map(q => ({
+                id: q.id,
+                question_code: q.question_code || `收藏${q.id}`
+              }));
+              
+              // 使用index参数或查找当前题目在收藏列表中的位置
+              const favIndex = searchParams.get('index');
+              if (favIndex && !isNaN(parseInt(favIndex))) {
+                currentIndex = parseInt(favIndex);
+              } else {
+                currentIndex = questionsToDisplay.findIndex(q => q.id === currentId);
               }
-            } catch (e) {
-              console.error("解析favoriteQuestionsList失败:", e);
+              
+              console.log(`从收藏列表加载的导航数据：共${questionsToDisplay.length}题，当前索引：${currentIndex}`);
+              
+              // 设置题目来源为收藏页面
+              console.log('设置收藏页面来源');
             }
           }
-          
-          // 如果从localStorage未能获取到列表，尝试从会话存储获取
-          if (questionsToDisplay.length === 0) {
-            const sessionFavoritesStr = sessionStorage.getItem('active_favorites_list');
-            if (sessionFavoritesStr) {
-              try {
-                const sessionFavorites = JSON.parse(sessionFavoritesStr);
-                if (Array.isArray(sessionFavorites) && sessionFavorites.length > 0) {
-                  questionsToDisplay = sessionFavorites;
-                  console.log(`从会话存储恢复收藏题目列表：共${questionsToDisplay.length}题`);
-                }
-              } catch (e) {
-                console.error("解析会话存储中的收藏列表失败:", e);
-              }
-            }
-          }
-          
-          // 如果还是没有获取到列表，尝试从favoriteQuestions ID列表生成
-          if (questionsToDisplay.length === 0) {
-            const favoritesStr = localStorage.getItem('favoriteQuestions');
-            if (favoritesStr) {
-              try {
-                const favoriteIds = JSON.parse(favoritesStr);
-                if (Array.isArray(favoriteIds) && favoriteIds.length > 0) {
-                  questionsToDisplay = favoriteIds.map(id => ({ 
-                    id, 
-                    question_code: `收藏${id}` 
-                  }));
-                  
-                  // 同样保存到会话存储
-                  sessionStorage.setItem('active_favorites_list', JSON.stringify(questionsToDisplay));
-                  
-                  console.log(`从favoriteQuestions ID列表生成收藏导航数据：共${questionsToDisplay.length}题`);
-                }
-              } catch (e) {
-                console.error("解析favoriteQuestions失败:", e);
-              }
-            }
-          }
-          
-          // 找到当前题目在列表中的位置
-          // 使用index参数或查找当前题目在收藏列表中的位置
-          const favIndex = searchParams.get('index');
-          if (favIndex && !isNaN(parseInt(favIndex))) {
-            currentIndex = parseInt(favIndex);
-            // 确保index不超出范围
-            if (currentIndex >= questionsToDisplay.length) {
-              currentIndex = 0;
-              console.warn(`收藏题目index ${favIndex} 超出范围，重置为0`);
-            }
-          } else {
-            currentIndex = questionsToDisplay.findIndex(q => q.id === currentId);
-          }
-          
-          console.log(`收藏导航初始化完成：共${questionsToDisplay.length}题，当前索引：${currentIndex}`);
         } catch (e) {
-          console.error("初始化收藏导航失败:", e);
+          console.error("解析收藏列表数据失败:", e);
         }
       } else if (filteredData && filteredData.questions && filteredData.questions.length > 0) {
         console.log(`从localStorage加载筛选后的题目列表，共${filteredData.questions.length}题`);
@@ -377,16 +323,6 @@ export default function QuestionPage() {
         }
       }
       
-      // 确保收藏模式下有一个有效的题目列表
-      if (source === 'favorites' && questionsToDisplay.length === 0) {
-        console.warn('收藏模式但没有找到有效的收藏题目列表，创建包含当前题目的列表');
-        questionsToDisplay = [{ id: currentId, question_code: `收藏${currentId}` }];
-        currentIndex = 0;
-        
-        // 保存到会话存储
-        sessionStorage.setItem('active_favorites_list', JSON.stringify(questionsToDisplay));
-      }
-      
       setFilteredQuestions(questionsToDisplay);
       setFilteredTotalCount(questionsToDisplay.length); // 关键：确保显示的总数与实际列表长度一致
       console.log(`导航初始化完成: 共 ${questionsToDisplay.length} 题可导航, 当前题目索引: ${currentIndex}`);
@@ -413,7 +349,7 @@ export default function QuestionPage() {
       setCurrentNavPage(1);
       navigationInitializedRef.current = true;
     }
-  }, [questionId, searchParams, getFilteredInfo, questionsPerPage, totalAllQuestions, sessionAnswers]);
+  }, [questionId, searchParams, getFilteredInfo, questionsPerPage, totalAllQuestions]);
 
   // 获取题目总数 (此函数现在主要设置 totalAllQuestions)
   const fetchTotalQuestions = async () => {
@@ -509,9 +445,9 @@ export default function QuestionPage() {
                 const favorites = JSON.parse(favoritesStr);
                 favoriteQuestions = favorites.map(id => id.toString());
                 console.log(`[DEBUG] 从favoriteQuestions获取收藏题目ID列表，共${favoriteQuestions.length}道题`);
-              }
-            }
-          } catch (e) {
+          }
+        }
+      } catch (e) {
             console.error('[DEBUG] 获取收藏题目列表失败:', e);
           }
           
@@ -542,7 +478,7 @@ export default function QuestionPage() {
                     if (fqId === questionId && !shouldResetState) {
                       const qResult = normalHistory.results[fqId];
                       setSubmittedAnswer(qResult.submittedAnswer);
-                      setAnswerResult({
+            setAnswerResult({
                         is_correct: qResult.isCorrect,
                         correct_answer: qResult.correctAnswer,
                         explanation: qResult.explanation || "暂无解析"
@@ -593,23 +529,23 @@ export default function QuestionPage() {
       
       if (historyString) {
         try {
-          const history = JSON.parse(historyString);
-          
+        const history = JSON.parse(historyString);
+        
           // 检查历史记录是否有效且未过期
           if (history && history.timestamp && Date.now() - history.timestamp < 86400000) {
             // 使用历史数据更新状态
-            setAnsweredQuestions(history.answered || {});
-            setCorrectAnswers(history.correct || {});
-            setTotalAnswered(Object.keys(history.answered || {}).length);
-            setTotalCorrect(Object.keys(history.correct || {}).length);
-            
+          setAnsweredQuestions(history.answered || {});
+          setCorrectAnswers(history.correct || {});
+          setTotalAnswered(Object.keys(history.answered || {}).length);
+          setTotalCorrect(Object.keys(history.correct || {}).length);
+          
             // 如果没有重置状态，且有当前题目的答题记录，恢复答题状态
             if (!shouldResetState && history.results && history.results[questionId]) {
               const questionResult = history.results[questionId];
               console.log(`[DEBUG] 恢复题目 #${questionId} 的答题状态:`, questionResult);
               
               setSubmittedAnswer(questionResult.submittedAnswer);
-              setAnswerResult({
+            setAnswerResult({
                 is_correct: questionResult.isCorrect,
                 correct_answer: questionResult.correctAnswer,
                 explanation: questionResult.explanation || "暂无解析"
@@ -628,8 +564,8 @@ export default function QuestionPage() {
             
             console.log(`[DEBUG] 成功加载${currentMode}模式答题历史`);
             return;
-          }
-        } catch (e) {
+      }
+    } catch (e) {
           console.error(`[DEBUG] 解析${currentMode}模式答题历史失败:`, e);
         }
       }
@@ -924,33 +860,13 @@ export default function QuestionPage() {
         // 更新状态管理
         setSessionAnswers(prev => ({
               ...prev,
-              [questionId]: {
-                submitted: formattedAnswer,
-                correct: result.data.correct_answer,
-                isCorrect: result.data.is_correct
+                [questionId]: {
+            submitted: formattedAnswer,
+            correct: result.data.correct_answer,
+            isCorrect: result.data.is_correct
               }
-        }));
-        
-        // 强制刷新导航状态 - 确保答题后导航按钮立即更新
-        setTimeout(() => {
-          console.log("强制刷新导航状态以显示最新答题结果");
-          // 1. 先强制重新获取过滤后的题目列表
-          const filteredData = getFilteredInfo();
-          if (filteredData && filteredData.questions) {
-            setFilteredQuestions([...filteredData.questions]);
-          }
-          
-          // 2. 强制刷新导航页码以触发重新渲染
-          setCurrentNavPage(curr => {
-            console.log("触发导航重新渲染");
-            return curr; // 返回相同值但会触发状态更新
-          });
-          
-          // 3. 确保navigationButtons useMemo会重新计算
-          navigationInitializedRef.current = true;
-        }, 100);
-        
-      } else {
+            }));
+          } else {
         console.error('提交答案失败:', result.message || '未知错误');
         setError('提交答案失败，请稍后重试');
       }
@@ -1037,23 +953,6 @@ export default function QuestionPage() {
           currentParams.set('wrongIndex', (currentQuestionIndex + 1).toString());
         }
         
-        // 收藏模式特殊处理
-        if (source === 'favorites') {
-          currentParams.set('source', 'favorites');
-          
-          // 确保收藏题目列表被保存到会话存储
-          if (filteredQuestions && filteredQuestions.length > 0) {
-            sessionStorage.setItem('active_favorites_list', JSON.stringify(filteredQuestions));
-            console.log(`已保存收藏题目列表到会话存储：${filteredQuestions.length}题`);
-          }
-          
-          // 保持continue参数
-          const isContinue = searchParams.get('continue') === 'true';
-          if (isContinue) {
-            currentParams.set('continue', 'true');
-          }
-        }
-        
         try {
           const nextUrl = `/question-bank/${nextQuestion.id}?${currentParams.toString()}`;
           router.push(nextUrl);
@@ -1089,23 +988,6 @@ export default function QuestionPage() {
       if (source === 'wrong') {
         currentParams.set('source', 'wrong');
         currentParams.set('wrongIndex', (currentQuestionIndex - 1).toString());
-      }
-      
-      // 收藏模式特殊处理
-      if (source === 'favorites') {
-        currentParams.set('source', 'favorites');
-        
-        // 确保收藏题目列表被保存到会话存储
-        if (filteredQuestions && filteredQuestions.length > 0) {
-          sessionStorage.setItem('active_favorites_list', JSON.stringify(filteredQuestions));
-          console.log(`已保存收藏题目列表到会话存储：${filteredQuestions.length}题`);
-        }
-        
-        // 保持continue参数
-        const isContinue = searchParams.get('continue') === 'true';
-        if (isContinue) {
-          currentParams.set('continue', 'true');
-        }
       }
       
       try {
@@ -1290,7 +1172,7 @@ export default function QuestionPage() {
       }
     }
   }, [answerResult, question, submittedAnswer, searchParams]);
-  
+
   // 格式化题目编号，使用question_code字段
   const formatQuestionNumber = () => {
     if (!question) return '';
@@ -1303,7 +1185,7 @@ export default function QuestionPage() {
     // 如果没有question_code，则使用ID作为备选
     return `题号: ${question.id}`;
   };
-  
+
   // 使用useMemo优化导航按钮渲染
   const navigationButtons = useMemo(() => {
     // 如果没有题目数据，显示加载中
@@ -1348,26 +1230,22 @@ export default function QuestionPage() {
       // 1. 当前会话状态(sessionAnswers) - 实时反映本次作答
       // 2. 全局答题历史不应在错题页面使用
       else if (isFromWrong) {
-        const sessionAnswer = sessionAnswers ? sessionAnswers[qIdStr] : null;
-        
-        if (sessionAnswer) {
-          console.log(`错题导航: 题目${qIdStr}使用会话状态：${sessionAnswer.isCorrect ? '正确' : '错误'}`);
-          if (sessionAnswer.isCorrect) {
-            extraStyle = "border-green-500 text-green-500";
-          } else {
-            extraStyle = "border-red-500 text-red-500";
-          }
+        if (sessionAnswers && sessionAnswers[qIdStr]) {
+          console.log(`错题导航: 题目${qIdStr}使用会话状态：${sessionAnswers[qIdStr].isCorrect ? '正确' : '错误'}`);
+        if (sessionAnswers[qIdStr].isCorrect) {
+          extraStyle = "border-green-500 text-green-500";
+        } else {
+          extraStyle = "border-red-500 text-red-500";
+        }
         }
         // 如果没有会话状态，错题页面默认保持未作答状态
       } 
       // 收藏页面状态指示使用收藏专用历史
       else if (isFromFavorites) {
         // 首先检查会话状态（实时反映）
-        const sessionAnswer = sessionAnswers ? sessionAnswers[qIdStr] : null;
-        
-        if (sessionAnswer) {
-          console.log(`收藏导航: 题目${qIdStr}使用会话状态：${sessionAnswer.isCorrect ? '正确' : '错误'}`);
-          if (sessionAnswer.isCorrect) {
+        if (sessionAnswers && sessionAnswers[qIdStr]) {
+          console.log(`收藏导航: 题目${qIdStr}使用会话状态：${sessionAnswers[qIdStr].isCorrect ? '正确' : '错误'}`);
+          if (sessionAnswers[qIdStr].isCorrect) {
             extraStyle = "border-green-500 text-green-500";
           } else {
             extraStyle = "border-red-500 text-red-500";
@@ -1438,8 +1316,8 @@ export default function QuestionPage() {
     return buttons;
   }, [filteredQuestions, questionId, currentNavPage, answeredQuestions, correctAnswers, 
      searchParams, questionsPerPage, router, sessionAnswers, navigationInitializedRef.current, 
-     filteredTotalCount, submittedAnswer, answerResult]);
-     
+     filteredTotalCount]);
+
   // 分页控件
   const paginationControl = useMemo(() => {
     const totalNavPages = Math.ceil(filteredTotalCount / questionsPerPage);
@@ -1468,7 +1346,7 @@ export default function QuestionPage() {
                 totalNavPages - 4
               );
               pageToShow = offset + i;
-             }
+            }
             
             return (
               <Button
@@ -1494,7 +1372,7 @@ export default function QuestionPage() {
       </div>
     );
   }, [currentNavPage, filteredTotalCount, questionsPerPage]);
-  
+
   // 修改页面卸载处理函数，处理待移除的错题
   const handleBeforeUnload = useCallback(() => {
     try {
@@ -1536,15 +1414,15 @@ export default function QuestionPage() {
                 
                 // 清除待移除列表
                 sessionStorage.removeItem('pendingWrongQuestionsRemoval');
-                
-                // 触发错题列表刷新事件
-                try {
-                  const event = new CustomEvent('wrongQuestionsChanged', {
+          
+          // 触发错题列表刷新事件
+          try {
+            const event = new CustomEvent('wrongQuestionsChanged', {
                     detail: { removed: pendingRemoval, action: 'removeMultiple' }
-                  });
-                  window.dispatchEvent(event);
-                } catch (eventErr) {
-                  console.error("触发错题更新事件失败:", eventErr);
+            });
+            window.dispatchEvent(event);
+          } catch (eventErr) {
+            console.error("触发错题更新事件失败:", eventErr);
                 }
               }
             } catch (e) {
@@ -1561,14 +1439,14 @@ export default function QuestionPage() {
   // 添加页面卸载事件监听器
   useEffect(() => {
     // 全局事件监听，确保在任何场景下离开页面都能触发
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    
-    // 组件卸载时移除事件监听器并执行清理
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      // 组件卸载时也执行一次清理
-      handleBeforeUnload();
-    };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        
+        // 组件卸载时移除事件监听器并执行清理
+        return () => {
+          window.removeEventListener('beforeunload', handleBeforeUnload);
+          // 组件卸载时也执行一次清理
+          handleBeforeUnload();
+        };
   }, [handleBeforeUnload]);
 
   // 为会话状态变化添加更强的更新机制
