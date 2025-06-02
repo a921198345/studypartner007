@@ -16,7 +16,7 @@ import { CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 
 // 获取当前页面模式（普通、错题、收藏）
-const getCurrentPageMode = (searchParams) => {
+const getCurrentPageMode = (searchParams: URLSearchParams | null): string => {
   const source = searchParams?.get('source');
   
   if (source === 'wrong-questions') {
@@ -29,7 +29,7 @@ const getCurrentPageMode = (searchParams) => {
 };
 
 // 根据不同模式返回对应的localStorage键名
-const getStorageKeyForMode = (mode) => {
+const getStorageKeyForMode = (mode: string): string => {
   switch(mode) {
     case 'wrong':
       return 'wrongAnswerHistory';
@@ -41,7 +41,7 @@ const getStorageKeyForMode = (mode) => {
 };
 
 // 获取当前模式的答题历史
-const getAnswerHistoryForMode = (mode) => {
+const getAnswerHistoryForMode = (mode: string): Record<string, any> => {
   try {
     const storageKey = getStorageKeyForMode(mode);
     const historyString = localStorage.getItem(storageKey);
@@ -59,7 +59,7 @@ const getAnswerHistoryForMode = (mode) => {
 };
 
 // 保存当前模式的答题历史
-const saveAnswerHistoryForMode = (mode, historyData) => {
+const saveAnswerHistoryForMode = (mode: string, historyData: Record<string, any>): void => {
   try {
     const storageKey = getStorageKeyForMode(mode);
     localStorage.setItem(storageKey, JSON.stringify({
@@ -417,12 +417,99 @@ export default function QuestionPage() {
       setSubmittedAnswer(null);
       setAnswerResult(null);
     }
-    
+      
     // 加载当前模式的答题历史
     const historyKey = getStorageKeyForMode(currentMode);
     console.log(`[DEBUG] 加载${currentMode}模式的答题历史，使用键: ${historyKey}`);
     
     try {
+      // 如果是收藏模式，首先检查是否需要从普通模式同步数据
+      if (currentMode === 'favorites') {
+        console.log('[DEBUG] 收藏模式：检查是否需要从普通模式同步答题数据');
+        
+        // 1. 获取收藏的题目列表
+        let favoriteQuestions = [];
+        try {
+          const favoritesListStr = localStorage.getItem('favoriteQuestionsList');
+          if (favoritesListStr) {
+            const favoritesList = JSON.parse(favoritesListStr);
+            if (favoritesList && favoritesList.questions) {
+              favoriteQuestions = favoritesList.questions.map(q => q.id.toString());
+              console.log(`[DEBUG] 获取到收藏题目列表，共${favoriteQuestions.length}道题`);
+            }
+          } else {
+            // 如果没有favoriteQuestionsList，尝试从favoriteQuestions获取
+            const favoritesStr = localStorage.getItem('favoriteQuestions');
+            if (favoritesStr) {
+              const favorites = JSON.parse(favoritesStr);
+              favoriteQuestions = favorites.map(id => id.toString());
+              console.log(`[DEBUG] 从favoriteQuestions获取收藏题目ID列表，共${favoriteQuestions.length}道题`);
+            }
+          }
+        } catch (e) {
+          console.error('[DEBUG] 获取收藏题目列表失败:', e);
+        }
+        
+        // 2. 获取普通模式的答题历史
+        const normalHistoryStr = localStorage.getItem('answerHistory');
+        if (normalHistoryStr && favoriteQuestions.length > 0) {
+          try {
+            const normalHistory = JSON.parse(normalHistoryStr);
+            if (normalHistory && normalHistory.timestamp && 
+                Date.now() - normalHistory.timestamp < 86400000) {
+              
+              // 3. 获取当前收藏模式的答题历史（如果存在）
+              let favoriteHistory = getAnswerHistoryForMode('favorites');
+              let hasNewData = false;
+              
+              // 4. 遍历收藏题目，检查在普通模式中是否已答过，如果是则复制状态
+              favoriteQuestions.forEach(fqId => {
+                if (normalHistory.results && normalHistory.results[fqId]) {
+                  console.log(`[DEBUG] 题目#${fqId}在普通模式下已答过，复制状态到收藏模式`);
+                  
+                  // 复制答题状态
+                  favoriteHistory.answered[fqId] = true;
+                  favoriteHistory.correct[fqId] = normalHistory.correct[fqId] || false;
+                  favoriteHistory.results[fqId] = normalHistory.results[fqId];
+                  hasNewData = true;
+                  
+                  // 如果当前题目是这道题，并且不需要重置状态，则恢复答题状态
+                  if (fqId === questionId && !shouldResetState) {
+                    const qResult = normalHistory.results[fqId];
+                    setSubmittedAnswer(qResult.submittedAnswer);
+                    setAnswerResult({
+                      is_correct: qResult.isCorrect,
+                      correct_answer: qResult.correctAnswer,
+                      explanation: qResult.explanation || "暂无解析"
+                    });
+                    
+                    // 更新当前会话状态
+                    setSessionAnswers(prev => ({
+                      ...prev,
+                      [fqId]: {
+                        submitted: qResult.submittedAnswer,
+                        correct: qResult.correctAnswer,
+                        isCorrect: qResult.isCorrect
+                      }
+                    }));
+                    
+                    console.log(`[DEBUG] 从普通模式恢复当前题目#${fqId}的答题状态`);
+                  }
+                }
+              });
+              
+              // 5. 如果有新数据，保存更新后的收藏模式答题历史
+              if (hasNewData) {
+                saveAnswerHistoryForMode('favorites', favoriteHistory);
+                console.log('[DEBUG] 已从普通模式同步答题状态到收藏模式');
+              }
+            }
+          } catch (e) {
+            console.error('[DEBUG] 同步答题历史数据失败:', e);
+          }
+        }
+      }
+      
       // 读取本地存储中的答题历史
       const historyString = localStorage.getItem(historyKey);
       
@@ -731,7 +818,7 @@ export default function QuestionPage() {
               timestamp: Date.now()
             };
           }
-        } catch (e) {
+      } catch (e) {
           console.error(`解析${currentMode}模式答题历史失败:`, e);
         }
         
@@ -744,7 +831,7 @@ export default function QuestionPage() {
           correctAnswer: result.data.correct_answer,
           explanation: result.data.explanation || '暂无解析',
           questionType: question?.question_type || (result.data.correct_answer.length > 1 ? 2 : 1),
-          answeredAt: new Date().toISOString()
+            answeredAt: new Date().toISOString()
         };
         
         // 保存更新后的历史记录
@@ -758,14 +845,14 @@ export default function QuestionPage() {
         
         // 更新状态管理
         setSessionAnswers(prev => ({
-          ...prev,
-          [questionId]: {
+              ...prev,
+                [questionId]: {
             submitted: formattedAnswer,
             correct: result.data.correct_answer,
             isCorrect: result.data.is_correct
-          }
-        }));
-      } else {
+              }
+            }));
+          } else {
         console.error('提交答案失败:', result.message || '未知错误');
         setError('提交答案失败，请稍后重试');
       }
@@ -854,7 +941,7 @@ export default function QuestionPage() {
         
         try {
           const nextUrl = `/question-bank/${nextQuestion.id}?${currentParams.toString()}`;
-          router.replace(nextUrl);
+          router.push(nextUrl);
         } catch (err) {
           console.error(`跳转失败：`, err);
           window.location.href = `/question-bank/${nextQuestion.id}?${currentParams.toString()}`;
@@ -1081,6 +1168,7 @@ export default function QuestionPage() {
     // 获取当前导航来源
     const source = searchParams.get('source');
     const isFromWrong = source === 'wrong';
+    const isFromFavorites = source === 'favorites';
     
     // 生成要显示的按钮
     const buttons = [];
@@ -1106,14 +1194,37 @@ export default function QuestionPage() {
       else if (isFromWrong) {
         if (sessionAnswers && sessionAnswers[qIdStr]) {
           console.log(`错题导航: 题目${qIdStr}使用会话状态：${sessionAnswers[qIdStr].isCorrect ? '正确' : '错误'}`);
-        if (sessionAnswers[qIdStr].isCorrect) {
-          extraStyle = "border-green-500 text-green-500";
-        } else {
-          extraStyle = "border-red-500 text-red-500";
-        }
+          if (sessionAnswers[qIdStr].isCorrect) {
+            extraStyle = "border-green-500 text-green-500";
+          } else {
+            extraStyle = "border-red-500 text-red-500";
+          }
         }
         // 如果没有会话状态，错题页面默认保持未作答状态
-      } 
+      }
+      // 收藏页面状态指示使用收藏专用历史
+      else if (isFromFavorites) {
+        // 首先检查会话状态（实时反映）
+        if (sessionAnswers && sessionAnswers[qIdStr]) {
+          console.log(`收藏导航: 题目${qIdStr}使用会话状态：${sessionAnswers[qIdStr].isCorrect ? '正确' : '错误'}`);
+          if (sessionAnswers[qIdStr].isCorrect) {
+            extraStyle = "border-green-500 text-green-500";
+          } else {
+            extraStyle = "border-red-500 text-red-500";
+          }
+        } 
+        // 然后检查收藏模式的答题历史
+        else {
+          const favoriteHistory = getAnswerHistoryForMode('favorites');
+          if (favoriteHistory.answered && favoriteHistory.answered[qIdStr]) {
+            if (favoriteHistory.correct && favoriteHistory.correct[qIdStr]) {
+              extraStyle = "border-green-500 text-green-500";
+            } else {
+              extraStyle = "border-red-500 text-red-500";
+            }
+          }
+        }
+      }
       // 普通页面使用常规状态指示逻辑
       else if (answeredQuestions[qIdStr]) {
         if (correctAnswers[qIdStr]) {
@@ -1141,6 +1252,12 @@ export default function QuestionPage() {
             if (isFromWrong) {
               currentParams.set('source', 'wrong');
               currentParams.set('wrongIndex', absoluteIndex.toString());
+            }
+            
+            // 如果是从收藏进入，保持source=favorites参数和continue=true
+            if (isFromFavorites) {
+              currentParams.set('source', 'favorites');
+              currentParams.set('continue', 'true'); // 保持continue=true避免重置状态
             }
             
             const url = `/question-bank/${q.id}?${currentParams.toString()}`;

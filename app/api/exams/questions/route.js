@@ -159,9 +159,11 @@ export async function GET(request) {
         question_code,
         subject, 
         year, 
-            question_type,
+        question_type,
         question_text, 
-        options_json 
+        options_json,
+        correct_answer,
+        explanation_text
       FROM questions 
       ${whereClause} 
       ORDER BY id 
@@ -187,11 +189,13 @@ export async function GET(request) {
           question_code: q.question_code,
           subject: q.subject,
           year: q.year,
-              question_type: q.question_type,
+          question_type: q.question_type,
           question_text: q.question_text,
-              options: typeof q.options_json === 'string' 
-                ? JSON.parse(q.options_json) 
-                : q.options_json
+          options: typeof q.options_json === 'string' 
+            ? JSON.parse(q.options_json) 
+            : q.options_json,
+          correct_answer: q.correct_answer,
+          explanation: q.explanation_text || "暂无解析"
         })),
         pagination: {
           total,

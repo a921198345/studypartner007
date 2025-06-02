@@ -5,7 +5,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Star, Brain, ArrowLeft, ArrowRight, Lock } from "lucide-react"
+import { Star, Brain, ArrowLeft, ArrowRight, Lock, CheckCircle, XCircle } from "lucide-react"
 import Link from "next/link"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -383,55 +383,51 @@ export function QuestionDetail({
       )}
 
       {/* 答案和解析区域 - 增强版 */}
-      {submittedAnswer && (
-        <div className="mt-8 p-4 rounded-lg border bg-gray-50">
-          <h3 className="text-xl font-semibold mb-4">
-            {answerResult?.is_correct ? (
-              <span className="text-green-500">回答正确！</span>
-            ) : (
-              <span className="text-red-500">回答错误</span>
-            )}
-          </h3>
-          
-          {/* 正确答案显示 - 使用新的获取方法 */}
-          <div className="mb-4">
-            <div className="font-medium mb-2">正确答案：</div>
-            <div className="flex flex-wrap gap-2">
-              {getDisplayCorrectAnswers().map((opt, index) => (
-                <Badge
-                  key={`${opt}-${index}`}
-                  className="bg-green-100 text-green-800 border border-green-300"
-                >
-                  {opt}
-                </Badge>
-              ))}
-            </div>
-            </div>
-
-          {/* 解析显示 - 使用新的获取方法 */}
-          <div>
-            <div className="font-medium mb-2">解析：</div>
-            <div className="mt-1 whitespace-pre-wrap text-gray-700">
-              {getExplanationText()}
-            </div>
-            </div>
-
-          {/* 操作按钮 */}
-          <div className="flex justify-between mt-6">
-              <Button variant="outline" onClick={handleReset}>
-                重新作答
-              </Button>
-              <Link href={`/knowledge-map?point=related-to-${question.id}`}>
-                <Button className="flex items-center">
-                  <Brain className="mr-2 h-4 w-4" />
-                  查看相关知识导图
-                </Button>
-              </Link>
+      {question && submittedAnswer && answerResult && (
+        <div className="space-y-4 mt-8 bg-gray-50 p-4 rounded-lg">
+          <div className="flex items-center justify-between">
+            <h3 className="font-medium">答案解析</h3>
+            <div className="flex items-center">
+              {answerResult.is_correct ? (
+                <div className="flex items-center text-green-500">
+                  <CheckCircle className="h-5 w-5 mr-1" />
+                  <span>回答正确</span>
+                </div>
+              ) : (
+                <div className="flex items-center text-red-500">
+                  <XCircle className="h-5 w-5 mr-1" />
+                  <span>回答错误</span>
+                </div>
+              )}
             </div>
           </div>
-        )}
 
+          <div className="space-y-2">
+            <div className="text-sm">
+              <span className="font-medium">正确答案：</span>
+              {Array.isArray(answerResult.correct_answer) 
+                ? answerResult.correct_answer.join(', ') 
+                : (typeof answerResult.correct_answer === 'string' 
+                   ? answerResult.correct_answer 
+                   : answerResult.correct_answer !== undefined 
+                     ? String(answerResult.correct_answer) 
+                     : "未提供正确答案")}
+            </div>
+            <div className="text-sm">
+              <span className="font-medium">你的答案：</span>
+              {Array.isArray(submittedAnswer) 
+                ? submittedAnswer.join(', ') 
+                : submittedAnswer}
+            </div>
+            <div className="mt-4">
+              <div className="font-medium text-sm mb-2">解析：</div>
+              <p className="text-sm text-gray-700 whitespace-pre-line">{answerResult.explanation || "暂无解析"}</p>
+            </div>
+          </div>
         </div>
+      )}
+
+      </div>
   )
 }
 

@@ -946,7 +946,7 @@ export default function QuestionBankPage() {
                         localStorage.setItem('favoriteQuestionsList', JSON.stringify(favoritesList));
                         
                         // 跳转到第一个收藏题目
-                        router.push(`/question-bank/${favoriteQuestions[0].id}?source=favorites&index=0`);
+                        router.push(`/question-bank/${favoriteQuestions[0].id}?source=favorites&index=0&continue=true`);
                       }}>
                         开始练习收藏
                       </Button>
