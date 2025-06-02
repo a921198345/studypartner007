@@ -860,13 +860,33 @@ export default function QuestionPage() {
         // 更新状态管理
         setSessionAnswers(prev => ({
               ...prev,
-                [questionId]: {
-            submitted: formattedAnswer,
-            correct: result.data.correct_answer,
-            isCorrect: result.data.is_correct
+              [questionId]: {
+                submitted: formattedAnswer,
+                correct: result.data.correct_answer,
+                isCorrect: result.data.is_correct
               }
-            }));
-          } else {
+        }));
+        
+        // 强制刷新导航状态 - 确保答题后导航按钮立即更新
+        setTimeout(() => {
+          console.log("强制刷新导航状态以显示最新答题结果");
+          // 1. 先强制重新获取过滤后的题目列表
+          const filteredData = getFilteredInfo();
+          if (filteredData && filteredData.questions) {
+            setFilteredQuestions([...filteredData.questions]);
+          }
+          
+          // 2. 强制刷新导航页码以触发重新渲染
+          setCurrentNavPage(curr => {
+            console.log("触发导航重新渲染");
+            return curr; // 返回相同值但会触发状态更新
+          });
+          
+          // 3. 确保navigationButtons useMemo会重新计算
+          navigationInitializedRef.current = true;
+        }, 100);
+        
+      } else {
         console.error('提交答案失败:', result.message || '未知错误');
         setError('提交答案失败，请稍后重试');
       }
@@ -1230,22 +1250,26 @@ export default function QuestionPage() {
       // 1. 当前会话状态(sessionAnswers) - 实时反映本次作答
       // 2. 全局答题历史不应在错题页面使用
       else if (isFromWrong) {
-        if (sessionAnswers && sessionAnswers[qIdStr]) {
-          console.log(`错题导航: 题目${qIdStr}使用会话状态：${sessionAnswers[qIdStr].isCorrect ? '正确' : '错误'}`);
-        if (sessionAnswers[qIdStr].isCorrect) {
-          extraStyle = "border-green-500 text-green-500";
-        } else {
-          extraStyle = "border-red-500 text-red-500";
+        const sessionAnswer = sessionAnswers ? sessionAnswers[qIdStr] : null;
+        
+        if (sessionAnswer) {
+          console.log(`错题导航: 题目${qIdStr}使用会话状态：${sessionAnswer.isCorrect ? '正确' : '错误'}`);
+          if (sessionAnswer.isCorrect) {
+            extraStyle = "border-green-500 text-green-500";
+          } else {
+            extraStyle = "border-red-500 text-red-500";
+          }
         }
-       }
         // 如果没有会话状态，错题页面默认保持未作答状态
       } 
       // 收藏页面状态指示使用收藏专用历史
       else if (isFromFavorites) {
         // 首先检查会话状态（实时反映）
-        if (sessionAnswers && sessionAnswers[qIdStr]) {
-          console.log(`收藏导航: 题目${qIdStr}使用会话状态：${sessionAnswers[qIdStr].isCorrect ? '正确' : '错误'}`);
-          if (sessionAnswers[qIdStr].isCorrect) {
+        const sessionAnswer = sessionAnswers ? sessionAnswers[qIdStr] : null;
+        
+        if (sessionAnswer) {
+          console.log(`收藏导航: 题目${qIdStr}使用会话状态：${sessionAnswer.isCorrect ? '正确' : '错误'}`);
+          if (sessionAnswer.isCorrect) {
             extraStyle = "border-green-500 text-green-500";
           } else {
             extraStyle = "border-red-500 text-red-500";
@@ -1316,7 +1340,7 @@ export default function QuestionPage() {
     return buttons;
   }, [filteredQuestions, questionId, currentNavPage, answeredQuestions, correctAnswers, 
      searchParams, questionsPerPage, router, sessionAnswers, navigationInitializedRef.current, 
-     filteredTotalCount]);
+     filteredTotalCount, submittedAnswer, answerResult]);
      
   // 分页控件
   const paginationControl = useMemo(() => {
