@@ -8,6 +8,14 @@ import datetime # 用于处理日期时间
 from werkzeug.utils import secure_filename
 import uuid
 from flask_cors import CORS  # 导入CORS模块
+import re
+from flask import send_from_directory  # 导入send_from_directory用于提供静态文件
+import threading  # 导入threading模块用于处理多线程
+import time  # 导入time模块用于处理时间
+
+# 进度跟踪字典，用于存储每个文档处理的进度信息
+# 格式: {doc_id: {"status": "processing/completed/failed", "progress": 0-100, "message": "处理消息"}}
+processing_status = {}
 
 # 尝试导入MySQL连接器，如果不可用则跳过
 try:
@@ -45,13 +53,34 @@ except ImportError as e:
         raise Exception("文本分段模块未正确加载，无法处理文本分段")
     def segment_text_smart(full_text, max_chunk_size=1000, overlap=100):
         raise Exception("文本分段模块未正确加载，无法处理文本分段")
+    def segment_text_legal_structure(full_text, chunk_size=800):
+        raise Exception("法律结构分段模块未正确加载，无法处理文本分段")
+
+# 尝试导入增强法律结构处理模块
+try:
+    from enhanced_legal_structure import AIEnhancedLegalProcessor
+    from process_document import process_document
+    ENHANCED_LEGAL_AVAILABLE = True
+    print("成功导入增强法律结构处理模块")
+except ImportError as e:
+    ENHANCED_LEGAL_AVAILABLE = False
+    print(f"无法导入增强法律结构处理模块: {str(e)}")
+    
+# 导入向量存储模块
+try:
+    from vector_store import VectorStore
+    VECTOR_STORE_AVAILABLE = True
+    print("成功导入向量存储模块")
+except ImportError as e:
+    VECTOR_STORE_AVAILABLE = False
+    print(f"无法导入向量存储模块: {str(e)}")
 
 # =================================================================
 # ======================== 数据库配置区域 ==========================
 # =================================================================
 # 数据库类型：可以是 "mysql" 或 "sqlite"
 # 如果MySQL连接失败，将自动切换到SQLite
-DATABASE_TYPE = "mysql"  # 强制使用MySQL连接到宝塔面板
+DATABASE_TYPE = "sqlite"  # 使用SQLite作为本地数据库
 
 # MySQL配置
 MYSQL_CONFIG = {
@@ -81,6 +110,10 @@ except ImportError as e:
 app = Flask(__name__) # 创建一个Flask应用实例
 # 修改CORS配置，允许所有来源，包括null来源
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)  # 修改CORS配置
+
+# 配置静态文件夹路径
+app.static_folder = 'static'
+app.static_url_path = '/static'
 
 # 确保数据目录存在
 os.makedirs(os.path.dirname(SQLITE_DB_PATH), exist_ok=True)
@@ -1131,8 +1164,10 @@ def segment_document_text():
                 "overlap": overlap
             })
         elif strategy == 'legal_structure':
-            # 法律结构分段返回文本段落和元数据
-            segments, metadata = segment_text_legal_structure(text, chunk_size)
+            # 法律结构分段返回文本段落
+            segments = segment_text_legal_structure(text, chunk_size=chunk_size)
+            # 创建简单元数据
+            metadata = [{} for _ in segments]
             
             # 组合段落和元数据为结构化结果
             structured_chunks = []
@@ -1168,6 +1203,436 @@ def segment_document_text():
             "message": error_message,
             "chunks": []
         })
+
+# 注释：segment_text_smart和segment_text_legal_structure都使用从text_segmentation导入的函数
+# 不需要在这里重复定义
+
+# 文档向量化API
+@app.route('/admin/api/vectorize', methods=['POST'])
+def vectorize_document():
+    """
+    对上传的文档进行向量化处理
+    
+    请求参数:
+    - doc_id: 文档ID
+    
+    返回:
+    - 成功或失败的JSON消息
+    """
+    try:
+        # 获取请求参数
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                "success": False,
+                "message": "请求缺少必要的JSON数据"
+            }), 400
+        
+        doc_id = data.get('doc_id')
+        chunk_size = data.get('chunk_size', None)  # 现在使用智能分段，这个参数被忽略
+        
+        if not doc_id:
+            return jsonify({
+                "success": False,
+                "message": "缺少文档ID参数"
+            }), 400
+        
+        # 查询文档信息
+        if DATABASE_TYPE == "mysql" and MYSQL_AVAILABLE:
+            conn = mysql.connector.connect(**MYSQL_CONFIG)
+            cursor = conn.cursor(dictionary=True)
+            
+            query = "SELECT * FROM knowledge_documents WHERE doc_id = %s"
+            cursor.execute(query, (doc_id,))
+            document = cursor.fetchone()
+            
+            cursor.close()
+            conn.close()
+        else:
+            # 使用SQLite
+            conn = sqlite3.connect(SQLITE_DB_PATH)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            query = "SELECT * FROM knowledge_documents WHERE doc_id = ?"
+            cursor.execute(query, (doc_id,))
+            document_row = cursor.fetchone()
+            document = dict(document_row) if document_row else None
+            
+            cursor.close()
+            conn.close()
+                
+        if not document:
+            return jsonify({
+                "success": False,
+                "message": f"未找到ID为{doc_id}的文档"
+            }), 404
+        
+        # 获取文档路径和名称
+        file_path = document.get('file_path')
+        doc_name = document.get('doc_name', os.path.basename(file_path))
+        
+        # 检查文件是否存在
+        if not os.path.exists(file_path):
+            return jsonify({
+                "success": False,
+                "message": f"文件不存在: {file_path}"
+            }), 404
+            
+        # 从环境变量中获取API密钥
+        api_key = os.environ.get("DEEPSEEK_API_KEY")
+        
+        # 检查API密钥是否存在
+        if not api_key:
+            return jsonify({
+                "success": False,
+                "message": "DeepSeek API密钥未设置，无法执行向量化，请在.env文件中设置DEEPSEEK_API_KEY"
+            }), 500
+            
+        # 初始化进度状态
+        processing_status[doc_id] = {
+            "status": "processing",
+            "progress": 0,
+            "message": "正在准备处理..."
+        }
+        
+        # 定义后台处理函数
+        def process_document_in_background(doc_id, file_path, doc_name, chunk_size, api_key):
+            try:
+                # 更新状态：开始提取文本
+                processing_status[doc_id] = {
+                    "status": "processing",
+                    "progress": 5,
+                    "message": "正在从文档中提取文本..."
+                }
+                
+                # 提取文本
+                extracted_text = extract_text_from_word(file_path)
+                if not extracted_text:
+                    processing_status[doc_id] = {
+                        "status": "failed",
+                        "progress": 0,
+                        "message": "无法从文档中提取文本"
+                    }
+                    return
+                
+                # 更新状态：开始分段
+                processing_status[doc_id] = {
+                    "status": "processing",
+                    "progress": 20,
+                    "message": "正在进行智能分段..."
+                }
+                
+                # 使用法律文档智能分段
+                segments = segment_text_legal_structure(extracted_text)
+                if not segments:
+                    processing_status[doc_id] = {
+                        "status": "failed",
+                        "progress": 0,
+                        "message": "文本分段失败"
+                    }
+                    return
+                
+                # 更新状态：分段完成
+                processing_status[doc_id] = {
+                    "status": "processing",
+                    "progress": 40,
+                    "message": f"分段完成，共{len(segments)}个文本段落"
+                }
+                
+                # 准备元数据
+                metadata_list = [{} for _ in segments]  # 简单元数据
+                
+                # 更新状态：开始向量化
+                processing_status[doc_id] = {
+                    "status": "processing",
+                    "progress": 50,
+                    "message": "正在生成向量嵌入..."
+                }
+        
+                # 初始化向量存储，传递API密钥
+                if DATABASE_TYPE == "mysql" and MYSQL_AVAILABLE:
+                    vector_store = VectorStore(
+                        database_type="mysql",
+                        mysql_config=MYSQL_CONFIG,
+                        api_key=api_key,
+                        embedding_model="text-embedding-ada-002"  # 更新为DeepSeek支持的嵌入模型
+                    )
+                else:
+                    # 使用SQLite作为备用
+                    vector_store = VectorStore(
+                        database_type="sqlite",
+                        api_key=api_key,
+                        embedding_model="text-embedding-ada-002"  # 更新为DeepSeek支持的嵌入模型
+                    )
+        
+                # 分批处理文本段落，避免一次性处理过多段落导致卡顿
+                total_segments = len(segments)
+                batch_size = 50  # 每批处理50个段落
+                
+                # 确保至少有一个批次
+                num_batches = max(1, (total_segments + batch_size - 1) // batch_size)
+                
+                for batch_idx in range(num_batches):
+                    start_idx = batch_idx * batch_size
+                    end_idx = min(start_idx + batch_size, total_segments)
+                    
+                    batch_segments = segments[start_idx:end_idx]
+                    batch_metadata = metadata_list[start_idx:end_idx]
+                    
+                    # 处理当前批次的段落
+                    for i, (segment, metadata) in enumerate(zip(batch_segments, batch_metadata)):
+                        # 计算总体进度
+                        overall_idx = start_idx + i
+                        progress = 60 + int((overall_idx / total_segments) * 35)
+                        processing_status[doc_id]["progress"] = progress
+                        processing_status[doc_id]["message"] = f"正在处理第 {overall_idx+1}/{total_segments} 个文本段落..."
+                        
+                        # 避免线程占用过多CPU
+                        if i % 10 == 0:
+                            time.sleep(0.05)
+                
+                # 批量存储所有向量
+                success = vector_store.store_text_chunks(
+                    doc_id=doc_id,
+                    texts=segments,
+                    metadata_list=metadata_list,
+                    source_document_name=doc_name
+                )
+                
+                if not success:
+                    processing_status[doc_id] = {
+                        "status": "failed",
+                        "progress": 95,
+                        "message": "向量化存储失败"
+                    }
+                    return
+                
+                # 更新状态：完成
+                processing_status[doc_id] = {
+                    "status": "completed",
+                    "progress": 100,
+                    "message": f"成功对文档'{doc_name}'进行智能分段和向量化处理并存储",
+                    "segments_count": len(segments),
+                    "total_characters": len(extracted_text)
+                }
+                
+            except Exception as e:
+                # 处理过程中出现异常
+                processing_status[doc_id] = {
+                    "status": "failed",
+                    "progress": 0,
+                    "message": f"处理失败: {str(e)}"
+                }
+        
+        # 启动后台线程进行处理
+        threading.Thread(
+            target=process_document_in_background,
+            args=(doc_id, file_path, doc_name, chunk_size, api_key)
+        ).start()
+        
+        # 立即返回，后台继续处理
+        return jsonify({
+            "success": True,
+            "message": "向量化处理已开始，请通过状态API获取进度",
+            "data": {
+                "doc_id": doc_id,
+                "status_url": f"/admin/api/processing_status?doc_id={doc_id}"
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"处理失败: {str(e)}"
+        }), 500
+
+# 获取DeepSeek API密钥
+def get_deepseek_api_key():
+    """
+    从环境变量获取DeepSeek API密钥
+    
+    Returns:
+        str: API密钥，如果未设置则返回None
+    """
+    api_key = os.environ.get("DEEPSEEK_API_KEY")
+    if not api_key:
+        # 尝试从.env文件中读取
+        try:
+            with open('.env', 'r') as f:
+                for line in f:
+                    if line.startswith('DEEPSEEK_API_KEY='):
+                        api_key = line.strip().split('=', 1)[1].strip()
+                        # 移除可能的引号
+                        api_key = api_key.strip('"\'')
+                        break
+        except Exception as e:
+            print(f"无法从.env文件读取API密钥: {str(e)}")
+            
+    return api_key
+
+# 添加向量搜索API
+@app.route('/api/search', methods=['POST'])
+def search_documents():
+    """
+    搜索文档API，接收查询关键词，返回相关文档片段
+    """
+    try:
+        if not request.is_json:
+            return jsonify({
+                "success": False,
+                "message": "请求必须是JSON格式",
+                "query": "",
+                "results": []
+            }), 400
+            
+        # 从请求中获取查询内容
+        data = request.get_json()
+        query = data.get('query', '')
+        limit = data.get('limit', 5)
+        
+        if not query:
+            return jsonify({
+                "success": False,
+                "message": "查询关键词不能为空",
+                "query": query,
+                "results": []
+            }), 400
+            
+        # 获取API密钥
+        api_key = get_deepseek_api_key() 
+        if not api_key:
+            return jsonify({
+                "success": False,
+                "message": "DeepSeek API密钥未配置，无法进行向量搜索",
+                "query": query,
+                "results": []
+            }), 500
+            
+        # 初始化向量存储
+        if DATABASE_TYPE == "mysql" and MYSQL_AVAILABLE:
+            vector_store = VectorStore(
+                database_type="mysql",
+                mysql_config=MYSQL_CONFIG,
+                api_key=api_key,
+                embedding_model="text-embedding-ada-002"  # 更新为DeepSeek支持的嵌入模型
+            )
+        else:
+            # 使用SQLite作为备用
+            vector_store = VectorStore(
+                database_type="sqlite",
+                api_key=api_key,
+                embedding_model="text-embedding-ada-002"  # 更新为DeepSeek支持的嵌入模型
+            )
+            
+        # 加载向量索引并进行搜索
+        result_count = vector_store.count_vector_chunks()
+        print(f"向量数据库中共有{result_count}条记录")
+        
+        results = vector_store.search_similar_text(query, top_k=limit)
+        
+        if not results:
+            return jsonify({
+                "success": True,
+                "message": "未找到相关内容，可能是因为向量搜索未正确配置或文档未被正确向量化",
+                "query": query,
+                "results": []
+            })
+            
+        # 格式化结果
+        formatted_results = []
+        for i, result in enumerate(results):
+            formatted_result = {
+                "id": i + 1,
+                "text": result.get("original_text", ""),
+                "score": result.get("score", 0),
+                "metadata": {
+                    "doc_id": result.get("doc_id", ""),
+                    "chunk_id": result.get("chunk_id_in_document", ""),
+                    "source": result.get("source_document_name", ""),
+                    "law_name": result.get("law_name", ""),
+                    "book": result.get("book", ""),
+                    "chapter": result.get("chapter", ""),
+                    "section": result.get("section", ""),
+                    "article": result.get("article", "")
+                }
+            }
+            formatted_results.append(formatted_result)
+            
+        return jsonify({
+            "success": True,
+            "message": f"找到{len(formatted_results)}条相关内容",
+            "query": query,
+            "results": formatted_results
+        })
+        
+    except Exception as e:
+        print(f"搜索文档时发生错误: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "message": f"搜索失败: {str(e)}",
+            "query": query if 'query' in locals() else "",
+            "results": []
+        }), 500
+
+# 添加提供HTML文件的路由
+@app.route('/<html_file>.html')
+def serve_html(html_file):
+    """提供HTML文件"""
+    # 先尝试从static文件夹提供
+    if os.path.exists(os.path.join('static', f"{html_file}.html")):
+        return send_from_directory('static', f"{html_file}.html")
+    # 如果static中没有，尝试从项目根目录提供
+    elif os.path.exists(f"{html_file}.html"):
+        return send_from_directory('.', f"{html_file}.html")
+    else:
+        return f"找不到文件: {html_file}.html", 404
+
+# 添加提供easy_upload.html的路由
+@app.route('/easy_upload')
+def easy_upload():
+    """提供简化的上传向量化一体化界面"""
+    return send_from_directory('static', 'easy_upload.html')
+
+# 添加测试页面路由
+@app.route('/test_page')
+def test_page():
+    """提供API测试页面"""
+    return send_from_directory('static', 'test_page.html')
+
+# 添加获取处理进度的API端点
+@app.route('/admin/api/processing_status', methods=['GET'])
+def get_processing_status():
+    """
+    获取文档处理的进度状态
+    
+    请求参数:
+    - doc_id: 文档ID
+    
+    返回:
+    - 处理状态的JSON
+    """
+    doc_id = request.args.get('doc_id')
+    
+    if not doc_id:
+        return jsonify({
+            "success": False,
+            "message": "缺少文档ID参数"
+        }), 400
+    
+    # 获取处理状态
+    status = processing_status.get(doc_id, {
+        "status": "unknown",
+        "progress": 0,
+        "message": "未找到该文档的处理状态"
+    })
+    
+    return jsonify({
+        "success": True,
+        "doc_id": doc_id,
+        "data": status
+    })
 
 if __name__ == '__main__':
     # 应用启动诊断信息
