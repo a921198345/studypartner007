@@ -80,7 +80,7 @@ except ImportError as e:
 # =================================================================
 # 数据库类型：可以是 "mysql" 或 "sqlite"
 # 如果MySQL连接失败，将自动切换到SQLite
-DATABASE_TYPE = "sqlite"  # 使用SQLite作为本地数据库
+DATABASE_TYPE = "mysql"  # 强制使用MySQL连接到宝塔面板
 
 # MySQL配置
 MYSQL_CONFIG = {
@@ -1164,10 +1164,8 @@ def segment_document_text():
                 "overlap": overlap
             })
         elif strategy == 'legal_structure':
-            # 法律结构分段返回文本段落
-            segments = segment_text_legal_structure(text, chunk_size=chunk_size)
-            # 创建简单元数据
-            metadata = [{} for _ in segments]
+            # 法律结构分段返回文本段落和元数据
+            segments, metadata = segment_text_legal_structure(text, chunk_size=chunk_size)
             
             # 组合段落和元数据为结构化结果
             structured_chunks = []
@@ -1204,8 +1202,22 @@ def segment_document_text():
             "chunks": []
         })
 
-# 注释：segment_text_smart和segment_text_legal_structure都使用从text_segmentation导入的函数
-# 不需要在这里重复定义
+def segment_text_legal_structure(full_text, chunk_size=800):
+    """
+    使用法律结构智能分段器处理文本
+    
+    Args:
+        full_text: 要分段的文本内容
+        chunk_size: 最大分段大小
+        
+    Returns:
+        tuple: (分段列表, 元数据列表)
+    """
+    # 导入text_segmentation模块中的同名函数
+    from text_segmentation import segment_text_legal_structure as text_seg_legal
+    
+    # 调用实际的分段函数
+    return text_seg_legal(full_text, chunk_size=chunk_size)
 
 # 文档向量化API
 @app.route('/admin/api/vectorize', methods=['POST'])
@@ -1242,7 +1254,7 @@ def vectorize_document():
             conn = mysql.connector.connect(**MYSQL_CONFIG)
             cursor = conn.cursor(dictionary=True)
             
-            query = "SELECT * FROM knowledge_documents WHERE doc_id = %s"
+            query = "SELECT * FROM documents WHERE doc_id = %s"
             cursor.execute(query, (doc_id,))
             document = cursor.fetchone()
             
@@ -1254,10 +1266,9 @@ def vectorize_document():
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
-            query = "SELECT * FROM knowledge_documents WHERE doc_id = ?"
+            query = "SELECT * FROM documents WHERE doc_id = ?"
             cursor.execute(query, (doc_id,))
-            document_row = cursor.fetchone()
-            document = dict(document_row) if document_row else None
+            document = dict(cursor.fetchone()) if cursor.fetchone() else None
             
             cursor.close()
             conn.close()
@@ -1356,14 +1367,14 @@ def vectorize_document():
                         database_type="mysql",
                         mysql_config=MYSQL_CONFIG,
                         api_key=api_key,
-                        embedding_model="text-embedding-ada-002"  # 更新为DeepSeek支持的嵌入模型
+                        embedding_model="deepseek-embed"  # 更新为DeepSeek的嵌入模型
                     )
                 else:
                     # 使用SQLite作为备用
                     vector_store = VectorStore(
                         database_type="sqlite",
                         api_key=api_key,
-                        embedding_model="text-embedding-ada-002"  # 更新为DeepSeek支持的嵌入模型
+                        embedding_model="deepseek-embed"  # 更新为DeepSeek的嵌入模型
                     )
         
                 # 分批处理文本段落，避免一次性处理过多段落导致卡顿
@@ -1391,22 +1402,26 @@ def vectorize_document():
                         # 避免线程占用过多CPU
                         if i % 10 == 0:
                             time.sleep(0.05)
-                
-                # 批量存储所有向量
-                success = vector_store.store_text_chunks(
-                    doc_id=doc_id,
-                    texts=segments,
-                    metadata_list=metadata_list,
-                    source_document_name=doc_name
-                )
-                
-                if not success:
-                    processing_status[doc_id] = {
-                        "status": "failed",
-                        "progress": 95,
-                        "message": "向量化存储失败"
-                    }
-                    return
+                    
+                    # 批量存储当前批次的向量
+                    success = vector_store.store_text_chunks(
+                        doc_id=doc_id,
+                        texts=batch_segments,
+                        metadata_list=batch_metadata,
+                        source_document_name=doc_name
+                    )
+                    
+                    if not success:
+                        processing_status[doc_id] = {
+                            "status": "failed",
+                            "progress": 95,
+                            "message": "向量化存储失败"
+                        }
+                        return
+                    
+                    # 更新批次处理进度
+                    processing_status[doc_id]["progress"] = 95 + int((batch_idx + 1) / num_batches * 5)
+                    processing_status[doc_id]["message"] = f"正在保存第 {batch_idx+1}/{num_batches} 批向量数据..."
                 
                 # 更新状态：完成
                 processing_status[doc_id] = {
@@ -1447,90 +1462,83 @@ def vectorize_document():
             "message": f"处理失败: {str(e)}"
         }), 500
 
-# 获取DeepSeek API密钥
-def get_deepseek_api_key():
-    """
-    从环境变量获取DeepSeek API密钥
-    
-    Returns:
-        str: API密钥，如果未设置则返回None
-    """
-    api_key = os.environ.get("DEEPSEEK_API_KEY")
-    if not api_key:
-        # 尝试从.env文件中读取
-        try:
-            with open('.env', 'r') as f:
-                for line in f:
-                    if line.startswith('DEEPSEEK_API_KEY='):
-                        api_key = line.strip().split('=', 1)[1].strip()
-                        # 移除可能的引号
-                        api_key = api_key.strip('"\'')
-                        break
-        except Exception as e:
-            print(f"无法从.env文件读取API密钥: {str(e)}")
-            
-    return api_key
-
 # 添加向量搜索API
 @app.route('/api/search', methods=['POST'])
 def search_documents():
     """
-    搜索文档API，接收查询关键词，返回相关文档片段
+    基于向量相似度搜索文档
+    
+    请求参数:
+    - query: 搜索查询文本
+    - top_k: 返回的结果数量（可选，默认5）
+    - filters: 过滤条件，如 {"law_name": "中华人民共和国宪法"} （可选）
+    
+    返回:
+    - 相似文档列表的JSON
     """
+    if not VECTOR_STORE_AVAILABLE:
+        return jsonify({
+            "success": False,
+            "message": "向量存储模块未加载，无法处理请求",
+            "results": []
+        }), 500
+    
     try:
-        if not request.is_json:
+        # 获取请求参数
+        data = request.get_json()
+        if not data:
             return jsonify({
                 "success": False,
-                "message": "请求必须是JSON格式",
-                "query": "",
+                "message": "请求缺少必要的JSON数据",
                 "results": []
             }), 400
-            
-        # 从请求中获取查询内容
-        data = request.get_json()
-        query = data.get('query', '')
-        limit = data.get('limit', 5)
+        
+        query = data.get('query')
+        top_k = int(data.get('top_k', 5))
+        filters = data.get('filters', {})
         
         if not query:
             return jsonify({
                 "success": False,
-                "message": "查询关键词不能为空",
-                "query": query,
+                "message": "缺少搜索查询参数",
                 "results": []
             }), 400
-            
-        # 获取API密钥
-        api_key = get_deepseek_api_key() 
+        
+        # 从环境变量中获取API密钥
+        api_key = os.environ.get("DEEPSEEK_API_KEY")
+        
+        # 检查API密钥是否存在
         if not api_key:
             return jsonify({
                 "success": False,
-                "message": "DeepSeek API密钥未配置，无法进行向量搜索",
-                "query": query,
+                "message": "DeepSeek API密钥未设置，无法执行向量搜索，请在.env文件中设置DEEPSEEK_API_KEY",
                 "results": []
             }), 500
-            
+        
         # 初始化向量存储
         if DATABASE_TYPE == "mysql" and MYSQL_AVAILABLE:
             vector_store = VectorStore(
                 database_type="mysql",
                 mysql_config=MYSQL_CONFIG,
                 api_key=api_key,
-                embedding_model="text-embedding-ada-002"  # 更新为DeepSeek支持的嵌入模型
+                embedding_model="deepseek-embed"  # 更新为DeepSeek的嵌入模型
             )
         else:
             # 使用SQLite作为备用
             vector_store = VectorStore(
                 database_type="sqlite",
                 api_key=api_key,
-                embedding_model="text-embedding-ada-002"  # 更新为DeepSeek支持的嵌入模型
+                embedding_model="deepseek-embed"  # 更新为DeepSeek的嵌入模型
             )
-            
-        # 加载向量索引并进行搜索
-        result_count = vector_store.count_vector_chunks()
-        print(f"向量数据库中共有{result_count}条记录")
         
-        results = vector_store.search_similar_text(query, top_k=limit)
+        # 执行搜索
+        results = vector_store.search_similar_texts(
+            query_text=query,
+            top_k=top_k,
+            filters=filters
+        )
         
+        # 检查结果是否为空
         if not results:
             return jsonify({
                 "success": True,
@@ -1538,41 +1546,18 @@ def search_documents():
                 "query": query,
                 "results": []
             })
-            
-        # 格式化结果
-        formatted_results = []
-        for i, result in enumerate(results):
-            formatted_result = {
-                "id": i + 1,
-                "text": result.get("original_text", ""),
-                "score": result.get("score", 0),
-                "metadata": {
-                    "doc_id": result.get("doc_id", ""),
-                    "chunk_id": result.get("chunk_id_in_document", ""),
-                    "source": result.get("source_document_name", ""),
-                    "law_name": result.get("law_name", ""),
-                    "book": result.get("book", ""),
-                    "chapter": result.get("chapter", ""),
-                    "section": result.get("section", ""),
-                    "article": result.get("article", "")
-                }
-            }
-            formatted_results.append(formatted_result)
-            
+        
         return jsonify({
             "success": True,
-            "message": f"找到{len(formatted_results)}条相关内容",
+            "message": f"找到{len(results)}个相关结果",
             "query": query,
-            "results": formatted_results
+            "results": results
         })
         
     except Exception as e:
-        print(f"搜索文档时发生错误: {str(e)}")
-        traceback.print_exc()
         return jsonify({
             "success": False,
             "message": f"搜索失败: {str(e)}",
-            "query": query if 'query' in locals() else "",
             "results": []
         }), 500
 
@@ -1594,12 +1579,6 @@ def serve_html(html_file):
 def easy_upload():
     """提供简化的上传向量化一体化界面"""
     return send_from_directory('static', 'easy_upload.html')
-
-# 添加测试页面路由
-@app.route('/test_page')
-def test_page():
-    """提供API测试页面"""
-    return send_from_directory('static', 'test_page.html')
 
 # 添加获取处理进度的API端点
 @app.route('/admin/api/processing_status', methods=['GET'])

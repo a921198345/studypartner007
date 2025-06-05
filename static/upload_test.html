@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>法律文档处理工具</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            margin-top: 0;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        
+        h2 {
+            color: #3498db;
+            margin-top: 20px;
+        }
+        
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            border-bottom: none;
+            margin-right: 5px;
+            border-radius: 5px 5px 0 0;
+            background-color: #f8f9fa;
+        }
+        
+        .tab:hover {
+            background-color: #e9ecef;
+        }
+        
+        .tab.active {
+            background-color: #fff;
+            border-color: #ddd;
+            border-bottom-color: #fff;
+            margin-bottom: -1px;
+            font-weight: bold;
+            color: #3498db;
+        }
+        
+        .tab-content {
+            display: none;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-top: none;
+            background-color: #fff;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .text-input, .select-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        
+        textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            resize: vertical;
+        }
+        
+        .submit-btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .submit-btn:hover {
+            background-color: #2980b9;
+        }
+        
+        .response {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        #textPreview {
+            margin-top: 20px;
+        }
+        
+        .segment-option {
+            margin-bottom: 10px;
+        }
+        
+        .segment-option input[type="radio"] {
+            margin-right: 5px;
+        }
+        
+        .segment-blocks {
+            margin-top: 20px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .segment-block {
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .segment-header {
+            background-color: #f8f9fa;
+            padding: 8px 12px;
+            font-weight: bold;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .segment-content {
+            padding: 12px;
+            background-color: #fff;
+            white-space: pre-wrap;
+        }
+        
+        /* 法律结构分段特有样式 */
+        .segment-metadata {
+            background-color: #e6f2ff;
+            padding: 8px 12px;
+            border-bottom: 1px solid #b8daff;
+            font-weight: bold;
+            color: #004085;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .segment-metadata span {
+            background-color: #cce5ff;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        
+        /* 添加响应式支持 */
+        @media (max-width: 768px) {
+            .tabs {
+                flex-direction: column;
+            }
+            
+            .tab {
+                margin-bottom: 5px;
+                border-radius: 4px;
+            }
+            
+            .tab.active {
+                margin-bottom: 5px;
+            }
+        }
+        
+        /* 添加法律结构分段的提示样式 */
+        .info-tooltip {
+            font-size: 12px;
+            color: #666;
+            font-style: italic;
+            display: block;
+            margin-left: 22px;
+            margin-top: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>法律文档处理工具</h1>
+        
+        <div class="tabs">
+            <div class="tab active" data-tab="upload">文档上传</div>
+            <div class="tab" data-tab="extract">文本提取</div>
+            <div class="tab" data-tab="segment">文本分段</div>
+        </div>
+        
+        <!-- 文档上传选项卡 -->
+        <div id="uploadTab" class="tab-content active">
+            <h2>Word文档上传</h2>
+            <div class="upload-form">
+                <div class="form-group">
+                    <label for="file">选择Word文档：</label>
+                    <input type="file" id="file" class="text-input" accept=".doc,.docx">
+                </div>
+                <div class="form-group">
+                    <label for="subject">法典分类：</label>
+                    <select id="subject" class="select-input">
+                        <option value="宪法">宪法</option>
+                        <option value="民法">民法</option>
+                        <option value="商法">商法</option>
+                        <option value="民诉">民事诉讼法</option>
+                        <option value="知识产权法">知识产权法</option>
+                        <option value="刑法">刑法</option>
+                        <option value="刑诉">刑事诉讼法</option>
+                        <option value="行政法与行政诉讼法">行政法与行政诉讼法</option>
+                        <option value="经济法">经济法</option>
+                        <option value="环境资源法">环境资源法</option>
+                        <option value="劳动与社会保障法">劳动与社会保障法</option>
+                        <option value="国际公法">国际公法</option>
+                        <option value="国际私法">国际私法</option>
+                        <option value="国际经济法">国际经济法</option>
+                        <option value="司法制度与法律职业道德">司法制度与法律职业道德</option>
+                        <option value="粮食安全保障法">粮食安全保障法</option>
+                        <option value="慈善法">慈善法</option>
+                    </select>
+                </div>
+                <button id="uploadBtn" class="submit-btn">上传文档</button>
+                <div id="uploadResponse" class="response"></div>
+            </div>
+        </div>
+
+        <!-- 文本提取选项卡 -->
+        <div id="extractTab" class="tab-content">
+            <h2>文档文本提取</h2>
+            <div class="extract-form">
+                <div class="form-group">
+                    <label for="docId">文档ID：</label>
+                    <input type="text" id="docId" class="text-input" placeholder="输入上传后获得的文档ID">
+                </div>
+                <button id="extractBtn" class="submit-btn">提取文本</button>
+                <div id="extractResponse" class="response"></div>
+                <div id="textPreview" style="display: none;">
+                    <h3>提取的文本内容</h3>
+                    <pre id="extractedText"></pre>
+                    <button id="copyToSegmentBtn" class="submit-btn" style="margin-top: 10px;">复制到文本分段</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 文本分段选项卡 -->
+        <div id="segmentTab" class="tab-content">
+            <h2>文本分段处理</h2>
+            <div class="segment-form">
+                <div class="form-group">
+                    <label for="textToSegment">输入要分段的文本：</label>
+                    <textarea id="textToSegment" placeholder="在此输入要分段的文本，或从文本提取页面复制"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>分段策略：</label>
+                    <div class="segment-option">
+                        <input type="radio" id="fixedLength" name="strategy" value="fixed_length" checked>
+                        <label for="fixedLength">固定长度</label>
+                    </div>
+                    <div class="segment-option">
+                        <input type="radio" id="paragraph" name="strategy" value="paragraph">
+                        <label for="paragraph">按段落</label>
+                    </div>
+                    <div class="segment-option">
+                        <input type="radio" id="combined" name="strategy" value="combined">
+                        <label for="combined">组合策略</label>
+                    </div>
+                    <div class="segment-option">
+                        <input type="radio" id="smart" name="strategy" value="smart">
+                        <label for="smart">智能混合</label>
+                    </div>
+                    <div class="segment-option">
+                        <input type="radio" id="legalStructure" name="strategy" value="legal_structure">
+                        <label for="legalStructure">法律结构</label>
+                        <small class="info-tooltip">（最适合处理标准法律条文，将按编/章/节/条进行智能分段）</small>
+                    </div>
+                </div>
+                <div id="lengthOptions" class="form-group">
+                    <div class="form-group">
+                        <label for="chunkSize">块大小（字符数）：</label>
+                        <input type="number" id="chunkSize" class="text-input" value="500" min="10">
+                    </div>
+                    <div class="form-group">
+                        <label for="overlap">重叠字符数：</label>
+                        <input type="number" id="overlap" class="text-input" value="50" min="0">
+                    </div>
+                </div>
+                <button id="segmentBtn" class="submit-btn">分段处理</button>
+                <div id="segmentResponse" class="response"></div>
+                <div id="segmentResult" style="display: none;">
+                    <h3>分段结果</h3>
+                    <div id="segmentBlocks" class="segment-blocks"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 选项卡切换功能
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                // 移除所有选项卡的活动状态
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                // 添加当前选项卡的活动状态
+                this.classList.add('active');
+                const tabId = this.getAttribute('data-tab') + 'Tab';
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+
+        // 上传文档功能
+        document.getElementById('uploadBtn').addEventListener('click', async function() {
+            const fileInput = document.getElementById('file');
+            const subjectSelect = document.getElementById('subject');
+            const responseDiv = document.getElementById('uploadResponse');
+            
+            // 检查是否选择了文件
+            if (!fileInput.files.length) {
+                responseDiv.textContent = '请先选择要上传的Word文档';
+                responseDiv.className = 'response error';
+                responseDiv.style.display = 'block';
+                return;
+            }
+            
+            // 准备表单数据
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('subject_area', subjectSelect.value);
+            
+            // 显示上传中提示
+            responseDiv.textContent = '正在上传...';
+            responseDiv.className = 'response info';
+            responseDiv.style.display = 'block';
+            
+            try {
+                const response = await fetch('http://localhost:5003/admin/api/upload_word', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    responseDiv.className = 'response success';
+                    responseDiv.innerHTML = `<strong>${result.message}</strong><br>文档ID: ${result.data.file_id}<br>文件路径: ${result.data.file_path}<br>法典分类: ${result.data.subject_area}`;
+                } else {
+                    responseDiv.className = 'response error';
+                    responseDiv.textContent = `上传失败: ${result.message}`;
+                }
+            } catch (error) {
+                responseDiv.className = 'response error';
+                responseDiv.textContent = `发生错误: ${error.message}`;
+            }
+        });
+
+        // 文本提取功能
+        document.getElementById('extractBtn').addEventListener('click', async function() {
+            const docId = document.getElementById('docId').value.trim();
+            const extractResponseDiv = document.getElementById('extractResponse');
+            const textPreviewDiv = document.getElementById('textPreview');
+            
+            if (!docId) {
+                extractResponseDiv.className = 'response error';
+                extractResponseDiv.textContent = '请输入文档ID';
+                extractResponseDiv.style.display = 'block';
+                return;
+            }
+            
+            try {
+                extractResponseDiv.className = 'response info';
+                extractResponseDiv.textContent = '正在提取文本，请稍候...';
+                extractResponseDiv.style.display = 'block';
+                textPreviewDiv.style.display = 'none';
+                
+                // 添加时间戳避免缓存问题
+                const timestamp = new Date().getTime();
+                const response = await fetch(`http://localhost:5003/admin/api/extract_text?doc_id=${docId}&_=${timestamp}`);
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    extractResponseDiv.className = 'response success';
+                    extractResponseDiv.textContent = result.message;
+                    
+                    // 显示提取的文本
+                    document.getElementById('extractedText').textContent = result.data.text || result.data.text_preview || '';
+                    textPreviewDiv.style.display = 'block';
+                } else {
+                    extractResponseDiv.className = 'response error';
+                    extractResponseDiv.textContent = `提取失败: ${result.message}`;
+                    textPreviewDiv.style.display = 'none';
+                }
+            } catch (error) {
+                extractResponseDiv.className = 'response error';
+                extractResponseDiv.textContent = `发生错误: ${error.message}`;
+                textPreviewDiv.style.display = 'none';
+            }
+        });
+
+        // 复制文本到分段区域
+        document.getElementById('copyToSegmentBtn').addEventListener('click', function() {
+            const extractedText = document.getElementById('extractedText').textContent;
+            document.getElementById('textToSegment').value = extractedText;
+            
+            // 切换到分段选项卡
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            document.querySelector('.tab[data-tab="segment"]').classList.add('active');
+            document.getElementById('segmentTab').classList.add('active');
+        });
+
+        // 文本分段功能
+        document.getElementById('segmentBtn').addEventListener('click', async function() {
+            const textArea = document.getElementById('textToSegment');
+            const responseDiv = document.getElementById('segmentResponse');
+            const resultDiv = document.getElementById('segmentResult');
+            const blocksDiv = document.getElementById('segmentBlocks');
+            
+            // 获取选中的策略
+            const strategyRadios = document.getElementsByName('strategy');
+            let selectedStrategy;
+            strategyRadios.forEach(radio => {
+                if (radio.checked) {
+                    selectedStrategy = radio.value;
+                }
+            });
+            
+            // 获取块大小和重叠参数
+            const chunkSize = parseInt(document.getElementById('chunkSize').value) || 500;
+            const overlap = parseInt(document.getElementById('overlap').value) || 50;
+            
+            // 检查文本是否为空
+            if (!textArea.value.trim()) {
+                responseDiv.className = 'response error';
+                responseDiv.textContent = '请输入要分段的文本';
+                responseDiv.style.display = 'block';
+                resultDiv.style.display = 'none';
+                return;
+            }
+            
+            // 准备请求数据
+            const requestData = {
+                text: textArea.value,
+                strategy: selectedStrategy,
+                chunk_size: chunkSize,
+                overlap: overlap
+            };
+            
+            try {
+                responseDiv.className = 'response info';
+                responseDiv.textContent = '正在处理文本分段，请稍候...';
+                responseDiv.style.display = 'block';
+                resultDiv.style.display = 'none';
+                
+                const response = await fetch('http://localhost:5003/admin/api/segment_text', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    responseDiv.className = 'response success';
+                    responseDiv.textContent = result.message;
+                    
+                    // 清空分段块区域
+                    blocksDiv.innerHTML = '';
+                    
+                    // 显示分段结果
+                    if (selectedStrategy === 'legal_structure') {
+                        // 处理法律结构分段的结构化结果
+                        result.chunks.forEach((chunk, index) => {
+                            const blockDiv = document.createElement('div');
+                            blockDiv.className = 'segment-block';
+                            
+                            // 创建元数据标题
+                            const metaDiv = document.createElement('div');
+                            metaDiv.className = 'segment-metadata';
+                            
+                            const metadata = chunk.metadata;
+                            let metaHtml = '';
+                            if (metadata.law !== '未识别') metaHtml += `<span>法律: ${metadata.law}</span>`;
+                            if (metadata.编 !== '未识别') metaHtml += `<span>编: ${metadata.编}</span>`;
+                            if (metadata.章 !== '未识别') metaHtml += `<span>章: ${metadata.章}</span>`;
+                            if (metadata.节 !== '未识别') metaHtml += `<span>节: ${metadata.节}</span>`;
+                            if (metadata.条 !== '未识别') metaHtml += `<span>条: ${metadata.条}</span>`;
+                            
+                            if (metaHtml === '') {
+                                metaHtml = `<span>段落 #${index + 1}</span>`;
+                            }
+                            
+                            metaDiv.innerHTML = metaHtml;
+                            blockDiv.appendChild(metaDiv);
+                            
+                            // 创建文本内容
+                            const contentDiv = document.createElement('div');
+                            contentDiv.className = 'segment-content';
+                            contentDiv.textContent = chunk.content;
+                            blockDiv.appendChild(contentDiv);
+                            
+                            blocksDiv.appendChild(blockDiv);
+                        });
+                    } else {
+                        // 处理普通分段结果
+                        result.chunks.forEach((chunk, index) => {
+                            const blockDiv = document.createElement('div');
+                            blockDiv.className = 'segment-block';
+                            
+                            const headerDiv = document.createElement('div');
+                            headerDiv.className = 'segment-header';
+                            headerDiv.textContent = `文本块 #${index + 1}`;
+                            blockDiv.appendChild(headerDiv);
+                            
+                            const contentDiv = document.createElement('div');
+                            contentDiv.className = 'segment-content';
+                            contentDiv.textContent = chunk;
+                            blockDiv.appendChild(contentDiv);
+                            
+                            blocksDiv.appendChild(blockDiv);
+                        });
+                    }
+                    
+                    resultDiv.style.display = 'block';
+                } else {
+                    responseDiv.className = 'response error';
+                    responseDiv.textContent = `分段处理失败: ${result.message}`;
+                    resultDiv.style.display = 'none';
+                }
+            } catch (error) {
+                responseDiv.className = 'response error';
+                responseDiv.textContent = `发生错误: ${error.message}`;
+                resultDiv.style.display = 'none';
+            }
+        });
+
+        // 策略切换逻辑
+        document.querySelectorAll('input[name="strategy"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                const lengthOptions = document.getElementById('lengthOptions');
+                // 法律结构和按段落策略都不需要字符数设置
+                if (this.value === 'paragraph' || this.value === 'legal_structure') {
+                    lengthOptions.style.display = 'none';
+                } else {
+                    lengthOptions.style.display = 'block';
+                }
+            });
+        });
+        
+        // 页面加载时初始化策略选项
+        document.addEventListener('DOMContentLoaded', function() {
+            // 检查默认选中的策略
+            const selectedRadio = document.querySelector('input[name="strategy"]:checked');
+            if (selectedRadio) {
+                const lengthOptions = document.getElementById('lengthOptions');
+                if (selectedRadio.value === 'paragraph' || selectedRadio.value === 'legal_structure') {
+                    lengthOptions.style.display = 'none';
+                } else {
+                    lengthOptions.style.display = 'block';
+                }
+            }
+        });
+    </script>
+</body>
+</html> 

@@ -1,216 +1,164 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 """
-文档处理流程
-整合了文本提取、分段和向量化的完整流程
+法律文档处理脚本
+用于提取Word文档内容，进行法律结构分段，生成向量嵌入等
 """
 
 import os
+import sys
 import json
-from typing import List, Dict, Any, Optional
+import argparse
+from text_segmentation import LegalDocumentSegmenter
+from enhanced_legal_structure import AIEnhancedLegalProcessor
 
-# 导入文本提取模块
-try:
-    from parse_docx import extract_text_from_word
-    DOCX_PARSER_AVAILABLE = True
-    print("成功导入Word文档解析模块")
-except ImportError:
-    DOCX_PARSER_AVAILABLE = False
-    print("警告: parse_docx模块未找到，Word文档解析功能不可用")
+def extract_text_from_docx(file_path):
+    """从Word文档中提取文本"""
+    try:
+        import docx
+        doc = docx.Document(file_path)
+        full_text = []
+        for para in doc.paragraphs:
+            full_text.append(para.text)
+        return '\n'.join(full_text)
+    except ImportError:
+        print("请安装python-docx库: pip install python-docx", file=sys.stderr)
+        return None
+    except Exception as e:
+        print(f"提取文本出错: {e}", file=sys.stderr)
+        return None
 
-# 导入文本分段模块
-try:
-    from text_segmentation import segment_text
-    TEXT_SEGMENTATION_AVAILABLE = True
-    print("成功导入文本分段模块")
-except ImportError:
-    TEXT_SEGMENTATION_AVAILABLE = False
-    print("警告: text_segmentation模块未找到，文本分段功能不可用")
-
-# 导入向量化模块
-try:
-    from lib.embeddings import get_embeddings_from_deepseek
-    EMBEDDINGS_AVAILABLE = True
-    print("成功导入向量化模块")
-except ImportError:
-    EMBEDDINGS_AVAILABLE = False
-    print("警告: lib.embeddings模块未找到，向量化功能不可用")
-
-def process_document(
-    document_path: str,
-    segment_strategy: str = 'smart',
-    chunk_size: int = 1000,
-    overlap: int = 100,
-    api_key: Optional[str] = None,
-    output_path: Optional[str] = None
-) -> Dict[str, Any]:
-    """
-    处理文档的完整流程：提取文本、分段和向量化
+def process_document(file_path, law_name=None, doc_id=None):
+    """处理法律文档的入口函数"""
+    # 提取文件名（不含路径和扩展名）作为默认law_name
+    if not law_name:
+        base_name = os.path.basename(file_path)
+        law_name = os.path.splitext(base_name)[0]
     
-    参数:
-        document_path (str): 文档文件路径
-        segment_strategy (str): 分段策略，可选值：'fixed_length'、'paragraph'、'combined'或'smart'
-        chunk_size (int): 文本块的最大字符数
-        overlap (int): 相邻文本块的重叠字符数
-        api_key (str, optional): DeepSeek API密钥，如不提供则尝试从环境变量获取
-        output_path (str, optional): 结果输出的JSON文件路径，如不提供则不保存文件
+    # 生成默认文档ID
+    if not doc_id:
+        import time
+        import random
+        doc_id = f"doc_{int(time.time())}_{random.randint(100, 999)}"
+    
+    # 提取文本
+    text = extract_text_from_docx(file_path)
+    if not text:
+        return {
+            "success": False,
+            "error": "无法提取文档文本",
+            "doc_id": doc_id
+        }
+    
+    # 使用法律结构分段器处理文本
+    segmenter = LegalDocumentSegmenter()
+    segments = segmenter.segment_by_legal_structure(text, law_name)
+    
+    # 检查是否有API密钥决定是否使用增强功能
+    api_key = os.environ.get("DEEPSEEK_API_KEY")
+    use_ai = bool(api_key)
+    
+    # 准备存储到数据库的数据
+    db_segments = []
+    
+    # 如果有API密钥，使用AI增强功能
+    if use_ai:
+        processor = AIEnhancedLegalProcessor(api_key)
         
-    返回:
-        Dict[str, Any]: 处理结果，包含原始文本、分段和向量化信息
-    """
-    # 验证模块可用性
-    if not DOCX_PARSER_AVAILABLE:
-        raise ImportError("无法进行文档处理：parse_docx模块未找到")
-    if not TEXT_SEGMENTATION_AVAILABLE:
-        raise ImportError("无法进行文档处理：text_segmentation模块未找到")
-    if not EMBEDDINGS_AVAILABLE:
-        raise ImportError("无法进行文档处理：lib.embeddings模块未找到")
+        # 优化分段质量
+        optimized_segments = processor.ai_optimize_segmentation(segments[:10])  # 仅处理前10个作为示例
+        
+        # 生成向量嵌入
+        embeddings = processor.generate_embeddings(optimized_segments)
+        
+        for i, segment in enumerate(optimized_segments):
+            # 找到对应的向量数据
+            embedding_data = None
+            for emb in embeddings:
+                if emb.get("segment_id").endswith(f"_{segment.article or i}"):
+                    embedding_data = emb
+                    break
+            
+            if embedding_data:
+                db_segments.append(embedding_data)
+            else:
+                # 默认处理没有找到对应向量的情况
+                db_segments.append({
+                    "content": segment.content,
+                    "metadata": segment.to_dict()["metadata"],
+                    "token_count": segment.token_count,
+                    "key_concepts": []  # 基础版本没有关键概念提取
+                })
+    else:
+        # 使用基础分段，没有向量嵌入
+        for i, segment in enumerate(segments):
+            db_segments.append({
+                "content": segment.content,
+                "metadata": segment.to_dict()["metadata"],
+                "token_count": segment.token_count,
+                "key_concepts": []  # 基础版本没有关键概念提取
+            })
     
-    # 验证文件存在
-    if not os.path.exists(document_path):
-        raise FileNotFoundError(f"文件未找到: {document_path}")
-    
-    # 准备结果字典
-    result = {
-        "document_path": document_path,
-        "document_name": os.path.basename(document_path),
-        "segment_strategy": segment_strategy,
-        "chunk_size": chunk_size,
-        "overlap": overlap,
-        "processing_steps": []
+    # 提取一些元数据用于返回
+    metadata = {
+        "law_name": law_name,
+        "total_characters": len(text),
+        "ai_enhanced": use_ai
     }
     
-    # 第1步：提取文本
-    print(f"正在从文档提取文本: {document_path}")
-    try:
-        full_text = extract_text_from_word(document_path)
-        result["processing_steps"].append({
-            "step": "text_extraction",
-            "status": "success",
-            "text_length": len(full_text),
-            "message": "文本提取成功"
-        })
-        print(f"文本提取成功，共 {len(full_text)} 个字符")
-    except Exception as e:
-        error_msg = f"文本提取失败: {str(e)}"
-        result["processing_steps"].append({
-            "step": "text_extraction",
-            "status": "error",
-            "message": error_msg
-        })
-        print(error_msg)
-        return result
+    # 根据分段结果提取结构信息
+    structure_info = extract_structure_metadata(segments)
+    metadata.update(structure_info)
     
-    # 第2步：文本分段
-    print(f"正在对文本进行分段，使用策略: {segment_strategy}")
-    try:
-        text_chunks = segment_text(full_text, strategy=segment_strategy, 
-                                  chunk_size=chunk_size, overlap=overlap)
-        result["processing_steps"].append({
-            "step": "text_segmentation",
-            "status": "success",
-            "chunks_count": len(text_chunks),
-            "message": "文本分段成功"
-        })
-        print(f"文本分段成功，共分成 {len(text_chunks)} 个文本块")
-    except Exception as e:
-        error_msg = f"文本分段失败: {str(e)}"
-        result["processing_steps"].append({
-            "step": "text_segmentation",
-            "status": "error",
-            "message": error_msg
-        })
-        print(error_msg)
-        return result
+    # 构建返回结果
+    result = {
+        "success": True,
+        "doc_id": doc_id,
+        "segments_count": len(segments),
+        "metadata": metadata
+    }
     
-    # 第3步：向量化
-    print("正在对文本块进行向量化...")
-    try:
-        embedding_results = get_embeddings_from_deepseek(text_chunks, api_key=api_key)
-        
-        # 统计成功和失败的数量
-        successful = sum(1 for item in embedding_results if item['embedding'] is not None)
-        failed = len(embedding_results) - successful
-        
-        result["processing_steps"].append({
-            "step": "vectorization",
-            "status": "success" if failed == 0 else "partial_success",
-            "successful_chunks": successful,
-            "failed_chunks": failed,
-            "message": "向量化完成" if failed == 0 else f"向量化部分完成，{failed}个文本块失败"
-        })
-        
-        # 添加文本块和向量到结果中
-        result["chunks"] = []
-        for i, embed_result in enumerate(embedding_results):
-            chunk_info = {
-                "chunk_id": i,
-                "text": embed_result["text"],
-                "text_length": len(embed_result["text"]),
-                "has_embedding": embed_result["embedding"] is not None
-            }
-            
-            # 只包含向量维度信息，不包含完整向量（可能很大）
-            if embed_result["embedding"] is not None:
-                chunk_info["embedding_dim"] = len(embed_result["embedding"])
-            else:
-                chunk_info["error"] = embed_result.get("error", "未知错误")
-            
-            result["chunks"].append(chunk_info)
-        
-        # 添加完整向量数据（可选）
-        result["embeddings"] = [
-            {
-                "chunk_id": i,
-                "embedding": item["embedding"]
-            }
-            for i, item in enumerate(embedding_results) 
-            if item["embedding"] is not None
-        ]
-        
-        print(f"向量化处理完成: 成功 {successful} 个, 失败 {failed} 个")
-        
-    except Exception as e:
-        error_msg = f"向量化处理失败: {str(e)}"
-        result["processing_steps"].append({
-            "step": "vectorization",
-            "status": "error",
-            "message": error_msg
-        })
-        print(error_msg)
+    # 保存处理结果到临时文件
+    output_file = f"temp_{doc_id}_segments.json"
+    with open(output_file, 'w', encoding='utf-8') as f:
+        json.dump(db_segments, f, ensure_ascii=False, indent=2)
     
-    # 如果提供了输出路径，保存结果到JSON文件
-    if output_path:
-        try:
-            with open(output_path, 'w', encoding='utf-8') as f:
-                json.dump(result, f, ensure_ascii=False, indent=2)
-            print(f"处理结果已保存到: {output_path}")
-        except Exception as e:
-            print(f"保存结果文件失败: {str(e)}")
-    
+    # 返回JSON格式结果
     return result
 
-# 命令行运行
-if __name__ == "__main__":
-    import argparse
+def extract_structure_metadata(segments):
+    """从分段列表中提取结构元数据"""
+    books = set(s.book for s in segments if s.book)
+    chapters = set(s.chapter for s in segments if s.chapter)
+    sections = set(s.section for s in segments if s.section)
+    articles = set(s.article for s in segments if s.article)
     
-    parser = argparse.ArgumentParser(description="处理Word文档：提取文本、分段和向量化")
-    parser.add_argument("document_path", help="Word文档的路径")
-    parser.add_argument("--strategy", default="smart", choices=["fixed_length", "paragraph", "combined", "smart"],
-                        help="文本分段策略")
-    parser.add_argument("--chunk-size", type=int, default=1000, help="文本块的最大字符数")
-    parser.add_argument("--overlap", type=int, default=100, help="相邻文本块的重叠字符数")
-    parser.add_argument("--api-key", help="DeepSeek API密钥（如果不提供，将尝试从环境变量获取）")
-    parser.add_argument("--output", help="处理结果输出的JSON文件路径")
+    return {
+        "books": list(books),
+        "chapters": list(chapters),
+        "sections": list(sections),
+        "articles": list(articles),
+        "books_count": len(books),
+        "chapters_count": len(chapters),
+        "sections_count": len(sections),
+        "articles_count": len(articles)
+    }
+
+def main():
+    """命令行入口"""
+    parser = argparse.ArgumentParser(description='处理法律文档，提取文本，进行法律结构分段')
+    parser.add_argument('--file', required=True, help='要处理的Word文档路径')
+    parser.add_argument('--law_name', help='法律名称（可选）')
+    parser.add_argument('--doc_id', help='文档ID（可选）')
     
     args = parser.parse_args()
     
-    process_document(
-        document_path=args.document_path,
-        segment_strategy=args.strategy,
-        chunk_size=args.chunk_size,
-        overlap=args.overlap,
-        api_key=args.api_key,
-        output_path=args.output
-    ) 
+    # 处理文档
+    result = process_document(args.file, args.law_name, args.doc_id)
+    
+    # 将结果输出为JSON
+    print(json.dumps(result, ensure_ascii=False))
+
+if __name__ == "__main__":
+    main() 

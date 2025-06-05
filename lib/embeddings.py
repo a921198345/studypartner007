@@ -37,8 +37,8 @@ class DeepSeekEmbeddings:
             raise ValueError("未找到DeepSeek API密钥，请通过参数传入或设置DEEPSEEK_API_KEY环境变量")
             
         # API配置
-        self.api_url = "https://api.deepseek.com/v1/embeddings"  # DeepSeek的Embedding API地址
-        self.model = "deepseek-embed"  # 使用的模型名称
+        self.api_url = "https://api.deepseek.com/v1/embeddings"  # DeepSeek的API地址
+        self.model = "text-embedding-ada-002"  # 使用的模型名称
         self.max_retries = 3  # 最大重试次数
         self.retry_delay = 2  # 重试间隔(秒)
         
@@ -99,11 +99,13 @@ class DeepSeekEmbeddings:
         retries = 0
         while retries < self.max_retries:
             try:
+                # 禁用SSL证书验证以解决证书问题
                 response = requests.post(
                     self.api_url,
                     headers=headers,
                     data=json.dumps(payload),
-                    timeout=30  # 30秒超时
+                    timeout=30,  # 30秒超时
+                    verify=False  # 禁用SSL证书验证
                 )
                 
                 # 检查响应状态

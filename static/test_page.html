@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API测试页面</title>
+    <style>
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1a73e8;
+            text-align: center;
+        }
+        button {
+            background-color: #1a73e8;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+        button:hover {
+            background-color: #0d47a1;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>API测试页面</h1>
+        
+        <div>
+            <h2>测试API连接</h2>
+            <button id="testApiBtn">测试API连接</button>
+            <pre id="apiResult">点击按钮测试API连接...</pre>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('testApiBtn').addEventListener('click', async function() {
+            const resultElement = document.getElementById('apiResult');
+            resultElement.textContent = '正在测试API连接...';
+            
+            try {
+                // 测试获取文档列表API
+                const response = await fetch('/admin/api/documents');
+                const result = await response.json();
+                
+                // 显示结果
+                resultElement.textContent = JSON.stringify(result, null, 2);
+                
+            } catch (error) {
+                resultElement.textContent = `API连接失败: ${error.message}`;
+            }
+        });
+    </script>
+</body>
+</html> 

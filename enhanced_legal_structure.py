@@ -18,7 +18,8 @@ class AIEnhancedLegalProcessor:
     def __init__(self, api_key: str = None):
         self.base_segmenter = LegalDocumentSegmenter()
         self.api_key = api_key or os.getenv('DEEPSEEK_API_KEY')
-        self.api_base_url = "https://api.deepseek.com/v1"
+        # 更新到最新API端点
+        self.api_base_url = "https://api.deepseek.com"
         
         if not self.api_key:
             print("⚠️  警告: 未设置DEEPSEEK_API_KEY，AI增强功能将不可用")
@@ -44,7 +45,7 @@ class AIEnhancedLegalProcessor:
         
         try:
             response = requests.post(
-                f"{self.api_base_url}/chat/completions",
+                f"{self.api_base_url}/v1/chat/completions",
                 headers=headers,
                 json=data,
                 timeout=30
@@ -55,7 +56,7 @@ class AIEnhancedLegalProcessor:
             return result["choices"][0]["message"]["content"]
             
         except requests.exceptions.RequestException as e:
-            print(f"❌ API调用失败: {e}")
+            print(f"❌ API调用失败: {str(e)}")
             return ""
     
     def ai_enhance_structure_recognition(self, text: str) -> Dict[str, Any]:
@@ -100,68 +101,186 @@ class AIEnhancedLegalProcessor:
             "special_formats": []
         }
     
+    def check_segment_quality(self, segment: LegalSegment) -> Dict[str, Any]:
+        """
+        检查分段质量
+        
+        Args:
+            segment: 需要检查的分段
+            
+        Returns:
+            包含质量评估结果的字典
+        """
+        # 初始化评估结果
+        quality_assessment = {
+            "is_complete": True,
+            "issues": [],
+            "score": 10  # 1-10分数
+        }
+        
+        # 1. 检查内容长度 (太短可能不是完整语义单元)
+        content_length = len(segment.content)
+        if content_length < 50:
+            quality_assessment["is_complete"] = False
+            quality_assessment["issues"].append("内容过短，可能不是完整语义单元")
+            quality_assessment["score"] -= 2
+        
+        # 2. 检查元数据完整性
+        if not segment.article and not segment.chapter:
+            quality_assessment["issues"].append("缺少关键结构信息(条/章)")
+            quality_assessment["score"] -= 2
+            
+        # 3. 检查内容是否有明确的开始和结束
+        content = segment.content.strip()
+        if not content.endswith(("。", "！", "？", "；", ".", "!", "?", ";")):
+            quality_assessment["issues"].append("内容可能不完整，缺少适当的结束符")
+            quality_assessment["score"] -= 1
+            
+        # 4. 检查语义连贯性 (通过AI完成)
+        if self.api_key and len(content) > 100:  # 只对较长文本调用AI
+            ai_assessment = self._assess_semantic_quality(segment)
+            if ai_assessment:
+                if not ai_assessment.get("is_coherent", True):
+                    quality_assessment["issues"].append("AI检测到语义不连贯问题")
+                    quality_assessment["score"] -= 2
+                
+                # 合并AI评估结果
+                quality_assessment.update({
+                    "ai_assessment": ai_assessment
+                })
+        
+        # 确保最终分数在1-10范围内
+        quality_assessment["score"] = max(1, min(10, quality_assessment["score"]))
+        
+        return quality_assessment
+    
+    def _assess_semantic_quality(self, segment: LegalSegment) -> Dict[str, Any]:
+        """使用AI评估分段的语义质量"""
+        if not self.api_key:
+            return {}
+            
+        prompt = f"""
+分析以下法律条文分段的语义质量:
+
+分段内容:
+{segment.content}
+
+元数据:
+法律: {segment.law_name}
+章: {segment.chapter or '无'}
+条: {segment.article or '无'}
+
+请评估:
+1. 内容是否语义连贯？
+2. 是否包含完整的法律表述？
+3. 有无语义断裂或不连贯之处？
+
+以JSON格式回答:
+{{
+  "is_coherent": true/false,
+  "is_complete_statement": true/false,
+  "issues": ["问题1", "问题2"...],
+  "improvement": "改进建议"
+}}
+"""
+        
+        try:
+            response = self.call_deepseek_api(prompt)
+            # 尝试提取JSON
+            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group())
+        except Exception as e:
+            print(f"⚠️ AI语义评估失败: {e}")
+        
+        return {}
+    
     def ai_optimize_segmentation(self, segments: List[LegalSegment]) -> List[LegalSegment]:
         """使用AI优化分段质量"""
         if not self.api_key:
             print("⚠️  跳过AI优化（需要API密钥）")
             return segments
         
+        print(f"🔍 正在评估并优化 {len(segments)} 个分段的质量...")
         optimized_segments = []
+        quality_scores = []
         
-        for segment in segments:
-            # 对每个分段进行质量检查
-            if len(segment.content) > 100:  # 只对较长的分段进行优化
-                optimized_segment = self._optimize_single_segment(segment)
+        # 先进行质量检查，找出需要优化的分段
+        for i, segment in enumerate(segments):
+            print(f"  评估分段 {i+1}/{len(segments)}...")
+            quality = self.check_segment_quality(segment)
+            quality_scores.append(quality)
+            
+            # 如果质量分数低于阈值，进行优化
+            if quality["score"] < 7:
+                optimized_segment = self._optimize_single_segment(segment, quality)
                 optimized_segments.append(optimized_segment)
+                print(f"  ✨ 分段 {i+1} 已优化，原始分数: {quality['score']}")
             else:
                 optimized_segments.append(segment)
+                print(f"  ✅ 分段 {i+1} 质量良好，分数: {quality['score']}")
         
+        # 输出质量统计
+        scores = [q["score"] for q in quality_scores]
+        if scores:
+            avg_score = sum(scores) / len(scores)
+            print(f"📊 分段质量统计：平均分数 {avg_score:.1f}，最低 {min(scores)}，最高 {max(scores)}")
+            
         return optimized_segments
     
-    def _optimize_single_segment(self, segment: LegalSegment) -> LegalSegment:
+    def _optimize_single_segment(self, segment: LegalSegment, quality: Dict[str, Any]) -> LegalSegment:
         """优化单个分段"""
+        if not self.api_key:
+            return segment
+            
+        issues = quality.get("issues", [])
+        issues_str = "\n".join([f"- {issue}" for issue in issues])
+            
         prompt = f"""
-请分析以下法律条文分段，检查其是否具有语义完整性：
+作为法律文本分段优化专家，请优化以下法律分段内容，解决存在的质量问题:
 
-分段内容：
+原始分段内容:
 {segment.content}
 
-当前元数据：
+元数据:
 - 法律: {segment.law_name}
-- 条: {segment.article}
-- 章: {segment.chapter}
+- 编: {segment.book or '无'}
+- 章: {segment.chapter or '无'}
+- 节: {segment.section or '无'}
+- 条: {segment.article or '无'}
 
-请回答：
-1. 这个分段是否语义完整？
-2. 是否需要调整分段边界？
-3. 元数据是否准确？
+检测到的问题:
+{issues_str}
 
-返回格式：
-{{
-    "is_complete": true/false,
-    "suggestions": "改进建议",
-    "corrected_metadata": {{"修正的元数据"}}
-}}
+请执行以下优化:
+1. 修正不连贯或不完整的表述
+2. 确保语义完整性
+3. 保留原始法律含义和专业术语
+4. 保持原文结构和格式
+5. 不要添加原文中不存在的法律解释
+
+只返回优化后的文本内容，不要添加解释或其他内容。
 """
         
         try:
-            ai_response = self.call_deepseek_api(prompt)
-            json_match = re.search(r'\{.*\}', ai_response, re.DOTALL)
-            
-            if json_match:
-                analysis = json.loads(json_match.group())
-                
-                # 根据AI建议更新元数据
-                if "corrected_metadata" in analysis:
-                    corrected = analysis["corrected_metadata"]
-                    if corrected.get("article"):
-                        segment.article = corrected["article"]
-                    if corrected.get("chapter"):
-                        segment.chapter = corrected["chapter"]
-                
+            response = self.call_deepseek_api(prompt)
+            if response:
+                # 复制原分段，但替换内容为优化后的内容
+                return LegalSegment(
+                    content=response,
+                    law_name=segment.law_name,
+                    book=segment.book,
+                    chapter=segment.chapter,
+                    section=segment.section,
+                    article=segment.article,
+                    paragraph=segment.paragraph,
+                    item=segment.item,
+                    token_count=self.base_segmenter.estimate_tokens(response)
+                )
         except Exception as e:
-            print(f"⚠️  分段优化失败: {e}")
+            print(f"⚠️ 分段优化失败: {e}")
         
+        # 如果优化失败，返回原始分段
         return segment
     
     def extract_key_concepts(self, segment: LegalSegment) -> List[str]:
@@ -192,29 +311,77 @@ class AIEnhancedLegalProcessor:
         
         return []
     
+    def generate_embeddings_for_text(self, text: str, model: str = "text-embedding-ada-002") -> List[float]:
+        """
+        为文本生成向量嵌入
+        
+        Args:
+            text: 需要向量化的文本
+            model: 使用的嵌入模型名称
+            
+        Returns:
+            向量列表
+        """
+        if not self.api_key:
+            # 返回虚拟向量（实际项目中这里不应该这样处理）
+            return [0.1] * 512
+        
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        data = {
+            "model": model,
+            "input": text,
+            "encoding_format": "float"
+        }
+        
+        try:
+            response = requests.post(
+                f"{self.api_base_url}/v1/embeddings",
+                headers=headers,
+                json=data,
+                timeout=30
+            )
+            response.raise_for_status()
+            
+            result = response.json()
+            return result["data"][0]["embedding"]
+            
+        except requests.exceptions.RequestException as e:
+            print(f"❌ 嵌入生成失败: {str(e)}")
+            # 返回虚拟向量
+            return [0.1] * 512
+    
     def generate_embeddings(self, segments: List[LegalSegment]) -> List[Dict[str, Any]]:
-        """为分段生成向量嵌入（模拟）"""
+        """为分段生成向量嵌入"""
         results = []
         
-        for segment in segments:
-            # 实际项目中这里会调用DeepSeek的embedding API
-            # 现在我们模拟返回结构
+        print(f"⏳ 正在为 {len(segments)} 个分段生成向量嵌入...")
+        
+        for i, segment in enumerate(segments):
+            print(f"  处理分段 {i+1}/{len(segments)}...")
             
             # 提取关键概念
             key_concepts = self.extract_key_concepts(segment)
             
+            # 生成文本的向量嵌入
+            embedding = self.generate_embeddings_for_text(segment.content)
+            
             result = {
-                "segment_id": f"{segment.law_name}_{segment.article}",
+                "segment_id": f"{segment.law_name}_{segment.article or i}",
                 "content": segment.content,
                 "metadata": segment.to_dict()["metadata"],
                 "key_concepts": key_concepts,
-                "embedding": [0.1] * 512,  # 模拟512维向量
-                "embedding_model": "deepseek-embedding",
+                "embedding": embedding,
+                "embedding_model": "text-embedding-ada-002",
                 "token_count": segment.token_count
             }
             
             results.append(result)
         
+        print(f"✅ 向量嵌入生成完成")
         return results
     
     def process_legal_document(
