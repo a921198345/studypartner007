@@ -1,183 +1,175 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import React, { useState, useRef, useEffect } from "react"
 import { MainNav } from "@/components/main-nav"
 import { Footer } from "@/components/footer"
-import { ChatInterface } from "@/components/ai-chat/chat-interface"
-import { SidebarLearningPlan } from "@/components/ai-chat/sidebar-learning-plan"
-import { RelatedResources } from "@/components/ai-chat/related-resources"
-import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card"
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
+import ChatLayout from "@/components/ai-chat/ChatLayout"
+import StreamingMessage from "@/components/ai-chat/StreamingMessage"
+import InputArea from "@/components/ai-chat/InputArea"
+import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Input } from "@/components/ui/input"
-import { cn } from "@/lib/utils"
-import { SendIcon, SettingsIcon, MoveVerticalIcon } from "lucide-react"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Loader2 } from "lucide-react"
+import { v4 as uuidv4 } from 'uuid'
+import { askAIStream, AskAIParams } from "@/lib/api/aiService"
+import { useToast } from "@/components/ui/use-toast"
+import { useChatStore } from '@/hooks/useChatStore'
+import { ChevronLeftIcon } from 'lucide-react'
+import Link from 'next/link'
 
-export default function AiChatPage() {
-  const [messages, setMessages] = useState([
-    {
-      role: "assistant",
-      content: "你好！我是你的法考学习助手小雨。有什么法考问题需要我帮忙解答吗？",
-      timestamp: new Date().toISOString(),
-    },
-  ])
-  const [input, setInput] = useState("")
-  const [isTyping, setIsTyping] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const [activeTab, setActiveTab] = useState("plan")
+// 扩展消息类型，添加流式相关属性
+interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+  isStreaming?: boolean;
+  streamText?: string;
+  imageBase64?: string;
+  isError?: boolean;
+}
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
-
+export default function AIChat() {
+  const { toast } = useToast();
+  const { messages, addMessage, updateMessage } = useChatStore();
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingText, setStreamingText] = useState('');
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // 自动滚动到底部
   useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+    if (scrollAreaRef.current) {
+      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
+    }
+  }, [messages, streamingText]);
+  
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, streamingText]);
+  
+  const handleSendMessage = async (text: string) => {
+    if (!text.trim()) return;
 
-  const handleSendMessage = () => {
-    if (!input.trim()) return
-
+    // 生成唯一ID
+    const userMessageId = Date.now().toString();
+    const aiMessageId = (Date.now() + 1).toString();
+    
     // 添加用户消息
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: "user",
-        content: input,
-        timestamp: new Date().toISOString(),
-      },
-    ])
-    setInput("")
+    addMessage({
+      id: userMessageId,
+      role: 'user',
+      content: text,
+      timestamp: new Date().toISOString()
+    });
+    
+    // 添加空的AI消息，准备流式填充
+    addMessage({
+      id: aiMessageId,
+      role: 'assistant',
+      content: '',
+      timestamp: new Date().toISOString()
+    });
 
-    // 模拟AI思考
-    setIsTyping(true)
-
-    // 模拟AI回复
-    setTimeout(() => {
-      setIsTyping(false)
-      setMessages((prev) => [
-        ...prev,
+    // 重置流式文本和状态
+    setStreamingText('');
+    setIsStreaming(true);
+    
+    console.log("开始调用AI服务，参数:", { question: text });
+    
+    try {
+      // 调用流式API服务
+      console.log("开始接收流式响应");
+      await askAIStream(
+        { question: text },
         {
-          role: "assistant",
-          content:
-            "根据《民法典》第一百四十三条，具备以下条件的民事法律行为有效：一是行为人具有相应的民事行为能力；二是意思表示真实；三是不违反法律、行政法规的强制性规定，不违背公序良俗。\n\n您的问题涉及到民事法律行为的有效要件，这是民法总则中的重要知识点。",
-          timestamp: new Date().toISOString(),
-        },
-      ])
-    }, 2000)
-  }
+          onStart: () => console.log("AI开始回复"),
+          onToken: (token) => {
+            setStreamingText(prev => prev + token);
+          },
+          onComplete: (fullResponse) => {
+            // 完成后，更新AI消息的内容
+            updateMessage(aiMessageId, { content: fullResponse });
+            setIsStreaming(false);
+            setStreamingText('');
+            console.log("AI回复完成");
+          },
+          onError: (error) => {
+            console.error("流式响应错误:", error);
+            setIsStreaming(false);
+            // 添加错误提示到AI回复
+            updateMessage(aiMessageId, { 
+              content: "抱歉，回答生成过程中出现了错误。请稍后再试。" 
+            });
+          }
+        }
+      );
+    } catch (error) {
+      console.error("Fetch调用错误:", error);
+      setIsStreaming(false);
+      // 添加错误提示到AI回复
+      updateMessage(aiMessageId, { 
+        content: "抱歉，无法连接到AI服务。请检查网络连接后再试。" 
+      });
+    }
+  };
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col bg-gray-50">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center">
-          <MainNav />
+          <Link href="/" className="p-2 mr-2 rounded-md hover:bg-gray-100">
+            <ChevronLeftIcon className="h-5 w-5" />
+          </Link>
+          <h1 className="text-xl font-semibold">法考问答</h1>
         </div>
       </header>
-      <main className="flex-1 flex">
-        <div className="container mx-auto pt-6 flex-1 flex flex-col">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1">
-            <div className="md:col-span-2 flex flex-col md:pt-8">
-              <Card className="flex-1 flex flex-col">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Avatar>
-                      <AvatarImage src="/placeholder-user.jpg" />
-                      <AvatarFallback>FP</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="text-sm font-medium leading-none">法考教授</p>
-                      <p className="text-xs text-muted-foreground">AI 智能助手</p>
-                    </div>
+      <main className="flex-1">
+        <div className="container mx-auto py-6">
+          <div className="grid grid-cols-1">
+            {/* 聊天区域 */}
+            <Card className="h-[calc(100vh-180px)] flex flex-col">
+              <CardContent className="flex-1 p-4 overflow-hidden">
+                <ScrollArea className="h-full pr-4" ref={scrollAreaRef}>
+                  <div className="space-y-4 py-4">
+                    {messages.map((message) => (
+                      <div key={message.id}>
+                        <StreamingMessage
+                          initialText={message.content}
+                          streamText={message.id === messages[messages.length - 1]?.id && isStreaming ? streamingText : ''}
+                          sender={message.role}
+                          timestamp={message.timestamp}
+                          isStreaming={message.id === messages[messages.length - 1]?.id && isStreaming}
+                        />
+                        {/* 如果用户消息包含图片，显示图片 */}
+                        {message.role === 'user' && message.imageBase64 && (
+                          <div className="flex justify-end mt-2">
+                            <div className="rounded-lg overflow-hidden max-w-[200px]">
+                              <img 
+                                src={message.imageBase64} 
+                                alt="用户上传图片" 
+                                className="object-contain max-h-[150px]"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    <div ref={messagesEndRef} />
                   </div>
-                  <div className="flex items-center space-x-1">
-                    <Button variant="ghost" size="icon">
-                      <SettingsIcon className="h-4 w-4" />
-                      <span className="sr-only">Settings</span>
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoveVerticalIcon className="h-4 w-4" />
-                          <span className="sr-only">More options</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>清除对话</DropdownMenuItem>
-                        <DropdownMenuItem>导出对话</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem>帮助与反馈</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-4 flex-1 overflow-hidden">
-                  <ScrollArea className="h-full pr-4">
-                    <div className="space-y-4">
-                      {messages.map((message, index) => (
-                        <div
-                          key={index}
-                          className={cn(
-                            "flex w-max max-w-[75%] flex-col gap-2 rounded-lg px-3 py-2 text-sm",
-                            message.role === "user"
-                              ? "ml-auto bg-primary text-primary-foreground"
-                              : "bg-muted",
-                          )}
-                        >
-                          {message.content}
-                        </div>
-                      ))}
-                      {isTyping && (
-                        <div className="flex items-center space-x-2 bg-muted rounded-lg px-3 py-2 text-sm">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span>思考中...</span>
-                        </div>
-                      )}
-                    </div>
-                  </ScrollArea>
-                </CardContent>
-                <CardFooter className="p-4 border-t">
-                  <form
-                    onSubmit={handleSendMessage}
-                    className="flex w-full items-center space-x-2"
-                  >
-                    <Input
-                      id="message"
-                      placeholder="输入你的问题..."
-                      className="flex-1"
-                      autoComplete="off"
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                    />
-                    <Button type="submit" size="icon" disabled={isTyping}>
-                      <SendIcon className="h-4 w-4" />
-                      <span className="sr-only">发送</span>
-                    </Button>
-                  </form>
-                </CardFooter>
-              </Card>
-            </div>
-            <div className="md:col-span-1 space-y-6 md:pt-8">
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="w-full">
-                  <TabsTrigger value="plan" className="flex-1">
-                    学习计划
-                  </TabsTrigger>
-                  <TabsTrigger value="notes" className="flex-1">
-                    学习笔记
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent value="plan">
-                  <SidebarLearningPlan />
-                </TabsContent>
-                <TabsContent value="notes">
-                  <RelatedResources />
-                </TabsContent>
-              </Tabs>
-            </div>
+                </ScrollArea>
+              </CardContent>
+              
+              {/* 输入区域 */}
+              <div className="p-4 border-t">
+                <InputArea
+                  onSendMessage={handleSendMessage}
+                  isAiThinking={isStreaming}
+                  placeholder="输入您的法考问题或上传图片..."
+                />
+              </div>
+            </Card>
           </div>
         </div>
       </main>

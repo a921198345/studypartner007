@@ -27,157 +27,103 @@ interface StreamingMessageProps {
   typingSpeed?: number;
 }
 
-const StreamingMessage: React.FC<StreamingMessageProps> = ({
-  initialText = "",
-  streamText = "",
+// 记忆化的Markdown组件，减少重渲染
+const MemoizedMarkdown = React.memo(({ content }: { content: string }) => (
+  <ReactMarkdown
+    rehypePlugins={[rehypeHighlight]}
+    remarkPlugins={[remarkGfm]}
+    className="prose prose-sm dark:prose-invert max-w-full break-words"
+  >
+    {content}
+  </ReactMarkdown>
+));
+MemoizedMarkdown.displayName = 'MemoizedMarkdown';
+
+const StreamingMessage = ({
+  initialText = '',
+  streamText = '',
   sender,
-  timestamp,
+  timestamp = new Date().toISOString(),
   aiName = "法考助手",
-  aiAvatar = "/placeholder.svg",
+  aiAvatar = "/placeholder-user.jpg",
   isStreaming = false,
-  typingSpeed = 20
-}) => {
-  // 客户端渲染标志
-  const [isClient, setIsClient] = useState(false);
-
-  // 在客户端挂载后设置标志
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  // 组合初始文本和流式文本，使用useMemo优化性能
-  const fullText = useMemo(() => initialText + streamText, [initialText, streamText]);
+  typingSpeed = 20,
+}: StreamingMessageProps) => {
+  // 组合初始文本和流式文本
+  const combinedText = useMemo(() => {
+    return (initialText + streamText).trim();
+  }, [initialText, streamText]);
   
-  // 使用打字机效果，增加批量处理大小以减少渲染次数
-  const { displayText, isTyping } = useTypewriter(
-    isStreaming ? fullText : initialText,
-    typingSpeed,
-    { batchSize: 8 } // 每次更新增加更多字符，减少重渲染次数
-  );
+  // 使用打字机效果
+  const { displayText, isTyping } = useTypewriter(combinedText, typingSpeed, {
+    batchSize: 3, // 每次更新显示3个字符
+    initialDelay: sender === 'ai' ? 300 : 0 // 如果是AI回复，添加一点初始延迟
+  });
 
-  // 使用客户端状态存储格式化后的时间，初始设为固定值以避免水合错误
-  const [formattedTime, setFormattedTime] = useState<string>("--:--");
+  // 决定是否以打字机效果显示内容
+  const shouldUseTypewriter = sender === 'ai' && streamText && isStreaming;
+  const textToDisplay = shouldUseTypewriter ? displayText : combinedText;
+
+  // 如果没有内容，则不渲染任何内容
+  if (!textToDisplay && !isStreaming) {
+    return null;
+  }
   
-  // 只在客户端渲染后格式化时间
-  useEffect(() => {
-    if (isClient && timestamp) {
-      try {
-        const timeStr = timestamp;
-        const formatted = new Date(timeStr).toLocaleTimeString('zh-CN', {
-          hour: '2-digit',
-          minute: '2-digit'
-        });
-        setFormattedTime(formatted);
-      } catch (e) {
-        console.error("时间格式化错误:", e);
-        setFormattedTime("--:--");
-      }
-    }
-  }, [timestamp, isClient]);
-
-  // 简单文本渲染组件
-  const SimpleTextRenderer = ({ text }: { text: string }) => (
-    <div className="whitespace-pre-wrap">{text}</div>
-  );
-
-  // 使用memo优化Markdown内容渲染
-  const MarkdownContent = useMemo(() => {
-    if (!isClient || !displayText) return null;
-    
-    return (
-      <ReactMarkdown 
-        remarkPlugins={[remarkGfm]} 
-        rehypePlugins={[rehypeHighlight]}
-        components={{
-          // 自定义链接，在新标签页打开
-          a: (props) => (
-            <a {...props} target="_blank" rel="noopener noreferrer" />
-          ),
-          // 自定义代码块样式
-          code: (props) => {
-            const { className, children, ...rest } = props;
-            
-            // 检查是否是内联代码
-            const isInline = !className;
-            
-            if (isInline) {
-              return (
-                <code className={className} {...rest}>
-                  {children}
-                </code>
-              );
-            }
-            
-            return (
-              <div className="relative">
-                <pre className={cn(
-                  "rounded-md p-4 overflow-x-auto", 
-                  className
-                )}>
-                  <code {...rest}>{children}</code>
-                </pre>
-              </div>
-            );
-          }
-        }}
-      >
-        {displayText}
-      </ReactMarkdown>
-    );
-  }, [displayText, isClient]);
-
   return (
     <div className={cn(
-      "flex",
+      "flex w-full mb-4",
       sender === 'user' ? "justify-end" : "justify-start"
     )}>
-      {/* 如果是AI消息，则显示头像 */}
-      {sender === 'ai' && (
-        <div className="flex-shrink-0 mr-2">
-          <Avatar>
-            <AvatarImage src={aiAvatar} alt={aiName} />
-            <AvatarFallback>{aiName.slice(0, 2)}</AvatarFallback>
-          </Avatar>
-        </div>
-      )}
-
       <div className={cn(
-        "flex flex-col max-w-[80%] rounded-lg p-4",
-        sender === 'user'
-          ? "bg-primary text-primary-foreground rounded-tr-none"
+        "rounded-lg p-4 max-w-[90%]",
+        sender === 'user' 
+          ? "bg-primary text-primary-foreground rounded-tr-none" 
           : "bg-muted rounded-tl-none"
       )}>
-        {/* AI头像和名称只在AI消息中显示 */}
         {sender === 'ai' && (
-          <div className="font-semibold mb-1">{aiName}</div>
+          <div className="flex items-center gap-2 mb-2">
+            <Avatar className="h-6 w-6">
+              <AvatarImage src={aiAvatar} />
+              <AvatarFallback>{aiName?.[0] || 'A'}</AvatarFallback>
+            </Avatar>
+            <span className="font-medium text-sm">{aiName}</span>
+          </div>
         )}
 
-        {/* 消息内容 */}
-        <div className="prose dark:prose-invert max-w-none">
-          {sender === 'ai' ? (
-            isClient ? (
-              MarkdownContent
-            ) : (
-              // 服务器端渲染使用简单文本
-              <SimpleTextRenderer text={initialText} />
-            )
-          ) : (
-            // 用户消息使用简单文本
-            <div className="text-primary-foreground">{displayText}</div>
+        <div className="relative min-h-[1.5em]">
+          {/* 打字机光标效果，仅在AI正在输入时显示 */}
+          {shouldUseTypewriter && isTyping && (
+            <span className="typing-cursor absolute -right-2 bottom-0"></span>
           )}
-          {isTyping && isClient && <span className="cursor-blink opacity-70">▋</span>}
+          
+          {/* 使用Markdown渲染内容或者纯文本 */}
+          {textToDisplay.includes('```') || textToDisplay.includes('#') ? (
+            <MemoizedMarkdown content={textToDisplay} />
+          ) : (
+            <div className="whitespace-pre-wrap">{textToDisplay}</div>
+          )}
         </div>
-
-        {/* 时间戳 */}
-        <div className={cn(
-          "text-xs mt-2",
-          sender === 'user' ? "text-primary-foreground/70" : "text-muted-foreground"
-        )}>
-          {formattedTime}
+        
+        <div className="text-xs text-gray-500 mt-2">
+          {new Date(timestamp).toLocaleTimeString()}
         </div>
       </div>
     </div>
   );
 };
 
-export default React.memo(StreamingMessage); 
+export default React.memo(StreamingMessage);
+
+// 添加全局CSS (添加到你的globals.css文件中)
+// .typing-cursor {
+//   display: inline-block;
+//   width: 0.5em;
+//   height: 1em;
+//   background-color: currentColor;
+//   animation: cursor-blink 1s step-end infinite;
+// }
+// 
+// @keyframes cursor-blink {
+//   0%, 100% { opacity: 1; }
+//   50% { opacity: 0; }
+// } 
