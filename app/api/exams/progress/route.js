@@ -8,11 +8,16 @@ export async function GET(request) {
     // 获取会话信息，确认用户已登录
     const session = await getServerSession(authOptions);
     
+    // 如果用户未登录，返回空的进度数据而不是401错误
     if (!session || !session.user) {
-      return NextResponse.json(
-        { success: false, message: '请先登录' },
-        { status: 401 }
-      );
+      return NextResponse.json({
+        success: true,
+        message: "未登录用户",
+        data: {
+          answered: [],
+          total: 0
+        }
+      });
     }
     
     const userId = session.user.id;

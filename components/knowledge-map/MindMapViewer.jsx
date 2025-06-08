@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Tree from 'react-d3-tree';
 
 // 这是一个基础的MindMapViewer组件
@@ -150,23 +150,52 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
             setIsLoading(true); // 开始获取数据前，设置加载状态为true
             setError(null);     // 清除任何之前的错误信息
             
-            // 检查是否有缓存数据
+            // 检查内存缓存
+            if (window.mindMapCache && window.mindMapCache[subject]) {
+                const memoryCache = window.mindMapCache[subject];
+                const now = new Date().getTime();
+                const cacheAge = now - memoryCache.timestamp;
+                
+                // 内存缓存有效期10分钟
+                if (cacheAge < 600000) {
+                    console.log('使用内存缓存数据');
+                    setMindMapData(memoryCache.data);
+                    setOriginalData(JSON.parse(JSON.stringify(memoryCache.data)));
+                    setTotalNodeCount(countAllNodes(memoryCache.data));
+                    setIsLoading(false);
+                    return;
+                }
+            }
+            
+            // 检查localStorage缓存
             const cachedData = localStorage.getItem(`mindmap-${subject}`);
             const cachedTimestamp = localStorage.getItem(`mindmap-${subject}-timestamp`);
             
-            // 如果有缓存且不超过30分钟，先使用缓存数据快速渲染
+            // 如果有缓存且不超过2小时，使用缓存数据
             if (cachedData && cachedTimestamp) {
                 const now = new Date().getTime();
                 const cacheAge = now - parseInt(cachedTimestamp);
-                if (cacheAge < 1800000) { // 30分钟 = 1800000毫秒
+                if (cacheAge < 7200000) { // 2小时 = 7200000毫秒
                     try {
                         const parsedCache = JSON.parse(cachedData);
                         setMindMapData(parsedCache);
-                        setOriginalData(JSON.parse(JSON.stringify(parsedCache))); // 深拷贝
+                        setOriginalData(JSON.parse(JSON.stringify(parsedCache)));
+                        setTotalNodeCount(countAllNodes(parsedCache));
                         setIsLoading(false);
                         
-                        // 后台仍然加载新数据，但用户已经可以看到缓存的内容
-                        setTimeout(() => fetchFreshData(), 100);
+                        // 保存到内存缓存
+                        if (!window.mindMapCache) window.mindMapCache = {};
+                        window.mindMapCache[subject] = {
+                            data: parsedCache,
+                            timestamp: now
+                        };
+                        
+                        console.log('使用localStorage缓存数据');
+                        
+                        // 如果缓存超过30分钟，后台静默更新
+                        if (cacheAge > 1800000) {
+                            setTimeout(() => fetchFreshData(), 100);
+                        }
                         return;
                     } catch (e) {
                         console.error("缓存数据解析失败:", e);
@@ -202,10 +231,23 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
                     const nodeCount = countAllNodes(data.mindmap.map_data);
                     setTotalNodeCount(nodeCount);
                     
-                    // 缓存数据
+                    // 缓存数据到localStorage和内存
                     try {
-                        localStorage.setItem(`mindmap-${subject}`, JSON.stringify(data.mindmap.map_data));
-                        localStorage.setItem(`mindmap-${subject}-timestamp`, new Date().getTime().toString());
+                        const now = new Date().getTime();
+                        const mapData = data.mindmap.map_data;
+                        
+                        // localStorage缓存
+                        localStorage.setItem(`mindmap-${subject}`, JSON.stringify(mapData));
+                        localStorage.setItem(`mindmap-${subject}-timestamp`, now.toString());
+                        
+                        // 内存缓存
+                        if (!window.mindMapCache) window.mindMapCache = {};
+                        window.mindMapCache[subject] = {
+                            data: mapData,
+                            timestamp: now
+                        };
+                        
+                        console.log('数据已缓存到localStorage和内存');
                     } catch (e) {
                         console.warn("无法缓存导图数据:", e);
                     }
@@ -281,8 +323,8 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
         }
     }, [searchTerm, originalData]);
 
-    // 自定义节点组件
-    const renderCustomNodeElement = ({ nodeDatum, toggleNode }) => {
+    // 优化的自定义节点组件，使用useCallback减少重新渲染
+    const renderCustomNodeElement = useCallback(({ nodeDatum, toggleNode }) => {
         // 正确检测折叠的子节点
         const collapsed = nodeDatum.__rd3t && nodeDatum.__rd3t.collapsed;
         
@@ -334,7 +376,6 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
                 alignmentBaseline: 'middle',
                 textRendering: 'geometricPrecision', // 提高字体渲染精度
                 letterSpacing: '0.5px', // 增加字间距
-                textShadow: '0px 1px 2px white, 0px -1px 2px white, 1px 0px 2px white, -1px 0px 2px white',
             },
             childCountText: {
                 fontSize: '14px', // 增大数字大小
@@ -393,13 +434,41 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
                 </text>
             </g>
         );
-    };
+    }, [searchTerm]); // 只在searchTerm变化时重新创建
+    
+    // 使用useMemo优化Tree组件的props
+    const treeProps = useMemo(() => ({
+        data: mindMapData,
+        orientation: "horizontal",
+        pathFunc: "bezier",
+        initialDepth: 3,
+        translate: { x: 150, y: 300 },
+        zoomable: true,
+        separation: { siblings: 1.2, nonSiblings: 2.5 },
+        nodeSize: { x: 400, y: 120 },
+        renderCustomNodeElement,
+        depthFactor: 500,
+        centeringTransitionDuration: 600,
+        shouldCollapseNeighborNodes: false,
+        zoom: zoomLevel,
+        scaleExtent: { min: 0.1, max: 3 },
+        enableLegacyTransitions: false,
+        transitionDuration: 200,
+        collapsible: true,
+        pathClassFunc: () => 'mind-map-path'
+    }), [mindMapData, zoomLevel, renderCustomNodeElement]);
 
     // --- UI渲染逻辑 ---
 
     // 如果正在加载数据，显示加载提示
     if (isLoading) {
-        return <div className="flex justify-center p-10">正在加载知识导图...</div>;
+        return (
+            <div className="flex flex-col items-center justify-center p-10 space-y-4">
+                <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-500 rounded-full animate-spin"></div>
+                <div className="text-gray-600">正在加载知识导图...</div>
+                <div className="text-sm text-gray-400">首次加载可能需要几秒钟</div>
+            </div>
+        );
     }
 
     // 如果加载过程中发生错误，显示错误信息
@@ -430,7 +499,8 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
             )}
             
             {/* 添加预加载字体以确保字体正确渲染 */}
-            <style jsx global>{`
+            <style dangerouslySetInnerHTML={{
+                __html: `
                 @font-face {
                     font-family: 'SimSun';
                     font-display: swap;
@@ -460,31 +530,22 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
                     -webkit-font-smoothing: antialiased;
                     -moz-osx-font-smoothing: grayscale;
                 }
-            `}</style>
+                `
+            }} />
             
             <Tree
                 ref={treeRef}
-                data={mindMapData}
-                orientation="horizontal"
-                pathFunc="bezier"
-                initialDepth={3}
-                translate={{ x: 150, y: 300 }}
-                zoomable={true}
-                separation={{ siblings: 1.3, nonSiblings: 2.8 }}
-                nodeSize={{ x: 440, y: 140 }}
-                renderCustomNodeElement={renderCustomNodeElement}
-                depthFactor={600}
-                centeringTransitionDuration={800}
-                shouldCollapseNeighborNodes={true}
-                zoom={zoomLevel} // 使用状态变量
-                scaleExtent={{ min: 0.1, max: 3 }}
-                enableLegacyTransitions={true}
-                transitionDuration={300}
-                collapsible={true}
-                pathClassFunc={() => 'mind-map-path'}
+                {...treeProps}
             />
         </div>
     );
 };
 
-export default MindMapViewer; 
+// 使用React.memo优化组件，只在props真正变化时重新渲染
+export default React.memo(MindMapViewer, (prevProps, nextProps) => {
+  return (
+    prevProps.subject === nextProps.subject &&
+    prevProps.customZoom === nextProps.customZoom &&
+    prevProps.searchTerm === nextProps.searchTerm
+  );
+}); 

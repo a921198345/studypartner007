@@ -9,6 +9,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { generateAnswer, buildPrompt } from '@/lib/deepseek';
 import { logAIResponse } from '@/lib/ai-log';
+import { moderateAIAnswer } from '@/lib/content-moderation';
 
 /**
  * 处理AI回答请求
@@ -20,9 +21,8 @@ export async function POST(request) {
     if (!session || !session.user) {
       return NextResponse.json({
         success: false,
-        message: '请先登录再使用AI回答功能',
-        requireLogin: true
-      }, { status: 200 });  // 返回200状态码，避免前端报错
+        message: '请先登录再使用AI回答功能'
+      }, { status: 401 });
     }
 
     // 2. 解析请求数据
@@ -31,7 +31,8 @@ export async function POST(request) {
       question_text,
       chat_id,
       context = [],
-      knowledge_points = []
+      knowledge_points = [],
+      subject = '民法'  // 默认学科为民法
     } = data;
     
     if (!question_text || !chat_id) {
@@ -55,21 +56,40 @@ export async function POST(request) {
       throw new Error('无法生成回答，请稍后重试');
     }
     
-    // 4. 将回答保存到数据库
+    // 4. 内容审核
+    console.log('开始对AI回答进行内容审核...');
+    const moderationResult = await moderateAIAnswer(answer, question_text, subject);
+    
+    // 获取最终回答（原始回答或经过修改的回答）
+    const finalAnswer = moderationResult.modifiedAnswer || answer;
+    
+    // 如果内容不允许展示，则返回错误
+    if (!moderationResult.isAllowed) {
+      return NextResponse.json({
+        success: false,
+        message: moderationResult.reason || '回答内容不符合要求',
+        data: {
+          chat_id: chat_id
+        }
+      }, { status: 403 });
+    }
+    
+    // 5. 将回答保存到数据库
     console.log('保存AI回答到数据库...');
     const knowledgePointsJson = knowledge_points && knowledge_points.length > 0 
       ? JSON.stringify(knowledge_points) 
       : null;
       
-    await logAIResponse(chat_id, answer, knowledgePointsJson);
+    await logAIResponse(chat_id, finalAnswer, knowledgePointsJson);
     
-    // 5. 返回AI回答
+    // 6. 返回AI回答
     return NextResponse.json({
       success: true,
-      message: '成功生成AI回答',
+      message: moderationResult.reason ? `成功生成AI回答 (${moderationResult.reason})` : '成功生成AI回答',
       data: {
-        answer: answer,
-        chat_id: chat_id
+        answer: finalAnswer,
+        chat_id: chat_id,
+        has_modification: finalAnswer !== answer
       }
     });
     

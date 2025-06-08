@@ -1,5 +1,5 @@
 // config/redis.js
-const { createClient } = require('redis');
+import { createClient } from 'redis';
 
 // 模拟Redis客户端，在Redis不可用时使用
 class MockRedisClient {
@@ -90,4 +90,5 @@ const enhancedClient = {
   }
 };
 
+export default enhancedClient;
 module.exports = enhancedClient;
