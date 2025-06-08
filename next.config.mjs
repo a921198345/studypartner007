@@ -65,7 +65,12 @@ const nextConfig = {
         console.error('onStart钩子执行失败，不影响应用运行:', error);
       }
     }
-  }
+  },
+  
+  // 添加环境变量配置
+  env: {
+    DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY,
+  },
 }
 
 export default nextConfig

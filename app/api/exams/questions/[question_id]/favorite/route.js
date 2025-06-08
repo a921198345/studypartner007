@@ -8,11 +8,13 @@ export async function POST(request, { params }) {
     // 获取会话信息，确认用户已登录
     const session = await getServerSession(authOptions);
     
+    // 如果用户未登录，返回友好提示而不是401错误
     if (!session || !session.user) {
-      return NextResponse.json(
-        { success: false, message: '请先登录' },
-        { status: 401 }
-      );
+      return NextResponse.json({
+        success: false,
+        message: '请先登录后再收藏题目',
+        data: { is_favorite: false, requireLogin: true }
+      });
     }
     
     const userId = session.user.id;

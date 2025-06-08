@@ -8,7 +8,6 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { generateAnswerStream, buildPrompt } from '@/lib/deepseek';
 import { logAIResponse } from '@/lib/ai-log';
-import { moderateAIAnswer } from '@/lib/content-moderation';
 
 /**
  * 处理流式AI回答请求
@@ -21,10 +20,11 @@ export async function POST(request) {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          message: '请先登录再使用AI回答功能' 
+          message: '请先登录再使用AI回答功能',
+          requireLogin: true
         }), 
         { 
-          status: 401,
+          status: 200,  // 返回200状态码，避免前端报错
           headers: { 'Content-Type': 'application/json' } 
         }
       );
@@ -37,7 +37,7 @@ export async function POST(request) {
       chat_id,
       context = [],
       knowledge_points = [],
-      subject = '民法'  // 默认学科为民法
+      subject = '民法'
     } = data;
     
     if (!question_text || !chat_id) {
@@ -63,7 +63,7 @@ export async function POST(request) {
     // 调用DeepSeek API获取流式回答
     const stream = await generateAnswerStream(prompt);
     
-    // 4. 创建响应流，同时收集完整回答以便进行内容审核和保存到数据库
+    // 4. 创建响应流，同时收集完整回答以便保存到数据库
     const encoder = new TextEncoder();
     let fullAnswer = '';
     
@@ -97,61 +97,45 @@ export async function POST(request) {
         }
       },
       async flush(controller) {
-        // 流结束时，对完整回答进行内容审核
+        // 流结束时，将完整回答保存到数据库
         if (fullAnswer) {
           try {
-            console.log('对完整回答进行内容审核...');
-            const moderationResult = await moderateAIAnswer(fullAnswer, question_text, subject);
+            console.log('保存完整回答到数据库...');
+            console.log(`回答长度: ${fullAnswer.length} 字符`);
             
-            // 获取最终回答（原始回答或经过修改的回答）
-            const finalAnswer = moderationResult.modifiedAnswer || fullAnswer;
+            const knowledgePointsJson = knowledge_points && knowledge_points.length > 0 
+              ? JSON.stringify(knowledge_points) 
+              : null;
+              
+            await logAIResponse(chat_id, fullAnswer, knowledgePointsJson);
             
-            // 如果有警告或修改，发送通知给客户端
-            if (moderationResult.reason) {
-              const warningMessage = {
-                type: 'moderation_notice',
-                message: moderationResult.reason,
-                has_modification: finalAnswer !== fullAnswer
-              };
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify(warningMessage)}\n\n`));
-            }
-            
-            // 如果回答被审核拒绝，发送拒绝消息
-            if (!moderationResult.isAllowed) {
-              const rejectionMessage = {
-                type: 'moderation_rejection',
-                message: moderationResult.reason || '回答内容不符合要求'
-              };
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify(rejectionMessage)}\n\n`));
-            } else {
-              // 保存通过审核的回答到数据库
-              console.log('保存完整回答到数据库...');
-              console.log(`回答长度: ${finalAnswer.length} 字符`);
+            // 调用知识点提取API
+            try {
+              console.log('调用知识点提取API...');
+              const extractionResponse = await fetch(new URL('/api/ai/ask/context', request.url), {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Cookie': request.headers.get('cookie') || '' // 传递cookie以保持会话
+                },
+                body: JSON.stringify({
+                  chat_id,
+                  answer_text: fullAnswer,
+                  subject
+                })
+              });
               
-              const knowledgePointsJson = knowledge_points && knowledge_points.length > 0 
-                ? JSON.stringify(knowledge_points) 
-                : null;
-              
-              await logAIResponse(chat_id, finalAnswer, knowledgePointsJson);
-              
-              // 如果原始回答和最终回答不同，说明审核进行了修改，需要通知前端
-              if (finalAnswer !== fullAnswer) {
-                const modificationMessage = {
-                  type: 'content_modified',
-                  original_length: fullAnswer.length,
-                  modified_length: finalAnswer.length
-                };
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify(modificationMessage)}\n\n`));
+              if (extractionResponse.ok) {
+                console.log('知识点提取成功');
+              } else {
+                console.warn('知识点提取API返回非成功状态:', extractionResponse.status);
               }
+            } catch (extractionError) {
+              console.error('调用知识点提取API失败:', extractionError);
+              // 继续执行，不阻塞主流程
             }
           } catch (error) {
             console.error('保存回答到数据库失败:', error);
-            // 发送错误消息
-            const errorMessage = {
-              type: 'error',
-              message: '处理回答时出现错误'
-            };
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorMessage)}\n\n`));
           }
         }
         

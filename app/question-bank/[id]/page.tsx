@@ -19,7 +19,7 @@ import { Progress } from "@/components/ui/progress"
 const getCurrentPageMode = (searchParams: URLSearchParams | null): string => {
   const source = searchParams?.get('source');
   
-  if (source === 'wrong-questions') {
+  if (source === 'wrong' || source === 'wrong-questions') {
     return 'wrong';
   } else if (source === 'favorites') {
     return 'favorites';
@@ -131,11 +131,22 @@ export default function QuestionPage() {
   const questionsPerPage = 25; // 导航面板每页显示的题目按钮数量
   
   // 添加一个新状态来跟踪当前会话中的答题记录
-  const [sessionAnswers, setSessionAnswers] = useState<Record<string, {isCorrect: boolean}>>({});
+  // 初始化时从 sessionStorage 读取，确保页面切换时状态不丢失
+  const [sessionAnswers, setSessionAnswers] = useState<Record<string, {isCorrect: boolean}>>(() => {
+    try {
+      const saved = sessionStorage.getItem('currentSessionAnswers');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
   
   // 使用ref避免不必要的重渲染
   const navigationInitializedRef = useRef(false);
   const apiCallAttemptedRef = useRef(false);
+  
+  // 添加一个通用的导航刷新触发器
+  const [navigationRefreshTrigger, setNavigationRefreshTrigger] = useState(0);
   
   // 从URL获取查询参数
   const searchParams = useSearchParams();
@@ -245,11 +256,18 @@ export default function QuestionPage() {
             currentIndex = questionsToDisplay.findIndex(q => q.id === currentId);
           }
           
-          // 如果是重置错题状态（从"开始练习"按钮进入）或首次进入错题
-          if (resetWrong || !sessionAnswers || Object.keys(sessionAnswers).length === 0) {
-            // 清空当前会话中的答题记录，确保导航状态显示为未作答
+          // 错题页面：只在真正的初次进入时重置状态
+          const isFirstEnter = !searchParams.get('continue');
+          const isNavigationRefresh = navigationInitializedRef.current; // 如果已经初始化过，说明是导航刷新
+          
+          if ((resetWrong || isFirstEnter) && !isNavigationRefresh) {
+            // 清空当前会话中的答题记录
             setSessionAnswers({});
+            // 清空错题模式的答题历史
+            clearModeAnswerState('wrong');
             console.log("错题页面：重置所有错题的状态为未作答");
+          } else {
+            console.log("错题页面：保持现有的答题状态，不重置");
           }
           
           console.log(`从错题集加载的导航数据：共${questionsToDisplay.length}题，当前索引：${currentIndex}，重置状态：${resetWrong}`);
@@ -510,17 +528,26 @@ export default function QuestionPage() {
             }
           }
         } else {
-          // 如果不是继续模式，则清除收藏模式的答题历史记录
-          console.log('[DEBUG] 收藏模式(首次练习)：重置所有答题记录');
-          saveAnswerHistoryForMode('favorites', { answered: {}, correct: {}, results: {}, timestamp: Date.now() });
+          // 不是继续模式，检查是否是第一次进入收藏练习
+          const isFirstEntry = !sessionStorage.getItem('favorites_session_started');
           
-          // 更新状态变量，确保UI显示正确的未答状态
-          setAnsweredQuestions({});
-          setCorrectAnswers({});
-          setTotalAnswered(0);
-          setTotalCorrect(0);
-          setSessionAnswers({});
-          return; // 直接返回，不需要进一步处理
+          if (isFirstEntry) {
+            // 只在第一次进入时清空历史记录
+            console.log('[DEBUG] 收藏模式(开始练习)：首次进入，清空所有答题记录');
+            saveAnswerHistoryForMode('favorites', { answered: {}, correct: {}, results: {}, timestamp: Date.now() });
+            sessionStorage.setItem('favorites_session_started', 'true');
+            
+            // 更新状态变量，确保UI显示正确的未答状态
+            setAnsweredQuestions({});
+            setCorrectAnswers({});
+            setTotalAnswered(0);
+            setTotalCorrect(0);
+            setSessionAnswers({});
+          } else {
+            console.log('[DEBUG] 收藏模式(开始练习)：非首次进入，加载当前会话的答题记录');
+            // 即使不是第一次进入，也需要加载收藏模式的历史记录
+            // 这样可以在题目间切换时保持答题状态
+          }
         }
       }
       
@@ -858,14 +885,87 @@ export default function QuestionPage() {
         }
         
         // 更新状态管理
-        setSessionAnswers(prev => ({
-              ...prev,
-                [questionId]: {
-            submitted: formattedAnswer,
-            correct: result.data.correct_answer,
-            isCorrect: result.data.is_correct
-              }
-            }));
+        setSessionAnswers(prev => {
+          const newState = {
+            ...prev,
+            [questionId]: {
+              submitted: formattedAnswer,
+              correct: result.data.correct_answer,
+              isCorrect: result.data.is_correct
+            }
+          };
+          console.log(`更新sessionAnswers，题目${questionId}状态:`, newState[questionId]);
+          console.log(`当前sessionAnswers全量:`, newState);
+          
+          // 同时保存到 sessionStorage，确保页面切换时不丢失
+          try {
+            sessionStorage.setItem('currentSessionAnswers', JSON.stringify(newState));
+          } catch (e) {
+            console.error('保存会话答题状态失败:', e);
+          }
+          
+          return newState;
+        });
+        
+        // 同时更新 answeredQuestions 和 correctAnswers 状态（与全部题目模式保持一致）
+        setAnsweredQuestions(prev => {
+          const isNewAnswer = !prev[questionId];
+          const newState = {
+            ...prev,
+            [questionId]: true
+          };
+          
+          // 如果是新答题，更新统计
+          if (isNewAnswer) {
+            setTotalAnswered(total => total + 1);
+          }
+          
+          return newState;
+        });
+        
+        setCorrectAnswers(prev => {
+          const wasCorrect = prev[questionId];
+          const newState = {
+            ...prev,
+            [questionId]: result.data.is_correct
+          };
+          
+          // 更新正确题数统计
+          if (result.data.is_correct && !wasCorrect) {
+            setTotalCorrect(total => total + 1);
+          } else if (!result.data.is_correct && wasCorrect) {
+            setTotalCorrect(total => Math.max(0, total - 1));
+          }
+          
+          return newState;
+        });
+        
+        // 使用setTimeout确保状态更新完成后再触发导航刷新
+        setTimeout(() => {
+          setNavigationRefreshTrigger(prev => {
+            console.log(`触发导航刷新: ${prev} -> ${prev + 1}`);
+            return prev + 1;
+          });
+        }, 100); // 给一点延迟确保React完成状态更新
+        
+        // 如果在错题模式下答对了题目，标记为待移除（退出页面时处理）
+        if (currentMode === 'wrong' && result.data.is_correct) {
+          console.log(`错题模式下答对题目 #${questionId}，标记为待移除`);
+          
+          // 将答对的错题添加到待移除列表
+          try {
+            const pendingRemovalStr = sessionStorage.getItem('pendingWrongQuestionsRemoval') || '[]';
+            const pendingRemoval = JSON.parse(pendingRemovalStr);
+            
+            if (!pendingRemoval.includes(questionId)) {
+              pendingRemoval.push(questionId);
+              sessionStorage.setItem('pendingWrongQuestionsRemoval', JSON.stringify(pendingRemoval));
+              console.log(`题目 #${questionId} 已添加到待移除列表，将在退出答题页面时移除`);
+            }
+          } catch (e) {
+            console.error('添加到待移除列表失败:', e);
+          }
+        }
           } else {
         console.error('提交答案失败:', result.message || '未知错误');
         setError('提交答案失败，请稍后重试');
@@ -951,6 +1051,19 @@ export default function QuestionPage() {
         if (source === 'wrong') {
           currentParams.set('source', 'wrong');
           currentParams.set('wrongIndex', (currentQuestionIndex + 1).toString());
+          currentParams.set('continue', 'true'); // 添加continue参数
+        } else if (source === 'favorites') {
+          currentParams.set('source', 'favorites');
+          // 检查是否已开始收藏练习会话，如果是则添加continue参数保持状态
+          const hasStartedSession = sessionStorage.getItem('favorites_session_started');
+          if (hasStartedSession) {
+            currentParams.set('continue', 'true');
+          }
+          // 否则保持当前页面的continue状态
+          const currentContinue = searchParams.get('continue');
+          if (currentContinue === 'true') {
+            currentParams.set('continue', 'true');
+          }
         }
         
         try {
@@ -988,6 +1101,19 @@ export default function QuestionPage() {
       if (source === 'wrong') {
         currentParams.set('source', 'wrong');
         currentParams.set('wrongIndex', (currentQuestionIndex - 1).toString());
+        currentParams.set('continue', 'true'); // 添加continue参数
+      } else if (source === 'favorites') {
+        currentParams.set('source', 'favorites');
+        // 检查是否已开始收藏练习会话，如果是则添加continue参数保持状态
+        const hasStartedSession = sessionStorage.getItem('favorites_session_started');
+        if (hasStartedSession) {
+          currentParams.set('continue', 'true');
+        }
+        // 否则保持当前页面的continue状态
+        const currentContinue = searchParams.get('continue');
+        if (currentContinue === 'true') {
+          currentParams.set('continue', 'true');
+        }
       }
       
       try {
@@ -1188,6 +1314,9 @@ export default function QuestionPage() {
 
   // 使用useMemo优化导航按钮渲染
   const navigationButtons = useMemo(() => {
+    console.log('[导航渲染] 开始渲染导航按钮');
+    console.log('[导航渲染] sessionAnswers:', sessionAnswers);
+    console.log('[导航渲染] refreshTrigger:', navigationRefreshTrigger);
     // 如果没有题目数据，显示加载中
     if (filteredQuestions.length === 0) {
       return (
@@ -1202,6 +1331,8 @@ export default function QuestionPage() {
     const endIndex = Math.min(startIndex + questionsPerPage, filteredQuestions.length);
     
     console.log(`渲染导航按钮: 页码=${currentNavPage}, 范围=${startIndex}-${endIndex}, 总数=${filteredQuestions.length}`);
+    console.log(`当前sessionAnswers状态:`, sessionAnswers);
+    console.log(`navigationRefreshTrigger: ${navigationRefreshTrigger}`);
     
     // 获取当前导航来源
     const source = searchParams.get('source');
@@ -1226,41 +1357,36 @@ export default function QuestionPage() {
         buttonStyle = "default";
         extraStyle = "bg-blue-500 text-white font-bold";
       } 
-      // 错题页面状态指示优先级:
-      // 1. 当前会话状态(sessionAnswers) - 实时反映本次作答
-      // 2. 全局答题历史不应在错题页面使用
+      // 错题页面状态指示 - 使用与全部题目模式相同的逻辑
       else if (isFromWrong) {
-        if (sessionAnswers && sessionAnswers[qIdStr]) {
-          console.log(`错题导航: 题目${qIdStr}使用会话状态：${sessionAnswers[qIdStr].isCorrect ? '正确' : '错误'}`);
-        if (sessionAnswers[qIdStr].isCorrect) {
-          extraStyle = "border-green-500 text-green-500";
+        // 直接使用 answeredQuestions 和 correctAnswers，与全部题目模式保持一致
+        if (answeredQuestions[qIdStr]) {
+          console.log(`错题导航: 题目${qIdStr}已作答，状态：${correctAnswers[qIdStr] ? '正确' : '错误'}`);
+          
+          if (correctAnswers[qIdStr]) {
+            // 答对的错题显示为绿色，表示已完成
+            extraStyle = "border-green-500 text-green-500 bg-green-50";
+          } else {
+            // 答错的错题显示为红色
+            extraStyle = "border-red-500 text-red-500";
+          }
         } else {
-          extraStyle = "border-red-500 text-red-500";
+          console.log(`错题导航: 题目${qIdStr}未作答`);
         }
-        }
-        // 如果没有会话状态，错题页面默认保持未作答状态
       } 
-      // 收藏页面状态指示使用收藏专用历史
+      // 收藏页面状态指示 - 使用与全部题目模式相同的逻辑
       else if (isFromFavorites) {
-        // 首先检查会话状态（实时反映）
-        if (sessionAnswers && sessionAnswers[qIdStr]) {
-          console.log(`收藏导航: 题目${qIdStr}使用会话状态：${sessionAnswers[qIdStr].isCorrect ? '正确' : '错误'}`);
-          if (sessionAnswers[qIdStr].isCorrect) {
+        // 直接使用 answeredQuestions 和 correctAnswers，与全部题目模式保持一致
+        if (answeredQuestions[qIdStr]) {
+          console.log(`收藏导航: 题目${qIdStr}已作答，状态：${correctAnswers[qIdStr] ? '正确' : '错误'}`);
+          
+          if (correctAnswers[qIdStr]) {
             extraStyle = "border-green-500 text-green-500";
           } else {
             extraStyle = "border-red-500 text-red-500";
           }
-        } 
-        // 然后检查收藏模式的答题历史
-        else {
-          const favoriteHistory = getAnswerHistoryForMode('favorites');
-          if (favoriteHistory.answered && favoriteHistory.answered[qIdStr]) {
-            if (favoriteHistory.correct && favoriteHistory.correct[qIdStr]) {
-              extraStyle = "border-green-500 text-green-500";
-            } else {
-              extraStyle = "border-red-500 text-red-500";
-            }
-          }
+        } else {
+          console.log(`收藏导航: 题目${qIdStr}未作答`);
         }
       } 
       // 普通页面使用常规状态指示逻辑
@@ -1275,9 +1401,15 @@ export default function QuestionPage() {
       // 使用相对序号(从1开始)而不是题目ID
       const displayText = absoluteIndex + 1;
       
+      // 生成唯一的key，强制React重新渲染按钮
+      const sessionState = sessionAnswers[qIdStr];
+      const sessionKey = sessionState ? `${sessionState.isCorrect ? 'correct' : 'incorrect'}` : 'unanswered';
+      // 使用navigationRefreshTrigger确保按钮能够重新渲染
+      const buttonKey = `nav-${q.id}-${absoluteIndex}-${sessionKey}-${navigationRefreshTrigger}`;
+      
       buttons.push(
         <Button
-          key={`nav-${q.id}-${absoluteIndex}-${sessionAnswers[qIdStr] ? (sessionAnswers[qIdStr].isCorrect ? 'correct' : 'incorrect') : 'unanswered'}`}
+          key={buttonKey}
           variant={buttonStyle as any}
           size="sm"
           className={`w-full h-10 ${extraStyle}`}
@@ -1290,18 +1422,23 @@ export default function QuestionPage() {
             if (isFromWrong) {
               currentParams.set('source', 'wrong');
               currentParams.set('wrongIndex', absoluteIndex.toString());
+              // 切换题目时始终添加continue参数，避免重置答题历史
+              currentParams.set('continue', 'true');
             }
             
-            // 如果是从收藏进入，保持source=favorites参数和continue=true
+            // 如果是从收藏进入，保持source=favorites参数
             if (isFromFavorites) {
               currentParams.set('source', 'favorites');
-              
-              // 只有当当前URL中包含continue=true参数时，才继续保持该参数
-              const isContinue = searchParams.get('continue') === 'true';
-              if (isContinue) {
+              // 检查是否已开始收藏练习会话，如果是则添加continue参数保持状态
+              const hasStartedSession = sessionStorage.getItem('favorites_session_started');
+              if (hasStartedSession) {
                 currentParams.set('continue', 'true');
               }
-              // 否则不设置continue参数，默认会重置状态
+              // 否则保持当前页面的continue状态
+              const currentContinue = searchParams.get('continue');
+              if (currentContinue === 'true') {
+                currentParams.set('continue', 'true');
+              }
             }
             
             const url = `/question-bank/${q.id}?${currentParams.toString()}`;
@@ -1316,7 +1453,9 @@ export default function QuestionPage() {
     return buttons;
   }, [filteredQuestions, questionId, currentNavPage, answeredQuestions, correctAnswers, 
      searchParams, questionsPerPage, router, sessionAnswers, navigationInitializedRef.current, 
-     filteredTotalCount]);
+     filteredTotalCount, submittedAnswer, answerResult, navigationRefreshTrigger, 
+     // 添加sessionAnswers的字符串化，确保深度检测变化
+     JSON.stringify(sessionAnswers)]);
 
   // 分页控件
   const paginationControl = useMemo(() => {
@@ -1373,172 +1512,77 @@ export default function QuestionPage() {
     );
   }, [currentNavPage, filteredTotalCount, questionsPerPage]);
 
-  // 修改页面卸载处理函数，处理待移除的错题
-  const handleBeforeUnload = useCallback(() => {
+  
+  // 添加一个强制更新导航状态的函数
+  const forceUpdateNavigationState = useCallback((questionId: string, isCorrect: boolean) => {
+    console.log(`[导航更新] 强制更新题目 ${questionId} 状态为 ${isCorrect ? '正确' : '错误'}`);
+    
+    // 更新当前模式的答题历史
+    const currentMode = getCurrentPageMode(searchParams);
+    const historyKey = getStorageKeyForMode(currentMode);
+    
     try {
-      // 检查是否来自错题集
-      const source = searchParams.get('source');
-      const isFromWrongCollection = source === 'wrong';
+      const historyString = localStorage.getItem(historyKey) || '{}';
+      const history = JSON.parse(historyString);
       
-      if (isFromWrongCollection) {
-        console.log("页面卸载：检查是否有待移除的错题");
-        
-        // 获取待移除错题列表
-        const pendingRemovalStr = sessionStorage.getItem('pendingWrongQuestionsRemoval') || '[]';
-        const pendingRemoval = JSON.parse(pendingRemovalStr);
-        
-        if (pendingRemoval.length > 0) {
-          console.log(`页面卸载：发现${pendingRemoval.length}道待移除错题`, pendingRemoval);
-          
-          // 获取当前错题集
-          const wrongQuestionsStr = localStorage.getItem('wrongQuestions');
-          if (wrongQuestionsStr) {
-            try {
-              const wrongQuestions = JSON.parse(wrongQuestionsStr);
-              let hasChanges = false;
-              
-              // 移除标记为待移除的错题
-              const updatedWrongQuestions = wrongQuestions.filter(wq => {
-                const shouldKeep = !pendingRemoval.includes(wq.id);
-                if (!shouldKeep) {
-                  console.log(`从错题集中移除题目 #${wq.id}`);
-                  hasChanges = true;
-                }
-                return shouldKeep;
-              });
-              
-              // 保存更新后的错题集
-              if (hasChanges) {
-                localStorage.setItem('wrongQuestions', JSON.stringify(updatedWrongQuestions));
-                console.log(`更新错题集成功，当前错题集剩余${updatedWrongQuestions.length}道题`);
-                
-                // 清除待移除列表
-                sessionStorage.removeItem('pendingWrongQuestionsRemoval');
-          
-          // 触发错题列表刷新事件
-          try {
-            const event = new CustomEvent('wrongQuestionsChanged', {
-                    detail: { removed: pendingRemoval, action: 'removeMultiple' }
-            });
-            window.dispatchEvent(event);
-          } catch (eventErr) {
-            console.error("触发错题更新事件失败:", eventErr);
-                }
-              }
-            } catch (e) {
-              console.error("处理错题集数据失败:", e);
-            }
-          }
-        }
+      // 确保历史记录中有当前题目的状态
+      if (history.answered && history.answered[questionId] && 
+          history.correct && (history.correct[questionId] !== undefined)) {
+        console.log(`[导航更新] localStorage中题目 ${questionId} 状态已更新`);
       }
     } catch (e) {
-      console.error("页面卸载处理错题移除失败:", e);
+      console.error('[导航更新] 读取历史记录失败:', e);
     }
-  }, [searchParams]);
-
-  // 添加页面卸载事件监听器
-  useEffect(() => {
-    // 全局事件监听，确保在任何场景下离开页面都能触发
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        
-        // 组件卸载时移除事件监听器并执行清理
-        return () => {
-          window.removeEventListener('beforeunload', handleBeforeUnload);
-          // 组件卸载时也执行一次清理
-          handleBeforeUnload();
-        };
-  }, [handleBeforeUnload]);
-
-  // 为会话状态变化添加更强的更新机制
-  useEffect(() => {
-    // 添加一个清理旧错题状态的机制
-    const cleanupWrongQuestionStatus = () => {
-      const source = searchParams.get('source');
-      const isFromWrongCollection = source === 'wrong';
-      
-      if (isFromWrongCollection) {
-        console.log("检查并清理错题状态");
-        // 从localStorage获取错题集
-        const wrongQuestionsStr = localStorage.getItem('wrongQuestions');
-        if (wrongQuestionsStr) {
-          try {
-            const wrongQuestions = JSON.parse(wrongQuestionsStr);
-            
-            // 遍历会话中的答题记录
-            Object.entries(sessionAnswers).forEach(([qId, status]) => {
-              // 如果这是一个回答正确的错题
-              if (status.isCorrect) {
-                console.log(`会话中题目 #${qId} 已答对，应从错题集中移除`);
-                
-                // 查找该题目在错题集中是否存在
-                const questionIndex = wrongQuestions.findIndex(q => q.id === parseInt(qId) || q.id === qId);
-                if (questionIndex !== -1) {
-                  console.log(`在错题集找到题目 #${qId}，准备移除`);
-                  
-                  // 从错题集中移除
-                  wrongQuestions.splice(questionIndex, 1);
-                  
-                  // 更新本地存储
-                  localStorage.setItem('wrongQuestions', JSON.stringify(wrongQuestions));
-                  console.log(`题目 #${qId} 已从错题集中移除，当前错题集共有 ${wrongQuestions.length} 题`);
-                  
-                  // 触发错题列表刷新事件
-                  const event = new CustomEvent('wrongQuestionsChanged', {
-                    detail: { removedId: qId }
-                  });
-                  window.dispatchEvent(event);
-                }
-              }
-            });
-          } catch (err) {
-            console.error("清理错题状态失败:", err);
-          }
-        }
-      }
-    };
     
-    // 监听会话答题状态变化
-    if (Object.keys(sessionAnswers).length > 0) {
-      console.log("会话答题状态有更新，正在刷新导航");
-      const source = searchParams.get('source');
-      const isFromWrongCollection = source === 'wrong';
-      
-      if (isFromWrongCollection && questionId && sessionAnswers[questionId]) {
-        // 仅对错题页面进行特殊处理
-        console.log(`错题页面：检测到会话状态更新，当前题目${questionId}状态=${sessionAnswers[questionId].isCorrect ? '正确' : '错误'}`);
-        
-        // 强制重新渲染导航组件
-        setTimeout(() => {
-          setCurrentNavPage(p => {
-            console.log("强制刷新导航页码");
-            return p; // 不改变值，但触发重新渲染
-          });
-        }, 100);
-      }
-      
-      // 清理错题状态
-      cleanupWrongQuestionStatus();
-    }
-  }, [sessionAnswers, questionId, searchParams]);
+    // 强制触发导航重新渲染
+    setNavigationRefreshTrigger(prev => {
+      const newValue = prev + 1;
+      console.log(`[导航更新] 触发导航刷新: ${prev} -> ${newValue}`);
+      return newValue;
+    });
+  }, [searchParams]);
   
   // 添加一个通用的导航刷新函数，可以在任何地方调用
   const refreshNavigation = useCallback(() => {
     console.log("手动刷新导航组件");
-    // 重置导航初始化标记
-    navigationInitializedRef.current = false;
-    // 重新初始化导航
-    initializeNavigation();
-    // 触发页面重新渲染
-    setCurrentNavPage(p => p);
-  }, [initializeNavigation]);
+    // 对于错题页面，只刷新导航按钮的渲染，不重新初始化（避免清空状态）
+    const source = searchParams.get('source');
+    if (source === 'wrong') {
+      console.log("错题页面：仅刷新导航渲染，保持状态");
+      // 只触发导航按钮的重新渲染，不重新初始化
+      setNavigationRefreshTrigger(prev => prev + 1);
+    } else {
+      // 普通页面：完整的导航刷新
+      navigationInitializedRef.current = false;
+      initializeNavigation();
+      setNavigationRefreshTrigger(prev => prev + 1);
+    }
+  }, [initializeNavigation, searchParams]);
   
   // 当题目ID变化或提交答案后，强制刷新导航
   useEffect(() => {
     if (submittedAnswer) {
       console.log("检测到已提交答案，确保导航状态更新");
-      refreshNavigation();
+      // 延迟刷新，确保sessionAnswers已经更新
+      const timer = setTimeout(() => {
+        refreshNavigation();
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [submittedAnswer, questionId, refreshNavigation]);
+  
+  // 监听sessionAnswers的变化，确保导航能够实时更新
+  useEffect(() => {
+    const sessionAnswerCount = Object.keys(sessionAnswers).length;
+    if (sessionAnswerCount > 0) {
+      console.log(`[导航更新] sessionAnswers变化，当前有${sessionAnswerCount}道题的会话答题记录`);
+      // 稍微延迟以确保状态已经完全更新
+      const timer = setTimeout(() => {
+        setNavigationRefreshTrigger(prev => prev + 1);
+      }, 10);
+      return () => clearTimeout(timer);
+    }
+  }, [sessionAnswers]);
 
   // 错题页面的特殊处理
   useEffect(() => {
@@ -1624,50 +1668,62 @@ export default function QuestionPage() {
     ensureWrongQuestionsValidity();
   }, [ensureWrongQuestionsValidity]);
 
-  // 在组件内部添加页面退出监听器
+  // 处理退出答题页面时移除答对的错题
   useEffect(() => {
     const handleBeforeUnload = async () => {
-      // 获取source值
-      const source = searchParams.get('source');
-      // 获取isCorrect值
-      const isCorrect = answerResult?.is_correct;
-      
-      // 检查是否从错题集进入且已正确答题
-      if (source === 'wrong' && 
-          submittedAnswer && 
-          isCorrect && 
-          questionId) {
+      try {
+        const source = searchParams.get('source');
         
-        console.log('页面退出检测：从错题集进入且答对了，准备移除题目', {
-          questionId,
-          submittedAnswer,
-          isCorrect
-        });
-        
-        try {
-          // 从错题集移除该题目
-          const result = await questionApi.removeFromWrongQuestions(questionId);
-          if (result.success) {
-            console.log(`题目 ${questionId} 已从错题集移除`);
-          } else {
-            console.error('从错题集移除失败:', result.error);
-          }
-        } catch (error) {
-          console.error('页面退出时移除错题失败:', error);
+        // 如果是从收藏页面退出且不是继续模式，清理会话标记
+        if (source === 'favorites' && searchParams.get('continue') !== 'true') {
+          sessionStorage.removeItem('favorites_session_started');
+          console.log('清理收藏练习会话标记');
         }
+        
+        // 检查是否来自错题集且有待移除的题目
+        if (source === 'wrong') {
+          console.log('退出错题页面，检查待移除的错题');
+          
+          const pendingRemovalStr = sessionStorage.getItem('pendingWrongQuestionsRemoval') || '[]';
+          const pendingRemoval = JSON.parse(pendingRemovalStr);
+          
+          if (pendingRemoval.length > 0) {
+            console.log(`发现${pendingRemoval.length}道待移除错题:`, pendingRemoval);
+            
+            // 批量移除错题
+            for (const qId of pendingRemoval) {
+              try {
+                const result = await questionApi.removeFromWrongQuestions(qId);
+                if (result.success) {
+                  console.log(`题目 #${qId} 已从错题集移除`);
+                } else {
+                  console.error(`题目 #${qId} 移除失败:`, result.error);
+                }
+              } catch (error) {
+                console.error(`移除题目 #${qId} 时出错:`, error);
+              }
+            }
+            
+            // 清空待移除列表
+            sessionStorage.removeItem('pendingWrongQuestionsRemoval');
+            console.log('答对的错题已从错题集中移除');
+          }
+        }
+      } catch (error) {
+        console.error('退出页面时处理错题移除失败:', error);
       }
     };
 
-    // 添加页面退出监听器
+    // 监听页面卸载事件
     window.addEventListener('beforeunload', handleBeforeUnload);
     
-    // 组件卸载时清除监听器
+    // 组件卸载时也执行处理，并清理事件监听器
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      // 同样在组件卸载时执行移除逻辑
-      handleBeforeUnload();
+      handleBeforeUnload(); // 确保在路由跳转时也能执行
     };
-  }, [searchParams, submittedAnswer, answerResult, questionId]);
+  }, [searchParams]);
+
 
   return (
     <div className="flex min-h-screen flex-col">

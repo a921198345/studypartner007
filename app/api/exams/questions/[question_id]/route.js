@@ -1,38 +1,7 @@
 import { NextResponse } from 'next/server';
-import mysql from 'mysql2/promise';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-
-// 数据库连接配置 - 使用环境变量或默认值
-const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '3306', 10),
-  user: process.env.DB_USER || 'law_app_user',
-  password: process.env.DB_PASSWORD || 'pass@123',
-  database: process.env.DB_NAME || 'law_exam_assistant',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-  connectTimeout: 30000 // 连接超时时间设置为30秒
-};
-
-// 创建数据库连接池
-const pool = mysql.createPool(dbConfig);
-
-// 简单测试连接函数
-async function testConnection() {
-  let conn;
-  try {
-    conn = await pool.getConnection();
-    console.log('数据库连接成功！');
-    return true;
-  } catch (err) {
-    console.error('数据库连接失败:', err);
-    return false;
-  } finally {
-    if (conn) conn.release();
-  }
-}
+import { pool } from '@/db';
 
 // 处理GET请求 - 获取单个题目详情
 export async function GET(request, { params }) {
