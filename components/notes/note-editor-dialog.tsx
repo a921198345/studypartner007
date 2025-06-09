@@ -19,9 +19,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { SimpleEditor } from "./simple-editor"
+import { RichEditor } from "./rich-editor"
 import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
+
+interface Note {
+  note_id: number
+  title: string
+  content: string
+  category: string
+  is_pinned: boolean
+  created_at: string
+  updated_at: string
+  is_deleted?: boolean
+}
 
 interface NoteEditorDialogProps {
   open: boolean
@@ -56,6 +67,26 @@ export function NoteEditorDialog({
     "其他",
   ]
 
+  // 从本地存储获取笔记
+  const getLocalNotes = (): Note[] => {
+    if (typeof window === 'undefined') return []
+    const notesJson = localStorage.getItem('law-exam-notes')
+    return notesJson ? JSON.parse(notesJson) : []
+  }
+
+  // 保存笔记到本地存储
+  const saveLocalNotes = (notes: Note[]) => {
+    localStorage.setItem('law-exam-notes', JSON.stringify(notes))
+  }
+
+  // 生成新的笔记ID
+  const generateNoteId = (): number => {
+    const notes = getLocalNotes()
+    if (notes.length === 0) return 1
+    const maxId = Math.max(...notes.map(note => note.note_id))
+    return maxId + 1
+  }
+
   // 加载笔记详情
   useEffect(() => {
     if (open && noteId) {
@@ -68,38 +99,33 @@ export function NoteEditorDialog({
     }
   }, [open, noteId])
 
-  const loadNote = async () => {
+  const loadNote = () => {
     if (!noteId) return
 
     setLoading(true)
-    try {
-      const response = await fetch(`/api/notes/${noteId}`)
-      const data = await response.json()
-
-      if (data.success) {
-        setTitle(data.data.title || "")
-        setContent(data.data.content || "")
-        setCategory(data.data.category || "未分类")
+    
+    setTimeout(() => {
+      const notes = getLocalNotes()
+      const note = notes.find(n => n.note_id === noteId)
+      
+      if (note) {
+        setTitle(note.title || "")
+        setContent(note.content || "")
+        setCategory(note.category || "未分类")
       } else {
         toast({
           variant: "destructive",
           title: "加载失败",
-          description: data.message,
+          description: "笔记不存在",
         })
       }
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "加载失败",
-        description: "网络错误，请稍后重试",
-      })
-    } finally {
+      
       setLoading(false)
-    }
+    }, 300)
   }
 
   // 保存笔记
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!content.trim()) {
       toast({
         variant: "destructive",
@@ -110,47 +136,56 @@ export function NoteEditorDialog({
     }
 
     setSaving(true)
-    try {
-      const url = noteId ? `/api/notes/${noteId}` : "/api/notes"
-      const method = noteId ? "PUT" : "POST"
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+    
+    setTimeout(() => {
+      const notes = getLocalNotes()
+      const now = new Date().toISOString()
+      
+      if (noteId) {
+        // 更新现有笔记
+        const updatedNotes = notes.map(note => 
+          note.note_id === noteId 
+            ? {
+                ...note,
+                title: title.trim() || "无标题笔记",
+                content,
+                category,
+                updated_at: now,
+              }
+            : note
+        )
+        saveLocalNotes(updatedNotes)
+        
+        toast({
+          title: "更新成功",
+          description: "笔记已更新",
+        })
+      } else {
+        // 创建新笔记
+        const newNote: Note = {
+          note_id: generateNoteId(),
           title: title.trim() || "无标题笔记",
           content,
           category,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
+          is_pinned: false,
+          created_at: now,
+          updated_at: now,
+          is_deleted: false,
+        }
+        
+        notes.push(newNote)
+        saveLocalNotes(notes)
+        
         toast({
-          title: noteId ? "更新成功" : "创建成功",
-          description: noteId ? "笔记已更新" : "笔记已创建",
-        })
-        onOpenChange(false)
-        onSave()
-      } else {
-        toast({
-          variant: "destructive",
-          title: "保存失败",
-          description: data.message,
+          title: "创建成功",
+          description: "笔记已创建",
         })
       }
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "保存失败",
-        description: "网络错误，请稍后重试",
-      })
-    } finally {
+      
       setSaving(false)
-    }
+      onOpenChange(false)
+      onSave()
+    }, 500)
   }
 
   return (
@@ -199,7 +234,7 @@ export function NoteEditorDialog({
 
             <div className="space-y-2">
               <Label htmlFor="content">内容</Label>
-              <SimpleEditor
+              <RichEditor
                 value={content}
                 onChange={setContent}
                 placeholder="开始编写您的笔记..."

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, Edit, Trash2, RefreshCw, AlertCircle } from "lucide-react"
+import { Calendar, Edit, Trash2, AlertCircle } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import {
   AlertDialog,
@@ -21,101 +21,106 @@ import { Skeleton } from "@/components/ui/skeleton"
 interface Note {
   note_id: number
   title: string
-  preview: string
+  content: string
+  preview?: string
   category: string
   is_pinned: boolean
   created_at: string
   updated_at: string
+  is_deleted?: boolean
+  deleted_at?: string
 }
 
 interface NoteListProps {
   searchQuery: string
   selectedCategory: string
   onEditNote: (noteId: number) => void
+  onViewNote: (noteId: number) => void
   refreshTrigger?: number
 }
 
-export function NoteList({ searchQuery, selectedCategory, onEditNote, refreshTrigger }: NoteListProps) {
+export function NoteList({ searchQuery, selectedCategory, onEditNote, onViewNote, refreshTrigger }: NoteListProps) {
   const [notes, setNotes] = useState<Note[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [deleteNoteId, setDeleteNoteId] = useState<number | null>(null)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
   const { toast } = useToast()
 
-  // 获取笔记列表
-  const fetchNotes = async () => {
-    try {
-      setLoading(true)
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: "10",
-      })
+  // 从本地存储获取笔记
+  const getLocalNotes = (): Note[] => {
+    if (typeof window === 'undefined') return []
+    const notesJson = localStorage.getItem('law-exam-notes')
+    return notesJson ? JSON.parse(notesJson) : []
+  }
+
+  // 保存笔记到本地存储
+  const saveLocalNotes = (notes: Note[]) => {
+    localStorage.setItem('law-exam-notes', JSON.stringify(notes))
+  }
+
+  // 获取并过滤笔记
+  const fetchNotes = () => {
+    setLoading(true)
+    
+    setTimeout(() => {
+      let allNotes = getLocalNotes()
       
+      // 过滤删除的笔记
+      allNotes = allNotes.filter(note => !note.is_deleted)
+      
+      // 按分类过滤
       if (selectedCategory && selectedCategory !== "全部") {
-        params.append("category", selectedCategory)
+        allNotes = allNotes.filter(note => note.category === selectedCategory)
       }
       
+      // 按搜索关键词过滤
       if (searchQuery) {
-        params.append("keyword", searchQuery)
+        const query = searchQuery.toLowerCase()
+        allNotes = allNotes.filter(note => 
+          note.title.toLowerCase().includes(query) || 
+          note.content.toLowerCase().includes(query)
+        )
       }
-
-      const response = await fetch(`/api/notes?${params}`)
-      const data = await response.json()
-
-      if (data.success) {
-        setNotes(data.data.notes)
-        setTotalPages(data.data.pagination.totalPages)
-      } else {
-        toast({
-          variant: "destructive",
-          title: "获取笔记失败",
-          description: data.message,
-        })
-      }
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "获取笔记失败",
-        description: "网络错误，请稍后重试",
+      
+      // 排序：置顶的在前，然后按创建时间倒序
+      allNotes.sort((a, b) => {
+        if (a.is_pinned !== b.is_pinned) {
+          return a.is_pinned ? -1 : 1
+        }
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       })
-    } finally {
+      
+      // 为每个笔记生成预览
+      const notesWithPreview = allNotes.map(note => ({
+        ...note,
+        preview: note.content.replace(/<[^>]*>/g, '').substring(0, 100) + '...'
+      }))
+      
+      setNotes(notesWithPreview)
       setLoading(false)
-    }
+    }, 300) // 模拟加载延迟
   }
 
   useEffect(() => {
     fetchNotes()
-  }, [currentPage, selectedCategory, searchQuery, refreshTrigger])
+  }, [selectedCategory, searchQuery, refreshTrigger])
 
   // 删除笔记
-  const handleDelete = async (noteId: number) => {
-    try {
-      const response = await fetch(`/api/notes/${noteId}`, {
-        method: "DELETE",
-      })
-      const data = await response.json()
-
-      if (data.success) {
-        toast({
-          title: "删除成功",
-          description: "笔记已移至回收站，30天内可恢复",
-        })
-        fetchNotes()
-      } else {
-        toast({
-          variant: "destructive",
-          title: "删除失败",
-          description: data.message,
-        })
-      }
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "删除失败",
-        description: "网络错误，请稍后重试",
-      })
-    }
+  const handleDelete = (noteId: number) => {
+    const allNotes = getLocalNotes()
+    const updatedNotes = allNotes.map(note => 
+      note.note_id === noteId 
+        ? { ...note, is_deleted: true, deleted_at: new Date().toISOString() }
+        : note
+    )
+    
+    saveLocalNotes(updatedNotes)
+    
+    toast({
+      title: "删除成功",
+      description: "笔记已移至回收站，30天内可恢复",
+    })
+    
+    fetchNotes()
     setDeleteNoteId(null)
   }
 
@@ -169,7 +174,11 @@ export function NoteList({ searchQuery, selectedCategory, onEditNote, refreshTri
     <>
       <div className="space-y-4">
         {notes.map((note) => (
-          <Card key={note.note_id} className="hover:shadow-md transition-shadow">
+          <Card 
+            key={note.note_id} 
+            className="hover:shadow-md transition-shadow cursor-pointer"
+            onClick={() => onViewNote(note.note_id)}
+          >
             <CardContent className="p-4">
               <div className="flex items-start justify-between mb-2">
                 <h3 className="font-medium text-lg">{note.title}</h3>
@@ -195,7 +204,10 @@ export function NoteList({ searchQuery, selectedCategory, onEditNote, refreshTri
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => onEditNote(note.note_id)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onEditNote(note.note_id)
+                  }}
                 >
                   <Edit className="h-4 w-4 mr-1" />
                   编辑
@@ -204,7 +216,10 @@ export function NoteList({ searchQuery, selectedCategory, onEditNote, refreshTri
                   variant="outline"
                   size="sm"
                   className="text-red-500 hover:text-red-600"
-                  onClick={() => setDeleteNoteId(note.note_id)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setDeleteNoteId(note.note_id)
+                  }}
                 >
                   <Trash2 className="h-4 w-4 mr-1" />
                   删除
@@ -214,30 +229,6 @@ export function NoteList({ searchQuery, selectedCategory, onEditNote, refreshTri
           </Card>
         ))}
       </div>
-
-      {totalPages > 1 && (
-        <div className="flex justify-center mt-6 space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage(currentPage - 1)}
-            disabled={currentPage === 1}
-          >
-            上一页
-          </Button>
-          <span className="flex items-center px-3 text-sm">
-            第 {currentPage} / {totalPages} 页
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage(currentPage + 1)}
-            disabled={currentPage === totalPages}
-          >
-            下一页
-          </Button>
-        </div>
-      )}
 
       <AlertDialog open={deleteNoteId !== null} onOpenChange={() => setDeleteNoteId(null)}>
         <AlertDialogContent>

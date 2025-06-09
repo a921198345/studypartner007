@@ -9,14 +9,16 @@ import ChatLayout from "@/components/ai-chat/ChatLayout"
 import StreamingMessage from "@/components/ai-chat/StreamingMessage"
 import { InputArea } from "@/components/ai-chat/InputArea"
 import { SaveNoteButton } from "@/components/ai-chat/SaveNoteButton"
+import { ConversationSidebar } from "@/components/ai-chat/conversation-sidebar"
 import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Button } from "@/components/ui/button"
+import { Sheet, SheetContent } from "@/components/ui/sheet"
+import { Menu, PanelLeftClose, PanelLeft } from "lucide-react"
 import { v4 as uuidv4 } from 'uuid'
 import { askAIStream, AskAIParams } from "@/lib/api/aiService"
 import { useToast } from "@/components/ui/use-toast"
 import { useChatStore } from '@/hooks/useChatStore'
-import { ChevronLeftIcon } from 'lucide-react'
-import Link from 'next/link'
 
 // 扩展消息类型，添加流式相关属性
 interface Message {
@@ -32,31 +34,58 @@ interface Message {
 
 export default function AIChat() {
   const { toast } = useToast();
-  const { messages, addMessage, updateMessage } = useChatStore();
+  const { 
+    messages, 
+    addMessage, 
+    updateMessage,
+    currentConversationId,
+    conversations,
+    createNewConversation,
+    switchConversation,
+    deleteConversation,
+    updateConversationTitle
+  } = useChatStore();
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState('');
   const [isInitialized, setIsInitialized] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // 确保客户端渲染
   useEffect(() => {
     setMounted(true);
+    // 从 localStorage 读取侧边栏状态
+    const saved = localStorage.getItem('ai-chat-sidebar-collapsed');
+    if (saved !== null) {
+      setDesktopSidebarCollapsed(JSON.parse(saved));
+    }
   }, []);
   
-  // 初始化欢迎消息
+  // 保存侧边栏状态到 localStorage
   useEffect(() => {
-    if (mounted && !isInitialized && messages.length === 0) {
-      addMessage({
-        id: 'welcome',
-        role: 'assistant',
-        content: '欢迎使用法考助手AI，请输入您的法考问题，我会尽力帮您解答。',
-        timestamp: new Date().toISOString()
-      });
-      setIsInitialized(true);
+    if (mounted) {
+      localStorage.setItem('ai-chat-sidebar-collapsed', JSON.stringify(desktopSidebarCollapsed));
     }
-  }, [mounted, messages.length, isInitialized, addMessage]);
+  }, [desktopSidebarCollapsed, mounted]);
+  
+  // 初始化对话
+  useEffect(() => {
+    if (mounted && !currentConversationId && conversations.length === 0) {
+      const newConvId = createNewConversation();
+      // 添加欢迎消息
+      setTimeout(() => {
+        addMessage({
+          id: 'welcome',
+          role: 'assistant',
+          content: '欢迎使用法考助手AI，请输入您的法考问题，我会尽力帮您解答。',
+          timestamp: new Date().toISOString()
+        });
+      }, 100);
+    }
+  }, [mounted, currentConversationId, conversations.length, createNewConversation, addMessage]);
   
   // 自动滚动到底部 - 必须在所有条件之后
   useEffect(() => {
@@ -71,9 +100,29 @@ export default function AIChat() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamingText]);
+
+  // 页面加载时滚动到底部
+  useEffect(() => {
+    if (mounted && messages.length > 0) {
+      setTimeout(() => {
+        if (scrollAreaRef.current) {
+          const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+          if (scrollContainer) {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+          }
+        }
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  }, [mounted]);
   
   const handleSendMessage = async (text: string) => {
     if (!text.trim()) return;
+    
+    // 如果没有当前对话，创建新对话
+    if (!currentConversationId) {
+      createNewConversation();
+    }
 
     // 生成唯一ID
     const userMessageId = Date.now().toString();
@@ -86,6 +135,12 @@ export default function AIChat() {
       content: text,
       timestamp: new Date().toISOString()
     });
+    
+    // 根据第一条用户消息自动更新对话标题
+    if (messages.length <= 1 && currentConversationId) {
+      const title = text.length > 30 ? text.substring(0, 30) + '...' : text;
+      updateConversationTitle(currentConversationId, title);
+    }
     
     // 添加空的AI消息，准备流式填充
     addMessage({
@@ -156,7 +211,7 @@ export default function AIChat() {
       <div className="flex min-h-screen flex-col bg-gray-50">
         <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="container flex h-16 items-center">
-            <h1 className="text-xl font-semibold">法考问答</h1>
+            <MainNav />
           </div>
         </header>
         <main className="flex-1 flex items-center justify-center">
@@ -170,17 +225,74 @@ export default function AIChat() {
     <div className="flex min-h-screen flex-col bg-gray-50">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center">
-          <Link href="/" className="p-2 mr-2 rounded-md hover:bg-gray-100">
-            <ChevronLeftIcon className="h-5 w-5" />
-          </Link>
-          <h1 className="text-xl font-semibold">法考问答</h1>
+          <MainNav />
         </div>
       </header>
       <main className="flex-1">
         <div className="container mx-auto py-6">
-          <div className="grid grid-cols-1">
+          <div className="flex gap-6">
+            {/* 左侧边栏 - 对话历史 */}
+            <div className={`hidden lg:block transition-all duration-300 ${
+              desktopSidebarCollapsed ? 'w-0 overflow-hidden' : 'w-80'
+            }`}>
+              <ConversationSidebar
+                currentConversationId={currentConversationId}
+                conversations={conversations}
+                onNewConversation={() => {
+                  const newId = createNewConversation();
+                  // 添加欢迎消息
+                  setTimeout(() => {
+                    addMessage({
+                      id: `welcome-${Date.now()}`,
+                      role: 'assistant',
+                      content: '欢迎使用法考助手AI，请输入您的法考问题，我会尽力帮您解答。',
+                      timestamp: new Date().toISOString()
+                    });
+                  }, 100);
+                }}
+                onSelectConversation={switchConversation}
+                onDeleteConversation={deleteConversation}
+              />
+            </div>
+            
             {/* 聊天区域 */}
-            <Card className="h-[calc(100vh-180px)] flex flex-col shadow-lg border-0 bg-gradient-to-br from-blue-50/30 via-white to-indigo-50/30">
+            <Card className="flex-1 h-[calc(100vh-180px)] flex flex-col shadow-lg border-0 bg-gradient-to-br from-blue-50/30 via-white to-indigo-50/30">
+              {/* 顶部工具栏 */}
+              <div className="p-4 border-b flex items-center justify-between">
+                {/* 移动端菜单按钮 */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="lg:hidden"
+                  onClick={() => setSidebarOpen(true)}
+                >
+                  <Menu className="h-5 w-5" />
+                </Button>
+                
+                {/* 桌面端侧边栏切换按钮 */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="hidden lg:flex"
+                  onClick={() => setDesktopSidebarCollapsed(!desktopSidebarCollapsed)}
+                  title={desktopSidebarCollapsed ? "展开侧边栏" : "收起侧边栏"}
+                >
+                  {desktopSidebarCollapsed ? (
+                    <PanelLeft className="h-5 w-5" />
+                  ) : (
+                    <PanelLeftClose className="h-5 w-5" />
+                  )}
+                </Button>
+                
+                {/* 标题 */}
+                <h2 className="text-lg font-semibold flex-1 text-center lg:text-left">
+                  AI 法考助手
+                </h2>
+                
+                {/* 占位符保持布局平衡 */}
+                <div className="w-10 lg:hidden" />
+              </div>
+              
               <CardContent className="flex-1 p-6 overflow-hidden bg-gray-50/50">
                 <ScrollArea className="h-full pr-4" ref={scrollAreaRef}>
                   <div className="space-y-6 py-6">
@@ -249,6 +361,34 @@ export default function AIChat() {
         </div>
       </main>
       <Footer />
+      
+      {/* 移动端侧边栏 */}
+      <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+        <SheetContent side="left" className="w-[300px] p-0">
+          <ConversationSidebar
+            currentConversationId={currentConversationId}
+            conversations={conversations}
+            onNewConversation={() => {
+              const newId = createNewConversation();
+              // 添加欢迎消息
+              setTimeout(() => {
+                addMessage({
+                  id: `welcome-${Date.now()}`,
+                  role: 'assistant',
+                  content: '欢迎使用法考助手AI，请输入您的法考问题，我会尽力帮您解答。',
+                  timestamp: new Date().toISOString()
+                });
+              }, 100);
+              setSidebarOpen(false);
+            }}
+            onSelectConversation={(id) => {
+              switchConversation(id);
+              setSidebarOpen(false);
+            }}
+            onDeleteConversation={deleteConversation}
+          />
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }
