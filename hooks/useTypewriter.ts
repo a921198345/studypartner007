@@ -21,13 +21,13 @@ interface UseTypewriterResult {
  */
 export function useTypewriter(
   text: string, 
-  speed: number = 20, 
+  speed: number = 5, // 进一步减少默认延迟，让打字更快
   options: UseTypewriterOptions = {}
 ): UseTypewriterResult {
   const { 
     initialDelay = 0, 
     typingDelay = speed, 
-    batchSize = 3  // 默认每次更新3个字符
+    batchSize = 1  // 默认每次更新1个字符，确保流畅显示
   } = options;
   
   // 为避免SSR水合错误，初始状态应保持空

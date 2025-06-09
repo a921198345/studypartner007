@@ -4,7 +4,7 @@ import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import MessageBubble from './MessageBubble';
-import InputArea from './InputArea';
+import { InputArea } from './InputArea';
 
 // 示例消息数据类型
 export interface Message {

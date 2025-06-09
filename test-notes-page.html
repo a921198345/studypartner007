@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试笔记页面</title>
+</head>
+<body>
+    <h1>测试笔记页面访问</h1>
+    
+    <button onclick="checkNotesPage()">检查笔记页面</button>
+    <button onclick="checkNotesAPI()">检查笔记API</button>
+    
+    <div id="result"></div>
+    
+    <script>
+    async function checkNotesPage() {
+        const resultDiv = document.getElementById('result');
+        try {
+            const response = await fetch('http://localhost:3001/notes');
+            resultDiv.innerHTML = `
+                <h3>笔记页面状态：</h3>
+                <p>状态码: ${response.status}</p>
+                <p>状态: ${response.ok ? '✅ 正常' : '❌ 错误'}</p>
+            `;
+            
+            if (!response.ok) {
+                const text = await response.text();
+                resultDiv.innerHTML += `<pre>${text.substring(0, 500)}...</pre>`;
+            }
+        } catch (error) {
+            resultDiv.innerHTML = `<p style="color: red;">错误: ${error.message}</p>`;
+        }
+    }
+    
+    async function checkNotesAPI() {
+        const resultDiv = document.getElementById('result');
+        try {
+            const response = await fetch('http://localhost:3001/api/notes', {
+                credentials: 'include'
+            });
+            const data = await response.json();
+            resultDiv.innerHTML = `
+                <h3>笔记API状态：</h3>
+                <p>状态码: ${response.status}</p>
+                <pre>${JSON.stringify(data, null, 2)}</pre>
+            `;
+        } catch (error) {
+            resultDiv.innerHTML = `<p style="color: red;">错误: ${error.message}</p>`;
+        }
+    }
+    </script>
+</body>
+</html>

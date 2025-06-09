@@ -24,15 +24,7 @@ interface ChatState {
 export const useChatStore = create<ChatState>()(
   persist(
     (set) => ({
-      messages: [
-        // 初始欢迎消息
-        {
-          id: 'welcome',
-          role: 'assistant',
-          content: '欢迎使用法考助手AI，请输入您的法考问题，我会尽力帮您解答。',
-          timestamp: new Date().toISOString(),
-        }
-      ],
+      messages: [],  // 初始为空，避免水合错误
       
       // 添加新消息
       addMessage: (message) => set((state) => ({
@@ -40,11 +32,14 @@ export const useChatStore = create<ChatState>()(
       })),
       
       // 更新现有消息
-      updateMessage: (id, update) => set((state) => ({
-        messages: state.messages.map((msg) => 
-          msg.id === id ? { ...msg, ...update } : msg
-        )
-      })),
+      updateMessage: (id, update) => set((state) => {
+        console.log('🔄 更新消息:', { id, update, messageCount: state.messages.length });
+        return {
+          messages: state.messages.map((msg) => 
+            msg.id === id ? { ...msg, ...update } : msg
+          )
+        };
+      }),
       
       // 删除消息
       deleteMessage: (id) => set((state) => ({
@@ -53,15 +48,7 @@ export const useChatStore = create<ChatState>()(
       
       // 清空所有消息
       clearMessages: () => set({
-        messages: [
-          // 重置为只包含欢迎消息
-          {
-            id: 'welcome',
-            role: 'assistant',
-            content: '欢迎使用法考助手AI，请输入您的法考问题，我会尽力帮您解答。',
-            timestamp: new Date().toISOString(),
-          }
-        ]
+        messages: []
       })
     }),
     {
