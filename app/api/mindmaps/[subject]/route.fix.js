@@ -5,7 +5,7 @@
 import { NextResponse } from 'next/server';
 import db from '../../../../lib/db'; 
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "../../auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 const cache = require('../../../../lib/cache');
 
 // 定义知识导图数据格式化函数

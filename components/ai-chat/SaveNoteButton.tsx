@@ -28,6 +28,17 @@ interface SaveNoteButtonProps {
   chatId?: string
 }
 
+interface Note {
+  note_id: number
+  title: string
+  content: string
+  category: string
+  is_pinned: boolean
+  created_at: string
+  updated_at: string
+  is_deleted?: boolean
+}
+
 export function SaveNoteButton({ question, answer, chatId }: SaveNoteButtonProps) {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -48,48 +59,85 @@ export function SaveNoteButton({ question, answer, chatId }: SaveNoteButtonProps
     "其他",
   ]
 
-  const handleSave = async () => {
+  // 从本地存储获取笔记
+  const getLocalNotes = (): Note[] => {
+    if (typeof window === 'undefined') return []
+    const notesJson = localStorage.getItem('law-exam-notes')
+    return notesJson ? JSON.parse(notesJson) : []
+  }
+
+  // 保存笔记到本地存储
+  const saveLocalNotes = (notes: Note[]) => {
+    localStorage.setItem('law-exam-notes', JSON.stringify(notes))
+  }
+
+  // 生成新的笔记ID
+  const generateNoteId = (): number => {
+    const notes = getLocalNotes()
+    if (notes.length === 0) return 1
+    const maxId = Math.max(...notes.map(note => note.note_id))
+    return maxId + 1
+  }
+
+  const handleSave = () => {
     setSaving(true)
-    try {
-      const response = await fetch("/api/notes/save-from-ai", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          question,
-          answer,
-          chatId,
+    
+    setTimeout(() => {
+      try {
+        const notes = getLocalNotes()
+        const now = new Date().toISOString()
+        
+        // 构建笔记内容（HTML格式）
+        const noteContent = `
+          <div class="ai-note">
+            <div class="question">
+              <h3>问题：</h3>
+              <p>${question}</p>
+            </div>
+            <hr />
+            <div class="answer">
+              <h3>AI回答：</h3>
+              <div>${answer}</div>
+            </div>
+            <hr />
+            <div class="note-meta">
+              <small>保存自AI问答 - ${new Date().toLocaleString('zh-CN')}</small>
+            </div>
+          </div>
+        `
+        
+        // 创建新笔记
+        const newNote: Note = {
+          note_id: generateNoteId(),
+          title: title || question.substring(0, 50) + (question.length > 50 ? '...' : ''),
+          content: noteContent,
           category,
-          title: title || question.substring(0, 50),
-        }),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
+          is_pinned: false,
+          created_at: now,
+          updated_at: now,
+          is_deleted: false,
+        }
+        
+        notes.push(newNote)
+        saveLocalNotes(notes)
+        
         toast({
           title: "保存成功",
           description: "AI回答已保存为笔记",
         })
+        
         setOpen(false)
         setTitle("")
-      } else {
+      } catch (error) {
         toast({
           variant: "destructive",
           title: "保存失败",
-          description: data.message,
+          description: "保存笔记时出错",
         })
+      } finally {
+        setSaving(false)
       }
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "保存失败",
-        description: "网络错误，请稍后重试",
-      })
-    } finally {
-      setSaving(false)
-    }
+    }, 500)
   }
 
   return (

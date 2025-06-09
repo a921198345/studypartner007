@@ -3,17 +3,28 @@
 import { useState, useEffect } from "react"
 import { MainNav } from "@/components/main-nav"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Search, FileText, Plus, Lock, Trash } from "lucide-react"
+import { Search, FileText, Plus, Trash } from "lucide-react"
 import { Footer } from "@/components/footer"
 import { NoteList } from "@/components/notes/note-list"
 import { NoteEditorDialog } from "@/components/notes/note-editor-dialog"
+import { NoteViewerDialog } from "@/components/notes/note-viewer-dialog"
 import { useToast } from "@/components/ui/use-toast"
-import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
+
+// 定义笔记类型
+interface Note {
+  note_id: number
+  title: string
+  content: string
+  category: string
+  is_pinned: boolean
+  created_at: string
+  updated_at: string
+}
 
 export default function NotesPage() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -22,38 +33,46 @@ export default function NotesPage() {
   const [totalNotes, setTotalNotes] = useState(0)
   const [editorOpen, setEditorOpen] = useState(false)
   const [editingNoteId, setEditingNoteId] = useState<number | null>(null)
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const [viewingNoteId, setViewingNoteId] = useState<number | null>(null)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const { toast } = useToast()
-  const { data: session, status } = useSession()
   const router = useRouter()
 
-  // 检查登录状态
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login")
-    }
-  }, [status, router])
+  // 从本地存储获取笔记
+  const getLocalNotes = (): Note[] => {
+    if (typeof window === 'undefined') return []
+    const notesJson = localStorage.getItem('law-exam-notes')
+    return notesJson ? JSON.parse(notesJson) : []
+  }
 
-  // 获取分类列表
-  const fetchCategories = async () => {
-    try {
-      const response = await fetch("/api/notes/categories")
-      const data = await response.json()
+  // 保存笔记到本地存储
+  const saveLocalNotes = (notes: Note[]) => {
+    localStorage.setItem('law-exam-notes', JSON.stringify(notes))
+  }
 
-      if (data.success) {
-        setCategories(data.data.categories)
-        setTotalNotes(data.data.total)
-      }
-    } catch (error) {
-      console.error("获取分类失败:", error)
-    }
+  // 计算分类统计
+  const calculateCategories = () => {
+    const notes = getLocalNotes()
+    const categoryMap = new Map<string, number>()
+    
+    notes.forEach(note => {
+      const count = categoryMap.get(note.category) || 0
+      categoryMap.set(note.category, count + 1)
+    })
+    
+    const categoriesArray = Array.from(categoryMap.entries()).map(([category, count]) => ({
+      category,
+      count
+    }))
+    
+    setCategories(categoriesArray)
+    setTotalNotes(notes.length)
   }
 
   useEffect(() => {
-    if (session) {
-      fetchCategories()
-    }
-  }, [session, refreshTrigger])
+    calculateCategories()
+  }, [refreshTrigger])
 
   // 打开编辑器
   const openEditor = (noteId?: number) => {
@@ -61,10 +80,23 @@ export default function NotesPage() {
     setEditorOpen(true)
   }
 
+  // 打开查看器
+  const openViewer = (noteId: number) => {
+    setViewingNoteId(noteId)
+    setViewerOpen(true)
+  }
+
+  // 从查看器打开编辑器
+  const handleEditFromViewer = (noteId: number) => {
+    setViewerOpen(false)
+    setViewingNoteId(null)
+    openEditor(noteId)
+  }
+
   // 保存后刷新
   const handleSave = () => {
     setRefreshTrigger(prev => prev + 1)
-    fetchCategories()
+    calculateCategories()
   }
 
   // 过滤显示的分类
@@ -72,17 +104,6 @@ export default function NotesPage() {
     { category: "全部", count: totalNotes },
     ...categories.filter(cat => cat.count > 0),
   ]
-
-  if (status === "loading") {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">加载中...</p>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -203,6 +224,7 @@ export default function NotesPage() {
                     searchQuery={searchQuery}
                     selectedCategory={selectedCategory}
                     onEditNote={openEditor}
+                    onViewNote={openViewer}
                     refreshTrigger={refreshTrigger}
                   />
                 </TabsContent>
@@ -229,6 +251,13 @@ export default function NotesPage() {
         onOpenChange={setEditorOpen}
         noteId={editingNoteId}
         onSave={handleSave}
+      />
+
+      <NoteViewerDialog
+        open={viewerOpen}
+        onOpenChange={setViewerOpen}
+        noteId={viewingNoteId}
+        onEdit={handleEditFromViewer}
       />
     </div>
   )

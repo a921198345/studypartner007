@@ -3,94 +3,189 @@
 import { useState, useEffect } from "react"
 import { MainNav } from "@/components/main-nav"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Calendar, Target, CheckCircle, ArrowRight, AlertTriangle } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Calendar, Clock, Plus, Trash2 } from "lucide-react"
 import { Footer } from "@/components/footer"
-import { useRouter } from "next/navigation"
-import { PlanWizard } from "@/components/learning-plan/plan-wizard"
-import { DailyTaskList } from "@/components/learning-plan/daily-task-list"
-import { WeeklyPlanView } from "@/components/learning-plan/weekly-plan-view"
-import { MonthlyPlanView } from "@/components/learning-plan/monthly-plan-view"
-import { LearningStats } from "@/components/learning-plan/learning-stats"
-import { LearningTips } from "@/components/learning-plan/learning-tips"
 import { ExamCountdown } from "@/components/learning-plan/exam-countdown"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { useToast } from "@/components/ui/use-toast"
+
+interface Task {
+  id: string
+  content: string
+  completed: boolean
+  createdAt: string
+}
+
+interface PlanData {
+  dailyTasks: Task[]
+  weeklyTasks: Task[]
+  monthlyTasks: Task[]
+}
 
 export default function LearningPlanPage() {
-  const router = useRouter()
-  const [hasPlan, setHasPlan] = useState(false)
-  const [showWizard, setShowWizard] = useState(false)
-  const [planData, setPlanData] = useState<any>(null)
-  const [isFirstVisit, setIsFirstVisit] = useState(true)
+  const [planData, setPlanData] = useState<PlanData>({
+    dailyTasks: [],
+    weeklyTasks: [],
+    monthlyTasks: []
+  })
+  const [newTaskContent, setNewTaskContent] = useState({
+    daily: "",
+    weekly: "",
+    monthly: ""
+  })
+  const { toast } = useToast()
 
-  // 模拟从服务器获取计划数据
+  // 从本地存储加载计划数据
   useEffect(() => {
-    // 这里应该是从API获取数据
-    // 模拟已有计划的情况
-    const savedPlan = localStorage.getItem("learningPlan")
+    const savedPlan = localStorage.getItem("law-exam-plan")
     if (savedPlan) {
       setPlanData(JSON.parse(savedPlan))
-      setHasPlan(true)
-      setIsFirstVisit(false)
     }
   }, [])
 
-  const handleCreatePlan = (data: any) => {
-    // 这里应该是发送到API
+  // 保存计划数据到本地存储
+  const savePlanData = (data: PlanData) => {
+    localStorage.setItem("law-exam-plan", JSON.stringify(data))
     setPlanData(data)
-    setHasPlan(true)
-    setShowWizard(false)
-    localStorage.setItem("learningPlan", JSON.stringify(data))
   }
 
-  const handleStartNow = () => {
-    if (isFirstVisit) {
-      setShowWizard(true)
-      setIsFirstVisit(false)
-    } else {
-      router.push("/ai-chat")
+  // 生成任务ID
+  const generateTaskId = () => {
+    return Date.now().toString()
+  }
+
+  // 添加任务
+  const addTask = (type: 'daily' | 'weekly' | 'monthly') => {
+    const content = newTaskContent[type].trim()
+    if (!content) {
+      toast({
+        variant: "destructive",
+        title: "添加失败",
+        description: "任务内容不能为空"
+      })
+      return
     }
+
+    const newTask: Task = {
+      id: generateTaskId(),
+      content,
+      completed: false,
+      createdAt: new Date().toISOString()
+    }
+
+    const updatedPlan = {
+      ...planData,
+      [`${type}Tasks`]: [...planData[`${type}Tasks`], newTask]
+    }
+
+    savePlanData(updatedPlan)
+    setNewTaskContent(prev => ({ ...prev, [type]: "" }))
+    
+    toast({
+      title: "添加成功",
+      description: "任务已添加到计划中"
+    })
   }
 
-  // 模拟任务数据
-  const today = new Date()
-  const todayTasks = [
-    {
-      id: "1",
-      type: "reading",
-      title: "民法总则",
-      description: "第三章 民事法律行为\n第一节 一般规定\n第二节 意思表示",
-      duration: 60,
-      completed: false,
-      subject: "民法",
-      link: "/knowledge-map",
-    },
-    {
-      id: "2",
-      type: "knowledge_map",
-      title: "知识导图学习",
-      description: "民事法律行为知识导图\n重点关注有效要件和无效情形",
-      duration: 30,
-      completed: false,
-      subject: "民法",
-      link: "/knowledge-map",
-    },
-    {
-      id: "3",
-      type: "practice",
-      title: "真题练习",
-      description: "民法总则 - 民事法律行为专项练习\n10道题目",
-      duration: 30,
-      completed: false,
-      subject: "民法",
-      link: "/question-bank",
-    },
-  ]
+  // 切换任务完成状态
+  const toggleTask = (type: 'daily' | 'weekly' | 'monthly', taskId: string) => {
+    const updatedTasks = planData[`${type}Tasks`].map(task =>
+      task.id === taskId ? { ...task, completed: !task.completed } : task
+    )
 
-  const handleTaskComplete = (taskId: string, completed: boolean) => {
-    // 这里应该是发送到API
-    console.log(`Task ${taskId} marked as ${completed ? "completed" : "incomplete"}`)
+    const updatedPlan = {
+      ...planData,
+      [`${type}Tasks`]: updatedTasks
+    }
+
+    savePlanData(updatedPlan)
+  }
+
+  // 删除任务
+  const deleteTask = (type: 'daily' | 'weekly' | 'monthly', taskId: string) => {
+    const updatedTasks = planData[`${type}Tasks`].filter(task => task.id !== taskId)
+
+    const updatedPlan = {
+      ...planData,
+      [`${type}Tasks`]: updatedTasks
+    }
+
+    savePlanData(updatedPlan)
+    
+    toast({
+      title: "删除成功",
+      description: "任务已从计划中移除"
+    })
+  }
+
+  // 渲染任务列表
+  const renderTaskList = (type: 'daily' | 'weekly' | 'monthly') => {
+    const tasks = planData[`${type}Tasks`]
+    const typeLabel = type === 'daily' ? '今日' : type === 'weekly' ? '本周' : '本月'
+
+    return (
+      <div className="space-y-4">
+        {/* 添加任务输入框 */}
+        <div className="flex gap-2">
+          <Input
+            placeholder={`输入${typeLabel}计划任务...`}
+            value={newTaskContent[type]}
+            onChange={(e) => setNewTaskContent(prev => ({ ...prev, [type]: e.target.value }))}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                addTask(type)
+              }
+            }}
+          />
+          <Button onClick={() => addTask(type)}>
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* 任务列表 */}
+        <div className="space-y-2">
+          {tasks.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              暂无{typeLabel}计划，点击上方添加任务
+            </div>
+          ) : (
+            tasks.map(task => (
+              <Card key={task.id} className={`p-4 ${task.completed ? 'opacity-60' : ''}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3 flex-1">
+                    <Checkbox
+                      checked={task.completed}
+                      onCheckedChange={() => toggleTask(type, task.id)}
+                    />
+                    <span className={`flex-1 ${task.completed ? 'line-through text-muted-foreground' : ''}`}>
+                      {task.content}
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => deleteTask(type, task.id)}
+                    className="text-red-500 hover:text-red-600"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </Card>
+            ))
+          )}
+        </div>
+
+        {/* 完成统计 */}
+        {tasks.length > 0 && (
+          <div className="text-sm text-muted-foreground text-center">
+            已完成 {tasks.filter(t => t.completed).length} / {tasks.length} 项任务
+          </div>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -100,122 +195,71 @@ export default function LearningPlanPage() {
           <MainNav />
         </div>
       </header>
+      
       <main className="flex-1">
-        <div className="container mx-auto py-8">
-          <h1 className="text-3xl font-bold mb-8 gradient-text">学习计划</h1>
-
-          {!hasPlan && !showWizard && (
-            <div className="max-w-3xl mx-auto text-center">
-              <Card className="mb-8">
+        <div className="container mx-auto py-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* 学习计划管理 */}
+            <div className="lg:col-span-2">
+              <Card>
                 <CardHeader>
-                  <CardTitle className="text-2xl">开始您的法考备考之旅</CardTitle>
-                  <CardDescription>定制专属学习计划，科学规划备考时间，提高学习效率</CardDescription>
+                  <CardTitle>我的学习计划</CardTitle>
+                  <CardDescription>
+                    制定并管理您的学习计划，通过打勾标记完成状态
+                  </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card className="p-4 text-center">
-                      <div className="flex justify-center mb-2">
-                        <Calendar className="h-8 w-8 text-primary" />
-                      </div>
-                      <h3 className="font-medium">科学规划时间</h3>
-                      <p className="text-sm text-gray-500">根据您的备考时间和学习习惯，合理安排每日学习任务</p>
-                    </Card>
-                    <Card className="p-4 text-center">
-                      <div className="flex justify-center mb-2">
-                        <Target className="h-8 w-8 text-primary" />
-                      </div>
-                      <h3 className="font-medium">个性化学习路径</h3>
-                      <p className="text-sm text-gray-500">根据您的学习进度和薄弱环节，定制专属学习路径</p>
-                    </Card>
-                    <Card className="p-4 text-center">
-                      <div className="flex justify-center mb-2">
-                        <CheckCircle className="h-8 w-8 text-primary" />
-                      </div>
-                      <h3 className="font-medium">进度跟踪与调整</h3>
-                      <p className="text-sm text-gray-500">实时记录学习进度，智能调整学习计划，确保备考效果</p>
-                    </Card>
-                  </div>
+                <CardContent>
+                  <Tabs defaultValue="daily">
+                    <TabsList className="mb-6 grid w-full grid-cols-3">
+                      <TabsTrigger value="daily">今日计划</TabsTrigger>
+                      <TabsTrigger value="weekly">本周计划</TabsTrigger>
+                      <TabsTrigger value="monthly">本月计划</TabsTrigger>
+                    </TabsList>
 
-                  <div className="pt-4">
-                    <Button size="lg" onClick={handleStartNow} className="mx-auto">
-                      定制我的学习计划 <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
+                    <TabsContent value="daily">
+                      {renderTaskList('daily')}
+                    </TabsContent>
+
+                    <TabsContent value="weekly">
+                      {renderTaskList('weekly')}
+                    </TabsContent>
+
+                    <TabsContent value="monthly">
+                      {renderTaskList('monthly')}
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* 考试倒计时 */}
+            <div className="space-y-6">
+              <ExamCountdown 
+                examName="2025年法律职业资格考试" 
+              />
+
+              {/* 学习提示 */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Clock className="h-5 w-5 mr-2 text-primary" />
+                    制定计划小贴士
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="text-sm text-muted-foreground">
+                    <p className="mb-2">📌 <strong>今日计划</strong>：具体到每个学习任务，如"完成民法第三章阅读"</p>
+                    <p className="mb-2">📅 <strong>本周计划</strong>：设定本周要完成的大目标，如"完成民法总则学习"</p>
+                    <p className="mb-2">🎯 <strong>本月计划</strong>：制定月度里程碑，如"完成民法和刑法基础部分"</p>
+                    <p>💡 建议每天晚上制定第二天的计划，每周日制定下周计划</p>
                   </div>
                 </CardContent>
               </Card>
             </div>
-          )}
-
-          {showWizard && <PlanWizard onComplete={handleCreatePlan} onCancel={() => setShowWizard(false)} />}
-
-          {hasPlan && !showWizard && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2 space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>您的学习计划</CardTitle>
-                    <CardDescription>
-                      基于您的目标和时间安排，我们为您制定了以下学习计划。您可以随时调整计划内容。
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Tabs defaultValue="daily">
-                      <TabsList className="mb-4">
-                        <TabsTrigger value="daily">今日计划</TabsTrigger>
-                        <TabsTrigger value="weekly">本周计划</TabsTrigger>
-                        <TabsTrigger value="monthly">月度计划</TabsTrigger>
-                      </TabsList>
-
-                      <TabsContent value="daily" className="space-y-4">
-                        <DailyTaskList date={today} tasks={todayTasks} onTaskComplete={handleTaskComplete} />
-                      </TabsContent>
-
-                      <TabsContent value="weekly">
-                        <WeeklyPlanView startDate={today} studyHours={planData?.studyHours || 2} />
-                      </TabsContent>
-
-                      <TabsContent value="monthly">
-                        <MonthlyPlanView
-                          month={today.getMonth()}
-                          year={today.getFullYear()}
-                          goal={planData?.selectedGoal || "通过考试"}
-                        />
-                      </TabsContent>
-                    </Tabs>
-                  </CardContent>
-                  <CardFooter className="flex justify-between">
-                    <Button variant="outline" onClick={() => setShowWizard(true)}>
-                      调整计划
-                    </Button>
-                    <Button>开始今日学习</Button>
-                  </CardFooter>
-                </Card>
-
-                <Alert>
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>学习提醒</AlertTitle>
-                  <AlertDescription>您已连续2天未完成学习任务，请及时安排学习以避免进度落后。</AlertDescription>
-                </Alert>
-              </div>
-
-              <div className="space-y-6">
-                <LearningStats
-                  totalProgress={35}
-                  dailyHours={0}
-                  weeklyHours={4}
-                  studyHours={planData?.studyHours || 2}
-                  weeklyStudyDays={planData?.weeklyStudyDays || 5}
-                  streak={0}
-                />
-
-                <LearningTips />
-
-                <ExamCountdown examName="2025年法律职业资格考试" daysLeft={120} />
-              </div>
-            </div>
-          )}
+          </div>
         </div>
       </main>
+      
       <Footer />
     </div>
   )
