@@ -65,8 +65,5 @@ export async function POST(request) {
   }
 }
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+// Route segment config for App Router
+export const runtime = 'nodejs';

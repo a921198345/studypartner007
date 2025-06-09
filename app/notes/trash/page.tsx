@@ -1,0 +1,356 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { MainNav } from "@/components/main-nav"
+import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { ArrowLeft, RefreshCw, Trash2, AlertCircle } from "lucide-react"
+import { Footer } from "@/components/footer"
+import { useToast } from "@/components/ui/use-toast"
+import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Badge } from "@/components/ui/badge"
+
+interface TrashNote {
+  note_id: number
+  title: string
+  category: string
+  deleted_at: string
+  days_remaining: number
+}
+
+export default function TrashPage() {
+  const [notes, setNotes] = useState<TrashNote[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedNote, setSelectedNote] = useState<TrashNote | null>(null)
+  const [actionType, setActionType] = useState<"restore" | "delete" | null>(null)
+  const { toast } = useToast()
+  const { data: session, status } = useSession()
+  const router = useRouter()
+
+  // 检查登录状态
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/login")
+    }
+  }, [status, router])
+
+  // 获取回收站笔记
+  const fetchTrashNotes = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch("/api/notes/trash")
+      const data = await response.json()
+
+      if (data.success) {
+        setNotes(data.data.notes)
+      } else {
+        toast({
+          variant: "destructive",
+          title: "获取失败",
+          description: data.message,
+        })
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "获取失败",
+        description: "网络错误，请稍后重试",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (session) {
+      fetchTrashNotes()
+    }
+  }, [session])
+
+  // 恢复笔记
+  const handleRestore = async (noteId: number) => {
+    try {
+      const response = await fetch("/api/notes/trash", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ noteId }),
+      })
+      const data = await response.json()
+
+      if (data.success) {
+        toast({
+          title: "恢复成功",
+          description: "笔记已恢复到笔记列表",
+        })
+        fetchTrashNotes()
+      } else {
+        toast({
+          variant: "destructive",
+          title: "恢复失败",
+          description: data.message,
+        })
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "恢复失败",
+        description: "网络错误，请稍后重试",
+      })
+    }
+    setSelectedNote(null)
+    setActionType(null)
+  }
+
+  // 永久删除笔记
+  const handlePermanentDelete = async (noteId: number) => {
+    try {
+      const response = await fetch(`/api/notes/${noteId}?permanent=true`, {
+        method: "DELETE",
+      })
+      const data = await response.json()
+
+      if (data.success) {
+        toast({
+          title: "删除成功",
+          description: "笔记已永久删除",
+        })
+        fetchTrashNotes()
+      } else {
+        toast({
+          variant: "destructive",
+          title: "删除失败",
+          description: data.message,
+        })
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "删除失败",
+        description: "网络错误，请稍后重试",
+      })
+    }
+    setSelectedNote(null)
+    setActionType(null)
+  }
+
+  // 清空回收站
+  const handleClearTrash = async () => {
+    try {
+      const response = await fetch("/api/notes/trash", {
+        method: "DELETE",
+      })
+      const data = await response.json()
+
+      if (data.success) {
+        toast({
+          title: "清理成功",
+          description: data.message,
+        })
+        fetchTrashNotes()
+      } else {
+        toast({
+          variant: "destructive",
+          title: "清理失败",
+          description: data.message,
+        })
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "清理失败",
+        description: "网络错误，请稍后重试",
+      })
+    }
+  }
+
+  // 格式化日期
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString("zh-CN", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })
+  }
+
+  if (status === "loading") {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">加载中...</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col">
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-16 items-center">
+          <MainNav />
+        </div>
+      </header>
+      <main className="flex-1">
+        <div className="container mx-auto py-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                onClick={() => router.push("/notes")}
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                返回笔记列表
+              </Button>
+              <h1 className="text-3xl font-bold gradient-text">回收站</h1>
+            </div>
+            <Button
+              variant="outline"
+              onClick={handleClearTrash}
+              disabled={notes.length === 0}
+            >
+              清空过期笔记
+            </Button>
+          </div>
+
+          <div className="max-w-4xl mx-auto">
+            {loading ? (
+              <Card>
+                <CardContent className="p-8">
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : notes.length === 0 ? (
+              <Card className="border-dashed border-2">
+                <CardContent className="p-8">
+                  <div className="flex flex-col items-center justify-center text-center space-y-4">
+                    <Trash2 className="h-12 w-12 text-muted-foreground" />
+                    <div>
+                      <h3 className="font-medium text-lg mb-2">回收站为空</h3>
+                      <p className="text-sm text-muted-foreground">
+                        删除的笔记会在这里保留30天
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                      <AlertCircle className="h-4 w-4" />
+                      <span>
+                        回收站中的笔记将在删除后30天自动清除
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {notes.map((note) => (
+                  <Card key={note.note_id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <h3 className="font-medium text-lg">{note.title}</h3>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <Badge variant="outline">{note.category}</Badge>
+                            <span className="text-xs text-gray-500">
+                              删除于 {formatDate(note.deleted_at)}
+                            </span>
+                          </div>
+                        </div>
+                        <Badge
+                          variant={note.days_remaining <= 7 ? "destructive" : "secondary"}
+                        >
+                          剩余 {note.days_remaining} 天
+                        </Badge>
+                      </div>
+                      <div className="flex justify-end space-x-2 mt-4">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedNote(note)
+                            setActionType("restore")
+                          }}
+                        >
+                          <RefreshCw className="h-4 w-4 mr-1" />
+                          恢复
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-red-500 hover:text-red-600"
+                          onClick={() => {
+                            setSelectedNote(note)
+                            setActionType("delete")
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          永久删除
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+      <Footer />
+
+      <AlertDialog
+        open={selectedNote !== null && actionType !== null}
+        onOpenChange={() => {
+          setSelectedNote(null)
+          setActionType(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {actionType === "restore" ? "确认恢复" : "确认永久删除"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {actionType === "restore"
+                ? "确定要恢复这条笔记吗？恢复后将重新出现在笔记列表中。"
+                : "确定要永久删除这条笔记吗？此操作不可撤销。"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (selectedNote && actionType === "restore") {
+                  handleRestore(selectedNote.note_id)
+                } else if (selectedNote && actionType === "delete") {
+                  handlePermanentDelete(selectedNote.note_id)
+                }
+              }}
+              className={actionType === "delete" ? "bg-red-500 hover:bg-red-600" : ""}
+            >
+              确认
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  )
+}
