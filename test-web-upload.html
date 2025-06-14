@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试Web上传功能</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        select, input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            display: none;
+        }
+        .status.success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .status.loading {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            display: block;
+        }
+        .format-issues {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .format-issues h3 {
+            margin-top: 0;
+            color: #856404;
+        }
+        .issue-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+        }
+        .issue-item .question-id {
+            font-weight: bold;
+            color: #dc3545;
+        }
+        .issue-list {
+            margin-left: 20px;
+            margin-top: 5px;
+        }
+        .issue-list li {
+            color: #666;
+            margin-bottom: 3px;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 10px;
+            display: none;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #4CAF50;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>法考题库Web上传测试</h1>
+        
+        <form id="uploadForm">
+            <div class="form-group">
+                <label for="subject">选择学科：</label>
+                <select id="subject" name="subject" required>
+                    <option value="">-- 请选择学科 --</option>
+                    <option value="民法">民法</option>
+                    <option value="刑法">刑法</option>
+                    <option value="行政法">行政法</option>
+                    <option value="民事诉讼法">民事诉讼法</option>
+                    <option value="刑事诉讼法">刑事诉讼法</option>
+                    <option value="行政诉讼法">行政诉讼法</option>
+                    <option value="商法">商法</option>
+                    <option value="国际法">国际法</option>
+                    <option value="理论法学">理论法学</option>
+                    <option value="经济法">经济法</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="file">选择Word文档：</label>
+                <input type="file" id="file" name="file" accept=".docx,.doc" required>
+                <small style="color: #666; display: block; margin-top: 5px;">
+                    支持格式：.docx, .doc (最大10MB)
+                </small>
+            </div>
+            
+            <button type="submit" id="submitBtn">上传并解析</button>
+        </form>
+        
+        <div class="progress" id="progressBar">
+            <div class="progress-bar" id="progressBarFill"></div>
+        </div>
+        
+        <div id="status" class="status"></div>
+        
+        <div id="formatIssues" class="format-issues" style="display: none;"></div>
+        
+        <div id="detailsSection" style="margin-top: 20px; display: none;">
+            <h3>详细响应信息：</h3>
+            <pre id="responseDetails"></pre>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('uploadForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const statusDiv = document.getElementById('status');
+        const formatIssuesDiv = document.getElementById('formatIssues');
+        const progressBar = document.getElementById('progressBar');
+        const progressBarFill = document.getElementById('progressBarFill');
+        const detailsSection = document.getElementById('detailsSection');
+        const responseDetails = document.getElementById('responseDetails');
+        
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // 重置状态
+            statusDiv.className = 'status loading';
+            statusDiv.textContent = '正在上传和解析文件，请稍候...';
+            formatIssuesDiv.style.display = 'none';
+            formatIssuesDiv.innerHTML = '';
+            detailsSection.style.display = 'none';
+            submitBtn.disabled = true;
+            
+            // 显示进度条
+            progressBar.style.display = 'block';
+            progressBarFill.style.width = '30%';
+            
+            const formData = new FormData();
+            formData.append('file', document.getElementById('file').files[0]);
+            formData.append('subject', document.getElementById('subject').value);
+            
+            try {
+                // 更新进度
+                progressBarFill.style.width = '60%';
+                
+                const response = await fetch('/api/admin/upload-questions', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                // 更新进度
+                progressBarFill.style.width = '90%';
+                
+                const data = await response.json();
+                
+                // 完成
+                progressBarFill.style.width = '100%';
+                
+                // 显示详细响应
+                detailsSection.style.display = 'block';
+                responseDetails.textContent = JSON.stringify(data, null, 2);
+                
+                if (response.ok) {
+                    statusDiv.className = 'status success';
+                    statusDiv.innerHTML = `
+                        <strong>上传成功！</strong><br>
+                        ${data.message}<br>
+                        总题目数：${data.total_questions || 0}<br>
+                        成功解析：${data.parsed_questions || 0}<br>
+                        保存到数据库：${data.saved_questions || 0}
+                    `;
+                    
+                    // 显示格式问题
+                    if (data.format_issues && Object.keys(data.format_issues).length > 0) {
+                        showFormatIssues(data.format_issues);
+                    }
+                } else {
+                    throw new Error(data.error || '上传失败');
+                }
+            } catch (error) {
+                statusDiv.className = 'status error';
+                statusDiv.innerHTML = `<strong>错误：</strong>${error.message}`;
+                progressBarFill.style.width = '0%';
+            } finally {
+                submitBtn.disabled = false;
+                setTimeout(() => {
+                    progressBar.style.display = 'none';
+                    progressBarFill.style.width = '0%';
+                }, 2000);
+            }
+        });
+        
+        function showFormatIssues(issues) {
+            formatIssuesDiv.style.display = 'block';
+            
+            // 统计错误类型
+            const errorTypes = {};
+            Object.entries(issues).forEach(([qId, data]) => {
+                data.issues.forEach(issue => {
+                    if (!errorTypes[issue]) {
+                        errorTypes[issue] = [];
+                    }
+                    errorTypes[issue].push(qId);
+                });
+            });
+            
+            let html = '<h3>检测到格式问题：</h3>';
+            
+            // 显示错误统计
+            html += '<div style="margin-bottom: 15px; padding: 10px; background-color: #fff; border: 1px solid #e0e0e0; border-radius: 4px;">';
+            html += '<strong>错误类型统计：</strong><ul>';
+            Object.entries(errorTypes).forEach(([type, qIds]) => {
+                html += `<li>${type}：${qIds.length} 个题目</li>`;
+            });
+            html += '</ul></div>';
+            
+            // 显示前10个错误详情
+            const issueEntries = Object.entries(issues).slice(0, 10);
+            issueEntries.forEach(([questionId, details]) => {
+                html += `
+                    <div class="issue-item">
+                        <div class="question-id">题号【${questionId}】</div>
+                        <ul class="issue-list">
+                            ${details.issues.map(issue => `<li>${issue}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            });
+            
+            if (Object.keys(issues).length > 10) {
+                html += `<p style="text-align: center; color: #666;">... 还有 ${Object.keys(issues).length - 10} 个题目存在问题</p>`;
+            }
+            
+            formatIssuesDiv.innerHTML = html;
+        }
+    </script>
+</body>
+</html>

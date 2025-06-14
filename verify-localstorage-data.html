@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>验证LocalStorage数据完整性</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background: #1890ff;
+            color: white;
+        }
+        button:hover {
+            background: #40a9ff;
+        }
+        .info-box {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .error {
+            color: #ff4d4f;
+            font-weight: bold;
+        }
+        .success {
+            color: #52c41a;
+            font-weight: bold;
+        }
+        .warning {
+            color: #faad14;
+            font-weight: bold;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f5f5f5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>LocalStorage 数据完整性验证</h1>
+        
+        <div>
+            <button onclick="checkFilteredList()">检查筛选列表数据</button>
+            <button onclick="simulateSave()">模拟保存55条数据</button>
+            <button onclick="clearData()">清除数据</button>
+        </div>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        function checkFilteredList() {
+            const resultDiv = document.getElementById('result');
+            
+            try {
+                const data = localStorage.getItem('filteredQuestionsList');
+                if (!data) {
+                    resultDiv.innerHTML = '<div class="error">未找到 filteredQuestionsList 数据</div>';
+                    return;
+                }
+                
+                const parsed = JSON.parse(data);
+                let html = '<h2>筛选列表数据分析</h2>';
+                
+                // 基本信息
+                html += '<div class="info-box">';
+                html += `<span class="success">数据已找到</span>\n\n`;
+                html += `<strong>基本信息：</strong>\n`;
+                html += `- questions 数组长度: ${parsed.questions ? parsed.questions.length : 0}\n`;
+                html += `- actualTotal 字段值: ${parsed.actualTotal || '未设置'}\n`;
+                html += `- partial 标记: ${parsed.partial ? '是' : '否'}\n`;
+                html += `- 时间戳: ${new Date(parsed.timestamp).toLocaleString()}\n`;
+                html += `\n<strong>筛选条件：</strong>\n`;
+                html += JSON.stringify(parsed.filters, null, 2);
+                html += '</div>';
+                
+                // 检查数据完整性
+                if (parsed.questions && parsed.questions.length > 0) {
+                    html += '<h3>题目ID列表（前20个）：</h3>';
+                    html += '<table>';
+                    html += '<tr><th>索引</th><th>ID</th><th>题号</th></tr>';
+                    
+                    const showCount = Math.min(20, parsed.questions.length);
+                    for (let i = 0; i < showCount; i++) {
+                        const q = parsed.questions[i];
+                        html += `<tr><td>${i}</td><td>${q.id}</td><td>${q.question_code || '无'}</td></tr>`;
+                    }
+                    
+                    if (parsed.questions.length > 20) {
+                        html += `<tr><td colspan="3">... 还有 ${parsed.questions.length - 20} 条数据</td></tr>`;
+                    }
+                    
+                    html += '</table>';
+                    
+                    // 检查是否有重复ID
+                    const ids = parsed.questions.map(q => q.id);
+                    const uniqueIds = new Set(ids);
+                    if (ids.length !== uniqueIds.size) {
+                        html += `<div class="warning">警告：发现重复的题目ID！</div>`;
+                    }
+                } else {
+                    html += '<div class="warning">questions 数组为空或不存在</div>';
+                }
+                
+                resultDiv.innerHTML = html;
+                
+            } catch (e) {
+                resultDiv.innerHTML = `<div class="error">解析数据时出错: ${e.message}</div>`;
+            }
+        }
+        
+        function simulateSave() {
+            // 模拟保存55条数据
+            const questions = [];
+            for (let i = 1; i <= 55; i++) {
+                questions.push({
+                    id: i * 10, // 使用非连续ID
+                    question_code: `Q${i}`
+                });
+            }
+            
+            const dataToSave = {
+                questions: questions,
+                filters: {
+                    subject: 'all',
+                    years: ['all'],
+                    types: ['全部题型'],
+                    search: '',
+                    aiKeywords: ['盗窃']
+                },
+                actualTotal: 55,
+                timestamp: Date.now()
+            };
+            
+            localStorage.setItem('filteredQuestionsList', JSON.stringify(dataToSave));
+            
+            document.getElementById('result').innerHTML = 
+                '<div class="success">已模拟保存55条数据到 filteredQuestionsList</div>';
+            
+            // 自动检查
+            setTimeout(checkFilteredList, 100);
+        }
+        
+        function clearData() {
+            localStorage.removeItem('filteredQuestionsList');
+            document.getElementById('result').innerHTML = 
+                '<div class="success">已清除 filteredQuestionsList</div>';
+        }
+        
+        // 页面加载时自动检查
+        window.addEventListener('DOMContentLoaded', () => {
+            checkFilteredList();
+        });
+    </script>
+</body>
+</html>

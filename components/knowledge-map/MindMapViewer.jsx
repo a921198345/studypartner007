@@ -61,12 +61,21 @@ const DEFAULT_CIVIL_LAW_DATA = {
 const searchNodes = (node, searchTerm) => {
   if (!node || !searchTerm) return false;
   
-  // 将搜索词和节点名称转换为小写以进行不区分大小写的比较
-  const searchTermLower = searchTerm.toLowerCase();
+  // 支持多个搜索词（用逗号分隔）
+  const searchTerms = searchTerm.includes(',') 
+    ? searchTerm.split(',').map(term => term.trim().toLowerCase()).filter(term => term)
+    : [searchTerm.toLowerCase()];
+  
   const nodeName = (node.name || '').toLowerCase();
   
-  // 检查当前节点是否匹配
-  const isMatch = nodeName.includes(searchTermLower);
+  // 检查当前节点是否匹配任何搜索词
+  let isMatch = false;
+  for (const term of searchTerms) {
+    if (nodeName.includes(term)) {
+      isMatch = true;
+      break;
+    }
+  }
   
   // 设置当前节点的searchMatch属性
   node.searchMatch = isMatch;
@@ -494,7 +503,14 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
             {/* 如果有搜索匹配项，显示提示 */}
             {searchTerm && (
                 <div className="absolute top-2 left-2 right-2 bg-blue-100 text-blue-800 p-2 text-center text-sm z-10 rounded-md">
-                    正在搜索: "{searchTerm}" - 匹配项以红色显示，匹配项路径以黄色显示
+                    正在搜索: {searchTerm.includes(',') 
+                        ? searchTerm.split(',').map(term => term.trim()).filter(term => term).map((term, index, arr) => (
+                            <span key={term}>
+                                "{term}"{index < arr.length - 1 ? '、' : ''}
+                            </span>
+                          ))
+                        : `"${searchTerm}"`
+                    } - 匹配项以红色显示，匹配项路径以黄色显示
                 </div>
             )}
             

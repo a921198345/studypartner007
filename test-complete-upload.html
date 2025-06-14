@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>完整测试法考题库上传</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .panel {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            grid-column: 1 / -1;
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #2563eb;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+        select, input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+            width: 100%;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        button:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+        .status.loading {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+        .format-issues {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fef3c7;
+            border: 1px solid #fcd34d;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .format-issues h3 {
+            color: #92400e;
+            margin-bottom: 10px;
+        }
+        .format-issues .issue-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+            border: 1px solid #fde68a;
+        }
+        .format-issues .issue-id {
+            font-weight: bold;
+            color: #d97706;
+        }
+        .format-issues ul {
+            margin: 5px 0;
+            padding-left: 20px;
+        }
+        .test-files {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f3f4f6;
+            border-radius: 4px;
+        }
+        .test-files h3 {
+            margin-bottom: 10px;
+            color: #374151;
+        }
+        .test-file-item {
+            padding: 8px 12px;
+            margin: 5px 0;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .test-file-item:hover {
+            background: #eff6ff;
+            border-color: #3b82f6;
+        }
+        .progress {
+            margin-top: 10px;
+            height: 20px;
+            background: #e5e7eb;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #3b82f6;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        pre {
+            background: #1f2937;
+            color: #f3f4f6;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>完整测试法考题库上传功能</h1>
+        
+        <!-- 左侧：上传表单 -->
+        <div class="panel">
+            <h2>📤 上传题库文件</h2>
+            
+            <div class="form-group">
+                <label for="subject">选择学科:</label>
+                <select id="subject" required>
+                    <option value="">-- 请选择学科 --</option>
+                    <option value="民法">民法</option>
+                    <option value="刑法">刑法</option>
+                    <option value="行政法">行政法</option>
+                    <option value="民事诉讼法">民事诉讼法</option>
+                    <option value="刑事诉讼法">刑事诉讼法</option>
+                    <option value="行政诉讼法">行政诉讼法</option>
+                    <option value="商法">商法</option>
+                    <option value="国际法">国际法</option>
+                    <option value="理论法学">理论法学</option>
+                    <option value="经济法">经济法</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="file">选择Word文档:</label>
+                <input type="file" id="file" accept=".docx,.doc" required />
+                <small style="color: #666; display: block; margin-top: 5px;">
+                    支持的格式: .docx, .doc (最大10MB)
+                </small>
+            </div>
+            
+            <button onclick="uploadFile()" id="uploadBtn">上传并解析</button>
+            
+            <div class="progress" id="progress" style="display: none;">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            
+            <div class="status" id="status" style="display: none;"></div>
+            
+            <!-- 格式问题显示区域 -->
+            <div class="format-issues" id="formatIssues" style="display: none;">
+                <h3>⚠️ 格式问题详情</h3>
+                <div id="issuesList"></div>
+            </div>
+            
+            <!-- 测试文件列表 -->
+            <div class="test-files">
+                <h3>📁 测试文件（点击快速选择）</h3>
+                <div class="test-file-item" onclick="selectTestFile('民法客观题.docx', '民法')">
+                    民法客观题.docx
+                </div>
+                <div class="test-file-item" onclick="selectTestFile('宪法.docx', '理论法学')">
+                    宪法.docx
+                </div>
+            </div>
+        </div>
+        
+        <!-- 右侧：响应详情 -->
+        <div class="panel">
+            <h2>📊 响应详情</h2>
+            <pre id="responseDetails">等待上传...</pre>
+        </div>
+    </div>
+
+    <script>
+        function selectTestFile(filename, subject) {
+            // 设置学科
+            document.getElementById('subject').value = subject;
+            
+            // 提示用户需要手动选择文件
+            const status = document.getElementById('status');
+            status.className = 'status';
+            status.textContent = `已选择学科：${subject}。请手动选择文件：${filename}`;
+            status.style.display = 'block';
+        }
+        
+        async function uploadFile() {
+            const fileInput = document.getElementById('file');
+            const subjectSelect = document.getElementById('subject');
+            const statusDiv = document.getElementById('status');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const progress = document.getElementById('progress');
+            const progressBar = document.getElementById('progressBar');
+            const responseDetails = document.getElementById('responseDetails');
+            const formatIssues = document.getElementById('formatIssues');
+            const issuesList = document.getElementById('issuesList');
+            
+            const file = fileInput.files[0];
+            const subject = subjectSelect.value;
+            
+            if (!file || !subject) {
+                statusDiv.className = 'status error';
+                statusDiv.textContent = '请选择文件和学科';
+                statusDiv.style.display = 'block';
+                return;
+            }
+            
+            // 记录开始时间
+            const startTime = new Date();
+            
+            // 清空响应详情
+            responseDetails.textContent = '正在上传...\n';
+            formatIssues.style.display = 'none';
+            
+            // 显示文件信息
+            responseDetails.textContent += `\n📄 文件信息:\n`;
+            responseDetails.textContent += `- 文件名: ${file.name}\n`;
+            responseDetails.textContent += `- 大小: ${(file.size / 1024 / 1024).toFixed(2)} MB\n`;
+            responseDetails.textContent += `- 类型: ${file.type}\n`;
+            responseDetails.textContent += `- 学科: ${subject}\n`;
+            responseDetails.textContent += `- 开始时间: ${startTime.toLocaleTimeString()}\n`;
+            
+            // 准备上传
+            uploadBtn.disabled = true;
+            statusDiv.className = 'status loading';
+            statusDiv.textContent = '正在上传文件，请稍候...';
+            statusDiv.style.display = 'block';
+            progress.style.display = 'block';
+            progressBar.style.width = '0%';
+            
+            try {
+                // 创建FormData
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('subject', subject);
+                
+                // 模拟上传进度
+                let progressValue = 0;
+                const progressInterval = setInterval(() => {
+                    progressValue += 10;
+                    if (progressValue <= 90) {
+                        progressBar.style.width = progressValue + '%';
+                    }
+                }, 300);
+                
+                // 发送请求
+                responseDetails.textContent += `\n📡 发送请求...\n`;
+                const response = await fetch('/api/admin/upload-questions', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                clearInterval(progressInterval);
+                progressBar.style.width = '100%';
+                
+                // 记录响应时间
+                const endTime = new Date();
+                const duration = (endTime - startTime) / 1000;
+                
+                responseDetails.textContent += `\n📥 响应信息:\n`;
+                responseDetails.textContent += `- 状态码: ${response.status}\n`;
+                responseDetails.textContent += `- 状态文本: ${response.statusText}\n`;
+                responseDetails.textContent += `- 响应时间: ${duration.toFixed(2)}秒\n`;
+                
+                const data = await response.json();
+                
+                responseDetails.textContent += `\n📊 响应数据:\n`;
+                responseDetails.textContent += JSON.stringify(data, null, 2);
+                
+                if (!response.ok) {
+                    throw new Error(data.error || '上传失败');
+                }
+                
+                // 处理成功响应
+                if (data.format_issues && Object.keys(data.format_issues).length > 0) {
+                    statusDiv.className = 'status error';
+                    statusDiv.innerHTML = `
+                        <strong>上传完成，但发现格式问题：</strong><br>
+                        ✅ 解析了 ${data.parsed_questions}/${data.total_questions} 道题目<br>
+                        ❌ ${Object.keys(data.format_issues).length} 道题目存在格式错误<br>
+                        💾 成功保存了 ${data.saved_questions} 道题目到数据库
+                    `;
+                    
+                    // 显示格式问题详情
+                    formatIssues.style.display = 'block';
+                    issuesList.innerHTML = '';
+                    
+                    for (const [questionId, details] of Object.entries(data.format_issues)) {
+                        const issueDiv = document.createElement('div');
+                        issueDiv.className = 'issue-item';
+                        issueDiv.innerHTML = `
+                            <div class="issue-id">题号【${questionId}】</div>
+                            <ul>
+                                ${details.issues.map(issue => `<li>${issue}</li>`).join('')}
+                            </ul>
+                        `;
+                        issuesList.appendChild(issueDiv);
+                    }
+                } else {
+                    statusDiv.className = 'status success';
+                    statusDiv.innerHTML = `
+                        <strong>✅ 上传成功！</strong><br>
+                        ${data.message || `成功解析并保存了 ${data.saved_questions} 道题目`}
+                    `;
+                }
+                
+                // 重置表单
+                setTimeout(() => {
+                    fileInput.value = '';
+                    subjectSelect.value = '';
+                    progress.style.display = 'none';
+                }, 3000);
+                
+            } catch (error) {
+                const endTime = new Date();
+                const duration = (endTime - startTime) / 1000;
+                
+                responseDetails.textContent += `\n❌ 错误信息:\n`;
+                responseDetails.textContent += `- 错误类型: ${error.name}\n`;
+                responseDetails.textContent += `- 错误消息: ${error.message}\n`;
+                responseDetails.textContent += `- 响应时间: ${duration.toFixed(2)}秒\n`;
+                responseDetails.textContent += `- 错误堆栈:\n${error.stack}`;
+                
+                statusDiv.className = 'status error';
+                statusDiv.innerHTML = `
+                    <strong>❌ 错误:</strong> ${error.message}
+                `;
+                progress.style.display = 'none';
+            } finally {
+                uploadBtn.disabled = false;
+            }
+        }
+        
+        // 监听文件选择
+        document.getElementById('file').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const responseDetails = document.getElementById('responseDetails');
+                responseDetails.textContent = `已选择文件: ${file.name}\n大小: ${(file.size / 1024 / 1024).toFixed(2)} MB`;
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>答题历史修复测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h1, h2 {
+            color: #333;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        button:hover {
+            background-color: #0056b3;
+        }
+        
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .result {
+            padding: 15px;
+            margin-top: 10px;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+        }
+        
+        .success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        
+        .error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        
+        .info {
+            background-color: #d1ecf1;
+            border-color: #bee5eb;
+            color: #0c5460;
+        }
+        
+        pre {
+            background-color: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .status-indicator.active {
+            background-color: #28a745;
+        }
+        
+        .status-indicator.inactive {
+            background-color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <h1>答题历史修复测试</h1>
+    
+    <div class="test-section">
+        <h2>1. 当前会话信息</h2>
+        <button onclick="checkSessionInfo()">检查会话信息</button>
+        <div id="sessionInfo" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. 答题历史API测试</h2>
+        <div class="button-group">
+            <button onclick="testAnswerHistoryAPI()">测试未登录用户API</button>
+            <button onclick="testAnswerHistoryWithSessionId()">测试带Session ID的API</button>
+        </div>
+        <div id="apiResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. 数据库答题记录</h2>
+        <button onclick="checkDatabaseRecords()">查询数据库记录</button>
+        <div id="dbRecords" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>4. 答题历史组件测试</h2>
+        <button onclick="checkAnswerHistoryComponent()">检查答题历史组件数据</button>
+        <div id="componentData" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>5. 模拟答题流程</h2>
+        <div class="button-group">
+            <button onclick="simulateAnswer()">模拟答题</button>
+            <button onclick="refreshHistory()">刷新历史</button>
+        </div>
+        <div id="simulationResult" class="result"></div>
+    </div>
+
+    <script>
+        // 获取客户端会话ID
+        function getClientSessionId() {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'client_session_id') {
+                    return value;
+                }
+            }
+            return null;
+        }
+        
+        // 1. 检查会话信息
+        async function checkSessionInfo() {
+            const resultDiv = document.getElementById('sessionInfo');
+            try {
+                // 检查localStorage中的会话信息
+                const currentSession = localStorage.getItem('currentAnswerSession');
+                const answerSessions = localStorage.getItem('answerSessions');
+                const clientSessionId = getClientSessionId();
+                
+                let html = '<h3>会话信息:</h3>';
+                
+                if (currentSession) {
+                    const session = JSON.parse(currentSession);
+                    html += `<p><strong>当前会话ID:</strong> ${session.sessionId}</p>`;
+                    html += `<p><strong>开始时间:</strong> ${new Date(session.startTime).toLocaleString()}</p>`;
+                    html += `<p><strong>已答题数:</strong> ${session.questionsAnswered}</p>`;
+                    html += `<p><strong>正确数:</strong> ${session.correctCount}</p>`;
+                } else {
+                    html += '<p>没有找到当前会话</p>';
+                }
+                
+                html += `<p><strong>客户端会话ID (Cookie):</strong> ${clientSessionId || '未设置'}</p>`;
+                
+                if (answerSessions) {
+                    const sessions = JSON.parse(answerSessions);
+                    html += `<p><strong>历史会话数:</strong> ${sessions.length}</p>`;
+                }
+                
+                resultDiv.innerHTML = html;
+                resultDiv.className = 'result info';
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">错误: ${error.message}</p>`;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        // 2. 测试答题历史API
+        async function testAnswerHistoryAPI() {
+            const resultDiv = document.getElementById('apiResult');
+            try {
+                const response = await fetch('/api/exams/answers/history');
+                const data = await response.json();
+                
+                let html = '<h3>API响应:</h3>';
+                html += `<p><strong>状态码:</strong> ${response.status}</p>`;
+                html += `<p><strong>成功:</strong> ${data.success}</p>`;
+                html += `<p><strong>消息:</strong> ${data.message || '无'}</p>`;
+                
+                if (data.data) {
+                    html += `<p><strong>答题记录数:</strong> ${Object.keys(data.data.answers || {}).length}</p>`;
+                    html += `<p><strong>总答题数:</strong> ${data.data.total || 0}</p>`;
+                    
+                    if (data.data.records && data.data.records.length > 0) {
+                        html += '<h4>最近答题记录:</h4>';
+                        html += '<ul>';
+                        data.data.records.slice(0, 5).forEach(record => {
+                            html += `<li>题目#${record.question_id} - ${record.is_correct ? '✓ 正确' : '✗ 错误'} - ${new Date(record.created_at).toLocaleString()}</li>`;
+                        });
+                        html += '</ul>';
+                    }
+                }
+                
+                resultDiv.innerHTML = html;
+                resultDiv.className = 'result success';
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">错误: ${error.message}</p>`;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        // 测试带Session ID的API
+        async function testAnswerHistoryWithSessionId() {
+            const resultDiv = document.getElementById('apiResult');
+            try {
+                const currentSessionStr = localStorage.getItem('currentAnswerSession');
+                if (!currentSessionStr) {
+                    throw new Error('没有找到当前会话');
+                }
+                
+                const currentSession = JSON.parse(currentSessionStr);
+                const sessionId = currentSession.sessionId;
+                
+                const response = await fetch(`/api/exams/answers/history?session_id=${sessionId}`);
+                const data = await response.json();
+                
+                let html = '<h3>带Session ID的API响应:</h3>';
+                html += `<p><strong>Session ID:</strong> ${sessionId}</p>`;
+                html += `<p><strong>状态码:</strong> ${response.status}</p>`;
+                html += `<p><strong>成功:</strong> ${data.success}</p>`;
+                
+                if (data.data) {
+                    const answeredCount = Object.keys(data.data.answered || {}).length;
+                    const correctCount = Object.values(data.data.correct || {}).filter(Boolean).length;
+                    
+                    html += `<p><strong>答题记录数:</strong> ${answeredCount}</p>`;
+                    html += `<p><strong>正确数:</strong> ${correctCount}</p>`;
+                    html += `<p><strong>正确率:</strong> ${answeredCount > 0 ? Math.round(correctCount/answeredCount * 100) : 0}%</p>`;
+                    
+                    if (data.data.records && data.data.records.length > 0) {
+                        html += '<h4>答题详情:</h4>';
+                        html += '<ul>';
+                        data.data.records.slice(0, 10).forEach(record => {
+                            html += `<li>题目#${record.question_id} - 答案: ${record.submitted_answer} - ${record.is_correct ? '✓ 正确' : '✗ 错误'}</li>`;
+                        });
+                        html += '</ul>';
+                    }
+                }
+                
+                resultDiv.innerHTML = html;
+                resultDiv.className = 'result success';
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">错误: ${error.message}</p>`;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        // 3. 查询数据库记录
+        async function checkDatabaseRecords() {
+            const resultDiv = document.getElementById('dbRecords');
+            try {
+                // 获取当前会话ID
+                const currentSessionStr = localStorage.getItem('currentAnswerSession');
+                if (!currentSessionStr) {
+                    throw new Error('没有找到当前会话');
+                }
+                
+                const currentSession = JSON.parse(currentSessionStr);
+                const sessionId = currentSession.sessionId;
+                
+                // 调用sessions API查看会话统计
+                const headers = {
+                    'X-Client-Session-Id': getClientSessionId() || 'test-session'
+                };
+                
+                const response = await fetch('/api/exams/sessions', { headers });
+                const data = await response.json();
+                
+                let html = '<h3>数据库会话记录:</h3>';
+                
+                if (data.success && data.data.sessions) {
+                    html += `<p><strong>找到会话数:</strong> ${data.data.sessions.length}</p>`;
+                    
+                    // 查找当前会话
+                    const currentDbSession = data.data.sessions.find(s => s.session_id === sessionId);
+                    if (currentDbSession) {
+                        html += '<h4>当前会话统计:</h4>';
+                        html += `<p><strong>会话ID:</strong> ${currentDbSession.session_id}</p>`;
+                        html += `<p><strong>已答题数:</strong> ${currentDbSession.questions_answered}</p>`;
+                        html += `<p><strong>正确数:</strong> ${currentDbSession.correct_count}</p>`;
+                        html += `<p><strong>总题数:</strong> ${currentDbSession.total_questions || '未知'}</p>`;
+                        html += `<p><strong>正确率:</strong> ${currentDbSession.accuracy_rate}%</p>`;
+                        html += `<p><strong>完成率:</strong> ${currentDbSession.completion_rate}%</p>`;
+                    } else {
+                        html += '<p class="error">当前会话在数据库中未找到</p>';
+                    }
+                    
+                    // 显示最近的会话
+                    if (data.data.sessions.length > 0) {
+                        html += '<h4>最近的答题会话:</h4>';
+                        html += '<ul>';
+                        data.data.sessions.slice(0, 5).forEach(session => {
+                            html += `<li>会话 ${session.session_id} - ${session.questions_answered}题/${session.correct_count}正确 - ${new Date(session.start_time).toLocaleString()}</li>`;
+                        });
+                        html += '</ul>';
+                    }
+                }
+                
+                resultDiv.innerHTML = html;
+                resultDiv.className = 'result info';
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">错误: ${error.message}</p>`;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        // 4. 检查答题历史组件数据
+        async function checkAnswerHistoryComponent() {
+            const resultDiv = document.getElementById('componentData');
+            try {
+                // 获取localStorage中的数据
+                const answerHistory = localStorage.getItem('answerHistory');
+                const answerSessions = localStorage.getItem('answerSessions');
+                
+                let html = '<h3>组件数据状态:</h3>';
+                
+                if (answerHistory) {
+                    const history = JSON.parse(answerHistory);
+                    const answeredCount = Object.keys(history.answered || {}).length;
+                    const correctCount = Object.values(history.correct || {}).filter(Boolean).length;
+                    
+                    html += '<h4>答题历史 (localStorage):</h4>';
+                    html += `<p><strong>已答题数:</strong> ${answeredCount}</p>`;
+                    html += `<p><strong>正确数:</strong> ${correctCount}</p>`;
+                    html += `<p><strong>正确率:</strong> ${answeredCount > 0 ? Math.round(correctCount/answeredCount * 100) : 0}%</p>`;
+                    html += `<p><strong>最后更新:</strong> ${new Date(history.timestamp).toLocaleString()}</p>`;
+                    
+                    // 显示最近答题的题目
+                    if (history.results) {
+                        const recentQuestions = Object.entries(history.results).slice(-5);
+                        if (recentQuestions.length > 0) {
+                            html += '<h5>最近答题:</h5>';
+                            html += '<ul>';
+                            recentQuestions.forEach(([qId, result]) => {
+                                html += `<li>题目#${qId} - ${result.isCorrect ? '✓' : '✗'} - 提交: ${result.submittedAnswer}</li>`;
+                            });
+                            html += '</ul>';
+                        }
+                    }
+                } else {
+                    html += '<p>没有找到答题历史数据</p>';
+                }
+                
+                if (answerSessions) {
+                    const sessions = JSON.parse(answerSessions);
+                    const activeSessions = sessions.filter(s => s.questionsAnswered > 0);
+                    
+                    html += '<h4>答题会话 (localStorage):</h4>';
+                    html += `<p><strong>总会话数:</strong> ${sessions.length}</p>`;
+                    html += `<p><strong>有答题的会话:</strong> ${activeSessions.length}</p>`;
+                }
+                
+                resultDiv.innerHTML = html;
+                resultDiv.className = 'result info';
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">错误: ${error.message}</p>`;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        // 5. 模拟答题
+        async function simulateAnswer() {
+            const resultDiv = document.getElementById('simulationResult');
+            try {
+                // 获取当前会话
+                const currentSessionStr = localStorage.getItem('currentAnswerSession');
+                if (!currentSessionStr) {
+                    throw new Error('没有找到当前会话，请先开始答题');
+                }
+                
+                const currentSession = JSON.parse(currentSessionStr);
+                const sessionId = currentSession.sessionId;
+                
+                // 模拟提交一个答案（假设题目ID为151，这是"故意杀人"相关的题目）
+                const testQuestionId = 151;
+                const testAnswer = 'B';
+                
+                const response = await fetch(`/api/exams/questions/${testQuestionId}/submit`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        submitted_answer: testAnswer,
+                        session_id: sessionId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                let html = '<h3>模拟答题结果:</h3>';
+                html += `<p><strong>题目ID:</strong> ${testQuestionId}</p>`;
+                html += `<p><strong>提交答案:</strong> ${testAnswer}</p>`;
+                html += `<p><strong>结果:</strong> ${data.data.is_correct ? '✓ 正确' : '✗ 错误'}</p>`;
+                html += `<p><strong>正确答案:</strong> ${data.data.correct_answer}</p>`;
+                
+                // 等待一秒后检查历史是否更新
+                setTimeout(async () => {
+                    html += '<h4>验证历史更新:</h4>';
+                    
+                    // 检查数据库
+                    const historyResponse = await fetch(`/api/exams/answers/history?session_id=${sessionId}`);
+                    const historyData = await historyResponse.json();
+                    
+                    if (historyData.success && historyData.data.answered && historyData.data.answered[testQuestionId]) {
+                        html += '<p class="success">✓ 答题历史已成功更新到数据库</p>';
+                    } else {
+                        html += '<p class="error">✗ 答题历史未在数据库中找到</p>';
+                    }
+                    
+                    resultDiv.innerHTML = html;
+                }, 1000);
+                
+                resultDiv.innerHTML = html;
+                resultDiv.className = 'result success';
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">错误: ${error.message}</p>`;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        // 刷新历史
+        async function refreshHistory() {
+            // 触发所有检查
+            await checkSessionInfo();
+            await testAnswerHistoryWithSessionId();
+            await checkDatabaseRecords();
+            await checkAnswerHistoryComponent();
+        }
+        
+        // 页面加载时自动检查
+        window.onload = function() {
+            checkSessionInfo();
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>直接测试搜索API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background: #1890ff;
+            color: white;
+        }
+        button:hover {
+            background: #40a9ff;
+        }
+        .info-box {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .error {
+            color: #ff4d4f;
+            font-weight: bold;
+        }
+        .success {
+            color: #52c41a;
+            font-weight: bold;
+        }
+        .warning {
+            color: #faad14;
+            font-weight: bold;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>直接测试搜索API</h1>
+        
+        <div>
+            <input id="keyword" type="text" placeholder="输入搜索关键词" value="盗窃">
+            <button onclick="testSearchAPI(10)">搜索(limit=10)</button>
+            <button onclick="testSearchAPI(100)">搜索(limit=100)</button>
+            <button onclick="testSearchAPI(1000)">搜索(limit=1000)</button>
+        </div>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function testSearchAPI(limit) {
+            const resultDiv = document.getElementById('result');
+            const keyword = document.getElementById('keyword').value;
+            
+            if (!keyword) {
+                resultDiv.innerHTML = '<div class="error">请输入搜索关键词</div>';
+                return;
+            }
+            
+            resultDiv.innerHTML = '<div class="info-box">正在搜索...</div>';
+            
+            try {
+                const response = await fetch('/api/exams/questions/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        keywords: [keyword],
+                        page: 1,
+                        limit: limit
+                    })
+                });
+                
+                const data = await response.json();
+                
+                let html = `<h2>搜索结果 (limit=${limit})</h2>`;
+                
+                if (data.success) {
+                    html += '<div class="info-box">';
+                    html += `<span class="success">搜索成功</span>\n\n`;
+                    html += `<strong>统计信息：</strong>\n`;
+                    html += `- 返回题目数: ${data.data.questions.length}\n`;
+                    html += `- 总题目数: ${data.data.pagination.total}\n`;
+                    html += `- 当前页: ${data.data.pagination.currentPage}\n`;
+                    html += `- 每页数量: ${data.data.pagination.perPage}\n`;
+                    html += `- 总页数: ${data.data.pagination.totalPages}\n`;
+                    
+                    if (data.data.debug) {
+                        html += `\n<strong>调试信息：</strong>\n`;
+                        html += `- 去重前总数: ${data.data.debug.total_before_dedup}\n`;
+                        html += `- 去重后总数: ${data.data.debug.total_after_dedup}\n`;
+                    }
+                    
+                    html += `\n<strong>题目ID列表：</strong>\n`;
+                    const ids = data.data.questions.map(q => q.id);
+                    if (ids.length <= 20) {
+                        html += ids.join(', ');
+                    } else {
+                        html += '前10个: ' + ids.slice(0, 10).join(', ');
+                        html += '\n...\n';
+                        html += '后10个: ' + ids.slice(-10).join(', ');
+                    }
+                    
+                    html += '</div>';
+                    
+                    // 检查是否返回了完整数据
+                    if (data.data.questions.length < data.data.pagination.total) {
+                        html += `<div class="warning">注意：只返回了部分数据 (${data.data.questions.length}/${data.data.pagination.total})</div>`;
+                    } else {
+                        html += `<div class="success">已返回所有数据</div>`;
+                    }
+                    
+                } else {
+                    html += `<div class="error">搜索失败: ${data.message}</div>`;
+                }
+                
+                resultDiv.innerHTML = html;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">请求失败: ${error.message}</div>`;
+            }
+        }
+        
+        // 页面加载后自动搜索
+        window.addEventListener('DOMContentLoaded', () => {
+            testSearchAPI(10);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试相关真题按钮</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .status {
+            padding: 5px 10px;
+            border-radius: 3px;
+            display: inline-block;
+            margin-top: 10px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>测试相关真题按钮功能</h1>
+
+    <div class="test-section">
+        <h2>1. 测试关键词提取API</h2>
+        <button onclick="testKeywordExtraction()">测试关键词提取</button>
+        <div id="keyword-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. 模拟AI聊天跳转</h2>
+        <p>测试不同科目的跳转：</p>
+        <button onclick="navigateToQuestions('民法', '合同,买卖')">民法 - 合同买卖</button>
+        <button onclick="navigateToQuestions('刑法', '故意杀人,正当防卫')">刑法 - 故意杀人与正当防卫</button>
+        <button onclick="navigateToQuestions('行政法', '行政许可,行政处罚')">行政法 - 行政许可与处罚</button>
+        <div id="navigation-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. 测试题库页面搜索</h2>
+        <button onclick="testQuestionSearch()">测试题库搜索API</button>
+        <div id="search-result" class="result"></div>
+    </div>
+
+    <script>
+        // 测试关键词提取
+        async function testKeywordExtraction() {
+            const resultDiv = document.getElementById('keyword-result');
+            resultDiv.textContent = '正在测试关键词提取...';
+            
+            try {
+                const response = await fetch('/api/ai/extract-single-keyword', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        question: '买卖合同中，如果买方未按时付款，卖方可以采取什么措施？',
+                        answer: '根据合同法规定，买方违约未按时付款时，卖方可以要求买方承担违约责任...',
+                        multipleKeywords: true
+                    })
+                });
+                
+                const data = await response.json();
+                resultDiv.innerHTML = `<strong>提取结果：</strong>\n${JSON.stringify(data, null, 2)}`;
+                
+                if (data.success) {
+                    resultDiv.innerHTML += `\n<span class="status success">✓ 提取成功</span>`;
+                } else {
+                    resultDiv.innerHTML += `\n<span class="status error">✗ 提取失败</span>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<strong>错误：</strong>${error.message}\n<span class="status error">✗ 请求失败</span>`;
+            }
+        }
+        
+        // 模拟跳转到题库
+        function navigateToQuestions(subject, keywords) {
+            const resultDiv = document.getElementById('navigation-result');
+            
+            const searchParams = new URLSearchParams({
+                subject: subject,
+                keywords: keywords,
+                source: 'ai-chat'
+            });
+            
+            const url = `/question-bank?${searchParams.toString()}`;
+            
+            resultDiv.innerHTML = `<strong>将跳转到：</strong>\n${url}\n\n<strong>参数：</strong>\n科目: ${subject}\n关键词: ${keywords}\n来源: ai-chat`;
+            resultDiv.innerHTML += `\n\n<a href="${url}" target="_blank" style="color: #4CAF50;">点击这里在新标签页打开</a>`;
+            resultDiv.innerHTML += `\n<span class="status success">✓ URL生成成功</span>`;
+        }
+        
+        // 测试题库搜索
+        async function testQuestionSearch() {
+            const resultDiv = document.getElementById('search-result');
+            resultDiv.textContent = '正在测试题库搜索...';
+            
+            try {
+                const response = await fetch('/api/exams/questions?' + new URLSearchParams({
+                    subject: '民法',
+                    search: '合同',
+                    page: 1,
+                    limit: 5
+                }));
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `<strong>搜索结果：</strong>\n找到 ${data.data.pagination.total} 道相关题目\n\n`;
+                    resultDiv.innerHTML += `<strong>前5道题目：</strong>\n`;
+                    data.data.questions.forEach((q, i) => {
+                        resultDiv.innerHTML += `${i+1}. [${q.subject}] ${q.content.substring(0, 50)}...\n`;
+                    });
+                    resultDiv.innerHTML += `\n<span class="status success">✓ 搜索成功</span>`;
+                } else {
+                    resultDiv.innerHTML = `<strong>搜索失败：</strong>${data.message}\n<span class="status error">✗ API返回错误</span>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<strong>错误：</strong>${error.message}\n<span class="status error">✗ 请求失败</span>`;
+            }
+        }
+    </script>
+</body>
+</html>

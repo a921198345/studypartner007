@@ -159,10 +159,10 @@ export function QuestionDetail({
   const getOptionStyle = (key: string) => {
     if (submittedAnswer) {
       if (isCorrectOption(key)) {
-        return "bg-green-50 border-green-200"
+        return "bg-green-50 border-green-500 border-2"
       }
       if (isWrongOption(key)) {
-        return "bg-red-50 border-red-200"
+        return "bg-red-50 border-red-500 border-2"
       }
     }
     return ""
@@ -312,10 +312,10 @@ export function QuestionDetail({
               className={`
                 p-3 rounded-lg border transition-all
                 ${disabled ? "cursor-not-allowed opacity-70" : "cursor-pointer"}
-                ${question.type === "single" 
+                ${!submittedAnswer && question.type === "single" 
                   ? (selectedAnswer === optionKey ? "border-primary bg-primary/5" : "border-gray-200 hover:border-gray-300")
-                  : (Array.isArray(selectedAnswer) && selectedAnswer.includes(optionKey) ? "border-primary bg-primary/5" : "border-gray-200 hover:border-gray-300")}
-                ${getOptionStyle(optionKey)}
+                  : !submittedAnswer && (Array.isArray(selectedAnswer) && selectedAnswer.includes(optionKey) ? "border-primary bg-primary/5" : "border-gray-200 hover:border-gray-300")}
+                ${submittedAnswer ? getOptionStyle(optionKey) : ""}
               `}
               onClick={() => !disabled && handleOptionSelect(optionKey)}
             >

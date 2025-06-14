@@ -33,7 +33,7 @@ export interface AIStreamCallbacks {
  * @param params 请求参数
  * @param callbacks 流式回调函数
  */
-export const askAIStream = async (params: AskAIParams, callbacks: AIStreamCallbacks) => {
+export const askAIStream = async (params: AskAIParams, callbacks: AIStreamCallbacks): Promise<() => void> => {
   try {
     // 调用onStart回调
     callbacks.onStart?.();
@@ -89,14 +89,32 @@ export const askAIStream = async (params: AskAIParams, callbacks: AIStreamCallba
       
       // 使用简单的while循环替代递归
       let done = false;
-      while (!done) {
+      let isCancelled = false;
+      
+      // 返回取消函数
+      const cancel = () => {
+        console.log('🚫 调用取消函数');
+        isCancelled = true;
+        try {
+          reader.cancel().then(() => {
+            console.log('✅ Reader 已成功取消');
+          }).catch((err) => {
+            console.error('❌ 取消 reader 时出错:', err);
+          });
+        } catch (error) {
+          console.error('❌ 取消 reader 时同步错误:', error);
+        }
+      };
+      
+      while (!done && !isCancelled) {
         try {
           const result = await reader.read();
           done = result.done;
           
-          if (done) {
+          if (done || isCancelled) {
+            console.log('流式读取结束, done:', done, 'isCancelled:', isCancelled);
             // 处理缓冲区中剩余的数据
-            if (buffer.trim() && buffer.startsWith('data: ')) {
+            if (!isCancelled && buffer.trim() && buffer.startsWith('data: ')) {
               const content = buffer.substring(6).trim();
               if (content && content !== '[DONE]') {
                 try {
@@ -111,7 +129,12 @@ export const askAIStream = async (params: AskAIParams, callbacks: AIStreamCallba
               }
             }
             console.log('流式响应完成，总长度:', fullResponse.length);
-            callbacks.onComplete?.(fullResponse);
+            if (!isCancelled) {
+              callbacks.onComplete?.(fullResponse);
+            } else {
+              // 如果是取消的，调用完成回调传递当前内容
+              callbacks.onComplete?.(fullResponse);
+            }
             break;
           }
           
@@ -127,6 +150,12 @@ export const askAIStream = async (params: AskAIParams, callbacks: AIStreamCallba
           buffer = lines.pop() || '';
           
           for (const line of lines) {
+            // 检查是否已取消
+            if (isCancelled) {
+              console.log('🔴 在处理数据时检测到取消');
+              break;
+            }
+            
             if (line.startsWith('data: ')) {
               try {
                 const content = line.substring(6).trim();
@@ -181,17 +210,18 @@ export const askAIStream = async (params: AskAIParams, callbacks: AIStreamCallba
         }
       }
       
-      return () => {
-        // 返回取消函数
-        reader.cancel();
-      };
+      // 返回取消函数
+      console.log('🎯 返回取消函数');
+      return cancel;
     } catch (error) {
       console.error("Fetch调用错误:", error);
       callbacks.onError?.(error as Error);
+      return () => {}; // 返回空的取消函数
     }
   } catch (error) {
     console.error("总体错误:", error);
     callbacks.onError?.(error as Error);
+    return () => {}; // 返回空的取消函数
   }
 };
 

@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试智能科目识别</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .test-case {
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .test-case h3 {
+            margin-top: 0;
+            color: #1976d2;
+        }
+        button {
+            background-color: #1976d2;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #1565c0;
+        }
+        .result {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+        .subject-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background-color: #1976d2;
+            color: white;
+            border-radius: 4px;
+            font-weight: 500;
+            margin-left: 10px;
+        }
+        .question-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .detected-info {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>智能科目识别测试</h1>
+    
+    <div class="test-section">
+        <h2>1. 预设问题测试</h2>
+        <div class="test-case">
+            <h3>民法相关问题</h3>
+            <button onclick="testSubjectDetection('什么是合同的效力？')">合同效力</button>
+            <button onclick="testSubjectDetection('无因管理的构成要件有哪些？')">无因管理</button>
+            <button onclick="testSubjectDetection('物权变动的原因有哪些？')">物权变动</button>
+            <button onclick="testSubjectDetection('侵权责任的归责原则是什么？')">侵权责任</button>
+            <div id="civil-result" class="result"></div>
+        </div>
+        
+        <div class="test-case">
+            <h3>刑法相关问题</h3>
+            <button onclick="testSubjectDetection('正当防卫的限度条件是什么？')">正当防卫</button>
+            <button onclick="testSubjectDetection('犯罪构成的要件有哪些？')">犯罪构成</button>
+            <button onclick="testSubjectDetection('故意犯罪和过失犯罪的区别？')">故意过失</button>
+            <button onclick="testSubjectDetection('共犯的认定标准是什么？')">共犯认定</button>
+            <div id="criminal-result" class="result"></div>
+        </div>
+        
+        <div class="test-case">
+            <h3>行政法相关问题</h3>
+            <button onclick="testSubjectDetection('行政许可的设定权限是什么？')">行政许可</button>
+            <button onclick="testSubjectDetection('行政处罚的种类有哪些？')">行政处罚</button>
+            <button onclick="testSubjectDetection('行政复议的申请条件？')">行政复议</button>
+            <div id="administrative-result" class="result"></div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. 自定义问题测试</h2>
+        <div class="test-case">
+            <h3>输入您的法律问题</h3>
+            <input type="text" 
+                   class="question-input" 
+                   id="custom-question" 
+                   placeholder="请输入法律问题，系统将自动识别所属科目..."
+                   value="什么是民事诉讼中的举证责任？">
+            <button onclick="testCustomQuestion()">测试识别</button>
+            <div id="custom-result" class="result"></div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. 批量测试</h2>
+        <div class="test-case">
+            <h3>测试多个问题的识别准确性</h3>
+            <button onclick="batchTest()">开始批量测试</button>
+            <div id="batch-result" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        // 智能识别科目的函数（与MindMapButton中的逻辑一致）
+        function detectSubject(text) {
+            const content = text.toLowerCase();
+            
+            // 定义科目关键词映射
+            const subjectKeywords = {
+                'civil': ['民法', '合同', '物权', '债权', '侵权', '婚姻', '继承', '人格权', '担保', '买卖', '租赁', '借贷', '赠与', '委托', '无因管理', '不当得利'],
+                'criminal': ['刑法', '犯罪', '刑罚', '故意', '过失', '正当防卫', '紧急避险', '犯罪构成', '主观', '客观', '共犯', '量刑', '死刑', '有期徒刑', '罚金'],
+                'administrative': ['行政法', '行政许可', '行政处罚', '行政强制', '行政复议', '行政诉讼', '政府', '行政机关', '公务员', '行政行为'],
+                'constitutional': ['宪法', '基本权利', '国家机构', '立法', '司法', '行政权', '公民权利', '选举', '人大', '国务院'],
+                'civilProcedure': ['民事诉讼', '民诉', '原告', '被告', '起诉', '答辩', '证据', '判决', '执行', '管辖', '送达', '期限', '上诉', '再审'],
+                'criminalProcedure': ['刑事诉讼', '刑诉', '侦查', '起诉', '审判', '辩护', '证据', '强制措施', '逮捕', '拘留', '取保候审'],
+                'economic': ['经济法', '公司法', '证券', '票据', '保险', '破产', '反垄断', '反不正当竞争', '消费者', '产品质量'],
+                'international': ['国际法', '国际公法', '国际私法', '国际经济法', '条约', '国际组织', '外交', '领事', '国际贸易', 'WTO'],
+                'theory': ['法理学', '法律原理', '法的概念', '法律关系', '法律体系', '法治', '立法', '司法', '执法', '法律解释']
+            };
+            
+            // 统计每个科目的匹配次数
+            const scores = {};
+            
+            for (const [subject, keywords] of Object.entries(subjectKeywords)) {
+                scores[subject] = 0;
+                for (const keyword of keywords) {
+                    if (content.includes(keyword)) {
+                        scores[subject]++;
+                    }
+                }
+            }
+            
+            // 找出得分最高的科目
+            let maxScore = 0;
+            let detectedSubject = 'civil'; // 默认民法
+            
+            for (const [subject, score] of Object.entries(scores)) {
+                if (score > maxScore) {
+                    maxScore = score;
+                    detectedSubject = subject;
+                }
+            }
+            
+            return { subject: detectedSubject, score: maxScore, scores };
+        }
+
+        // 科目名称映射
+        const subjectNames = {
+            'civil': '民法',
+            'criminal': '刑法',
+            'administrative': '行政法',
+            'constitutional': '宪法',
+            'civilProcedure': '民事诉讼法',
+            'criminalProcedure': '刑事诉讼法',
+            'economic': '经济法',
+            'international': '国际法',
+            'theory': '法理学'
+        };
+
+        // 测试科目识别
+        function testSubjectDetection(question) {
+            const result = detectSubject(question);
+            const detectedName = subjectNames[result.subject] || '未知';
+            
+            const output = `问题：${question}
+识别结果：${detectedName} (${result.subject})
+匹配分数：${result.score}
+
+各科目得分：
+${Object.entries(result.scores)
+    .sort((a, b) => b[1] - a[1])
+    .map(([subj, score]) => `${subjectNames[subj] || subj}: ${score}`)
+    .join('\n')}`;
+            
+            // 根据科目更新对应的结果区域
+            if (result.subject === 'civil') {
+                document.getElementById('civil-result').textContent = output;
+                document.getElementById('civil-result').className = 'result success';
+            } else if (result.subject === 'criminal') {
+                document.getElementById('criminal-result').textContent = output;
+                document.getElementById('criminal-result').className = 'result success';
+            } else if (result.subject === 'administrative') {
+                document.getElementById('administrative-result').textContent = output;
+                document.getElementById('administrative-result').className = 'result success';
+            }
+        }
+
+        // 测试自定义问题
+        function testCustomQuestion() {
+            const question = document.getElementById('custom-question').value;
+            if (!question.trim()) {
+                alert('请输入问题');
+                return;
+            }
+            
+            const result = detectSubject(question);
+            const detectedName = subjectNames[result.subject] || '未知';
+            
+            // 提取关键词
+            const keywords = question
+                .replace(/[？?。，！、：；""''（）《》【】]/g, ' ')
+                .split(' ')
+                .filter(word => word.length > 1)
+                .slice(0, 5)
+                .join(' ')
+                .substring(0, 30);
+            
+            const output = `问题：${question}
+
+识别结果：${detectedName} (${result.subject})
+匹配分数：${result.score}
+提取关键词：${keywords}
+
+将跳转到URL：/knowledge-map?subject=${result.subject}&search=${encodeURIComponent(keywords)}
+
+各科目得分：
+${Object.entries(result.scores)
+    .sort((a, b) => b[1] - a[1])
+    .map(([subj, score]) => `${subjectNames[subj] || subj}: ${score}`)
+    .join('\n')}`;
+            
+            document.getElementById('custom-result').textContent = output;
+            document.getElementById('custom-result').className = 'result success';
+        }
+
+        // 批量测试
+        function batchTest() {
+            const testCases = [
+                { q: '什么是善意取得？', expected: 'civil' },
+                { q: '共同犯罪的认定标准', expected: 'criminal' },
+                { q: '行政许可的撤销情形', expected: 'administrative' },
+                { q: '宪法规定的基本权利', expected: 'constitutional' },
+                { q: '民事诉讼的管辖权规定', expected: 'civilProcedure' },
+                { q: '刑事诉讼中的强制措施', expected: 'criminalProcedure' },
+                { q: '公司法中的股东权利', expected: 'economic' },
+                { q: '国际条约的缔结程序', expected: 'international' },
+                { q: '法的效力层次', expected: 'theory' }
+            ];
+            
+            let correct = 0;
+            let results = '批量测试结果：\n\n';
+            
+            testCases.forEach((testCase, index) => {
+                const result = detectSubject(testCase.q);
+                const isCorrect = result.subject === testCase.expected;
+                if (isCorrect) correct++;
+                
+                results += `${index + 1}. ${testCase.q}
+   期望：${subjectNames[testCase.expected]}
+   识别：${subjectNames[result.subject]} ${isCorrect ? '✅' : '❌'}
+   分数：${result.score}
+   
+`;
+            });
+            
+            results += `\n准确率：${correct}/${testCases.length} (${(correct/testCases.length*100).toFixed(1)}%)`;
+            
+            document.getElementById('batch-result').textContent = results;
+            document.getElementById('batch-result').className = 'result success';
+        }
+
+        // 页面加载时运行一个示例
+        window.onload = function() {
+            testCustomQuestion();
+        };
+    </script>
+</body>
+</html>

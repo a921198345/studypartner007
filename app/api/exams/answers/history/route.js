@@ -1,18 +1,23 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { pool } from '@/db';
+import { pool } from '@/lib/db';
 
 export async function GET(request) {
   try {
     // 获取会话信息
     const session = await getServerSession(authOptions);
+    const userId = session?.user?.id || null;
     
-    // 如果用户未登录，返回空的历史记录而不是401错误
-    if (!session || !session.user) {
+    // 获取查询参数
+    const { searchParams } = new URL(request.url);
+    const sessionId = searchParams.get('session_id');
+    
+    // 如果没有用户ID也没有session_id，返回空结果
+    if (!userId && !sessionId) {
       return NextResponse.json({
         success: true,
-        message: "未登录用户",
+        message: "请提供session_id参数",
         data: {
           answers: [],
           total: 0
@@ -20,10 +25,6 @@ export async function GET(request) {
       });
     }
     
-    const userId = session.user.id;
-    
-    // 获取查询参数
-    const { searchParams } = new URL(request.url);
     const subject = searchParams.get('subject');
     const year = searchParams.get('year');
     
@@ -39,10 +40,19 @@ export async function GET(request) {
         q.explanation_text
       FROM user_answers a
       JOIN questions q ON a.question_id = q.id
-      WHERE a.user_id = ?
+      WHERE 1=1
     `;
     
-    const queryParams = [userId];
+    const queryParams = [];
+    
+    // 根据用户登录状态添加查询条件
+    if (userId) {
+      query += ` AND a.user_id = ?`;
+      queryParams.push(userId);
+    } else if (sessionId) {
+      query += ` AND a.session_id = ?`;
+      queryParams.push(sessionId);
+    }
     
     // 添加筛选条件
     if (subject) {

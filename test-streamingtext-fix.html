@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试 streamingText 修复</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success {
+            color: green;
+        }
+        .error {
+            color: red;
+        }
+        .code {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 3px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>streamingText 修复验证</h1>
+    
+    <div class="test-section">
+        <h2>修复内容总结</h2>
+        <ul>
+            <li>✅ 从 /app/ai-chat/page.tsx 中移除了 streamText 属性传递</li>
+            <li>✅ 从 Message 接口中移除了 streamText 属性定义</li>
+            <li>✅ 更新了 SimpleStreamingMessage 组件以更好地处理可选的 streamText</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>修改的文件</h2>
+        <ol>
+            <li>
+                <strong>/app/ai-chat/page.tsx</strong>
+                <div class="code">
+// 之前（第430行）：
+&lt;SimpleStreamingMessage
+  initialText={message.content}
+  streamText=""  // ❌ 这个已被删除
+  sender={message.role === 'assistant' ? 'ai' : message.role}
+  ...
+/&gt;
+
+// 之后：
+&lt;SimpleStreamingMessage
+  initialText={message.content}
+  sender={message.role === 'assistant' ? 'ai' : message.role}
+  ...
+/&gt;
+
+// Message 接口修改：
+interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+  isStreaming?: boolean;
+  // streamText?: string;  ❌ 已删除
+  imageBase64?: string;
+  isError?: boolean;
+}
+                </div>
+            </li>
+            <li>
+                <strong>/components/ai-chat/SimpleStreamingMessage.tsx</strong>
+                <div class="code">
+// 更新了文本组合逻辑以安全处理可选的 streamText：
+const combinedText = (initialText + (streamText || '')).trim();
+                </div>
+            </li>
+        </ol>
+    </div>
+    
+    <div class="test-section">
+        <h2>验证步骤</h2>
+        <ol>
+            <li>启动应用：<code>npm run dev</code></li>
+            <li>访问 AI 聊天页面：<code>http://localhost:3000/ai-chat</code></li>
+            <li>发送一条消息，确认没有关于 streamingText 的错误</li>
+            <li>检查流式响应是否正常显示</li>
+        </ol>
+    </div>
+    
+    <div class="test-section">
+        <h2>预期结果</h2>
+        <ul>
+            <li class="success">✅ 页面应该正常加载，没有 TypeScript 错误</li>
+            <li class="success">✅ 聊天功能应该正常工作</li>
+            <li class="success">✅ AI 响应应该能够正常流式显示</li>
+            <li class="success">✅ 控制台不应该有关于 streamingText 的警告或错误</li>
+        </ul>
+    </div>
+</body>
+</html>

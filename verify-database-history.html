@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>验证数据库答题历史</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .status { 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 5px; 
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background: #007bff;
+            color: white;
+        }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>数据库答题历史验证</h1>
+    
+    <div id="status"></div>
+    
+    <div>
+        <button onclick="checkDatabase()">检查数据库连接</button>
+        <button onclick="createTestSession()">创建测试会话</button>
+        <button onclick="migrateData()">迁移本地数据</button>
+        <button onclick="window.location.href='/question-bank'">打开题库页面</button>
+    </div>
+    
+    <div id="results" style="margin-top: 20px;"></div>
+
+    <script>
+        function showStatus(message, type = 'info') {
+            document.getElementById('status').innerHTML = 
+                `<div class="status ${type}">${message}</div>`;
+        }
+
+        async function checkDatabase() {
+            try {
+                const response = await fetch('/api/exams/sessions');
+                const data = await response.json();
+                
+                if (data.success) {
+                    showStatus(`✅ 数据库连接正常！找到 ${data.data.length} 个答题会话`, 'success');
+                    
+                    if (data.data.length > 0) {
+                        let html = '<h3>最近答题会话：</h3><ul>';
+                        data.data.slice(0, 5).forEach(session => {
+                            html += `<li>会话 ${session.session_id}: ${session.questions_answered} 题已答，正确 ${session.correct_count} 题</li>`;
+                        });
+                        html += '</ul>';
+                        document.getElementById('results').innerHTML = html;
+                    }
+                } else {
+                    showStatus('❌ 数据库连接失败：' + data.message, 'error');
+                }
+            } catch (error) {
+                showStatus('❌ 请求失败：' + error.message, 'error');
+            }
+        }
+
+        async function createTestSession() {
+            try {
+                const response = await fetch('/api/exams/sessions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        filters: { subject: 'all' },
+                        totalQuestions: 100,
+                        source: 'test'
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    showStatus(`✅ 测试会话创建成功！ID: ${data.data.sessionId}`, 'success');
+                } else {
+                    showStatus('❌ 创建失败：' + data.message, 'error');
+                }
+            } catch (error) {
+                showStatus('❌ 请求失败：' + error.message, 'error');
+            }
+        }
+
+        async function migrateData() {
+            try {
+                const localData = localStorage.getItem('answerSessions');
+                if (!localData) {
+                    showStatus('ℹ️ 没有本地数据需要迁移', 'info');
+                    return;
+                }
+
+                const response = await fetch('/api/exams/sessions/migrate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessions: JSON.parse(localData) })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    showStatus(`✅ 成功迁移 ${data.data.migrated} 个会话到数据库！`, 'success');
+                } else {
+                    showStatus('❌ 迁移失败：' + data.message, 'error');
+                }
+            } catch (error) {
+                showStatus('❌ 迁移失败：' + error.message, 'error');
+            }
+        }
+
+        // 页面加载时自动检查
+        window.onload = checkDatabase;
+    </script>
+</body>
+</html>

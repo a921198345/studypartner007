@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>检查答题会话数据</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        .code-block {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        .instruction {
+            background: #e8f4f8;
+            padding: 15px;
+            border-left: 4px solid #2196F3;
+            margin: 20px 0;
+        }
+        .output {
+            background: #f9f9f9;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            min-height: 200px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+        button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #1976D2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>答题会话数据检查工具</h1>
+        
+        <div class="instruction">
+            <strong>使用说明：</strong>
+            <ol>
+                <li>打开浏览器开发者工具（F12 或 右键-检查）</li>
+                <li>切换到 Console（控制台）标签</li>
+                <li>点击下面的按钮运行相应的检查</li>
+                <li>查看控制台输出的结果</li>
+            </ol>
+        </div>
+
+        <h2>检查功能</h2>
+        
+        <button onclick="checkAllSessions()">查看所有会话详情</button>
+        <button onclick="checkWrongSessions()">查看错题会话</button>
+        <button onclick="checkSessionStats()">查看会话统计</button>
+        <button onclick="clearOutput()">清空输出</button>
+        
+        <h3>输出结果：</h3>
+        <div id="output" class="output">点击上面的按钮开始检查...</div>
+
+        <h2>手动运行代码</h2>
+        <p>您也可以直接在控制台运行以下代码：</p>
+        
+        <div class="code-block">
+// 查看所有会话的详细信息
+const sessions = JSON.parse(localStorage.getItem('answerSessions') || '[]');
+console.log('所有会话详情：');
+sessions.forEach((session, index) => {
+  console.log(`会话 ${index + 1}:`, {
+    source: session.source,
+    questionsAnswered: session.questionsAnswered,
+    totalQuestions: session.totalQuestions,
+    startTime: session.startTime,
+    endTime: session.endTime
+  });
+});
+
+// 查看为什么会话的questionsAnswered是0
+const wrongSessions = sessions.filter(s => s.source === 'wrong');
+console.log('错题会话：', wrongSessions);
+        </div>
+    </div>
+
+    <script>
+        const output = document.getElementById('output');
+
+        function log(message, data) {
+            const timestamp = new Date().toLocaleTimeString();
+            output.textContent += `[${timestamp}] ${message}\n`;
+            if (data !== undefined) {
+                output.textContent += JSON.stringify(data, null, 2) + '\n';
+            }
+            output.textContent += '\n';
+            console.log(message, data);
+        }
+
+        function clearOutput() {
+            output.textContent = '';
+            console.clear();
+        }
+
+        function checkAllSessions() {
+            clearOutput();
+            const sessions = JSON.parse(localStorage.getItem('answerSessions') || '[]');
+            
+            log(`找到 ${sessions.length} 个会话`);
+            
+            sessions.forEach((session, index) => {
+                log(`会话 ${index + 1}:`, {
+                    source: session.source,
+                    questionsAnswered: session.questionsAnswered,
+                    totalQuestions: session.totalQuestions,
+                    startTime: session.startTime,
+                    endTime: session.endTime,
+                    accuracy: session.accuracy,
+                    correctCount: session.correctCount
+                });
+            });
+
+            if (sessions.length === 0) {
+                log('没有找到任何会话数据');
+            }
+        }
+
+        function checkWrongSessions() {
+            clearOutput();
+            const sessions = JSON.parse(localStorage.getItem('answerSessions') || '[]');
+            const wrongSessions = sessions.filter(s => s.source === 'wrong');
+            
+            log(`找到 ${wrongSessions.length} 个错题会话`);
+            
+            wrongSessions.forEach((session, index) => {
+                log(`错题会话 ${index + 1}:`, {
+                    questionsAnswered: session.questionsAnswered,
+                    totalQuestions: session.totalQuestions,
+                    startTime: session.startTime,
+                    endTime: session.endTime,
+                    accuracy: session.accuracy,
+                    correctCount: session.correctCount
+                });
+            });
+
+            if (wrongSessions.length === 0) {
+                log('没有找到错题会话');
+            }
+        }
+
+        function checkSessionStats() {
+            clearOutput();
+            const sessions = JSON.parse(localStorage.getItem('answerSessions') || '[]');
+            
+            const stats = {
+                totalSessions: sessions.length,
+                bySource: {},
+                zeroQuestions: 0,
+                completedSessions: 0
+            };
+
+            sessions.forEach(session => {
+                // 按来源统计
+                if (!stats.bySource[session.source]) {
+                    stats.bySource[session.source] = {
+                        count: 0,
+                        totalQuestions: 0,
+                        answeredQuestions: 0
+                    };
+                }
+                
+                stats.bySource[session.source].count++;
+                stats.bySource[session.source].totalQuestions += session.totalQuestions || 0;
+                stats.bySource[session.source].answeredQuestions += session.questionsAnswered || 0;
+
+                // 统计问题会话
+                if (session.questionsAnswered === 0) {
+                    stats.zeroQuestions++;
+                }
+                
+                if (session.endTime) {
+                    stats.completedSessions++;
+                }
+            });
+
+            log('会话统计信息：', stats);
+
+            // 检查可能的问题
+            if (stats.zeroQuestions > 0) {
+                log(`⚠️ 发现 ${stats.zeroQuestions} 个会话的 questionsAnswered 为 0`);
+                
+                // 显示这些会话的详情
+                const zeroSessions = sessions.filter(s => s.questionsAnswered === 0);
+                log('questionsAnswered 为 0 的会话：', zeroSessions);
+            }
+        }
+
+        // 页面加载时自动检查
+        window.onload = function() {
+            log('页面已加载，可以点击按钮开始检查');
+            
+            // 检查localStorage是否可用
+            try {
+                const test = localStorage.getItem('answerSessions');
+                if (test === null) {
+                    log('⚠️ localStorage 中没有找到 answerSessions 数据');
+                } else {
+                    const sessions = JSON.parse(test);
+                    log(`✓ 找到 ${sessions.length} 个会话数据`);
+                }
+            } catch (e) {
+                log('❌ 无法访问 localStorage:', e.message);
+            }
+        };
+    </script>
+</body>
+</html>

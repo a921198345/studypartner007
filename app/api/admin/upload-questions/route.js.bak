@@ -38,9 +38,18 @@ export async function POST(request) {
     const fileBuffer = await file.arrayBuffer();
     await writeFile(filePath, Buffer.from(fileBuffer));
     
-    // 执行Python脚本解析文件
-    // 注意：在生产环境中应使用更安全的方式执行命令
-    const { stdout, stderr } = await execAsync(`python parse_exam_questions.py "${filePath}" "${subject}"`);
+    // 执行增强版Python脚本解析文件
+    // 使用虚拟环境中的Python
+    const pythonPath = join(process.cwd(), 'venv_flask_api/bin/python');
+    const scriptPath = join(process.cwd(), 'parse_questions.py');
+    
+    console.log('执行解析脚本:', `${pythonPath} ${scriptPath} "${filePath}" "${subject}" --output-json`);
+    
+    // 添加超时设置 - 增加到60秒
+    const { stdout, stderr } = await execAsync(
+      `${pythonPath} ${scriptPath} "${filePath}" "${subject}" --output-json`,
+      { timeout: 60000 } // 60秒超时
+    );
     
     if (stderr) {
       console.error('解析错误:', stderr);
@@ -50,10 +59,29 @@ export async function POST(request) {
       );
     }
     
+    // 尝试解析stdout为JSON，获取格式问题报告
+    let formatIssues = [];
+    let parseResult = {};
+    
+    try {
+      parseResult = JSON.parse(stdout);
+      if (parseResult.format_issues && Object.keys(parseResult.format_issues).length > 0) {
+        formatIssues = parseResult.format_issues;
+      }
+    } catch (e) {
+      console.error('解析脚本输出不是有效JSON:', e);
+      // 如果无法解析JSON，使用原始输出
+      parseResult = { message: stdout };
+    }
+    
+    // 返回结果，包括格式问题
     return NextResponse.json({
       success: true,
-      message: '文件上传并解析成功',
-      details: stdout
+      message: `文件上传并解析${formatIssues.length > 0 ? '部分' : ''}成功`,
+      details: parseResult.message || stdout,
+      format_issues: formatIssues,
+      total_questions: parseResult.total_questions || 0,
+      parsed_questions: parseResult.parsed_questions || 0
     });
     
   } catch (error) {
@@ -66,4 +94,4 @@ export async function POST(request) {
 }
 
 // Route segment config for App Router
-export const runtime = 'nodejs';
+export const runtime = 'nodejs'; 

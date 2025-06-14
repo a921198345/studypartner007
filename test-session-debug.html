@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>会话管理调试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        pre {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .error {
+            color: red;
+        }
+        .success {
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <h1>会话管理调试工具</h1>
+    
+    <div class="section">
+        <h2>当前会话</h2>
+        <button onclick="checkCurrentSession()">查看当前会话</button>
+        <button onclick="createTestSession('wrong')">创建错题测试会话</button>
+        <button onclick="createTestSession('favorites')">创建收藏测试会话</button>
+        <button onclick="endSession()">结束当前会话</button>
+        <pre id="currentSession">点击按钮查看当前会话</pre>
+    </div>
+    
+    <div class="section">
+        <h2>会话历史</h2>
+        <button onclick="checkSessionHistory()">查看会话历史</button>
+        <button onclick="clearSessionHistory()">清空会话历史</button>
+        <pre id="sessionHistory">点击按钮查看会话历史</pre>
+    </div>
+    
+    <div class="section">
+        <h2>答题历史</h2>
+        <button onclick="checkAnswerHistory()">查看所有答题历史</button>
+        <pre id="answerHistory">点击按钮查看答题历史</pre>
+    </div>
+
+    <script>
+        // 查看当前会话
+        function checkCurrentSession() {
+            const currentSession = localStorage.getItem('currentAnswerSession');
+            const display = document.getElementById('currentSession');
+            if (currentSession) {
+                display.textContent = JSON.stringify(JSON.parse(currentSession), null, 2);
+            } else {
+                display.textContent = '当前没有活动会话';
+            }
+        }
+
+        // 查看会话历史
+        function checkSessionHistory() {
+            const sessions = localStorage.getItem('answerSessions');
+            const display = document.getElementById('sessionHistory');
+            if (sessions) {
+                const sessionsData = JSON.parse(sessions);
+                display.textContent = `共有 ${sessionsData.length} 个历史会话:\n\n${JSON.stringify(sessionsData, null, 2)}`;
+            } else {
+                display.textContent = '没有会话历史';
+            }
+        }
+
+        // 查看答题历史
+        function checkAnswerHistory() {
+            const display = document.getElementById('answerHistory');
+            const histories = {
+                '普通模式(answerHistory)': localStorage.getItem('answerHistory'),
+                '错题模式(wrongAnswerHistory)': localStorage.getItem('wrongAnswerHistory'),
+                '收藏模式(favoriteAnswerHistory)': localStorage.getItem('favoriteAnswerHistory')
+            };
+            
+            let output = '';
+            for (const [name, data] of Object.entries(histories)) {
+                if (data) {
+                    const parsed = JSON.parse(data);
+                    const answered = Object.keys(parsed.answered || {}).length;
+                    const correct = Object.keys(parsed.correct || {}).filter(k => parsed.correct[k]).length;
+                    output += `${name}:\n  已答题: ${answered}\n  答对: ${correct}\n  详情: ${JSON.stringify(parsed, null, 2)}\n\n`;
+                } else {
+                    output += `${name}: 无数据\n\n`;
+                }
+            }
+            
+            display.textContent = output;
+        }
+
+        // 创建测试会话
+        function createTestSession(source) {
+            const session = {
+                sessionId: Date.now().toString(),
+                startTime: new Date().toISOString(),
+                questionsAnswered: Math.floor(Math.random() * 10) + 1,
+                correctCount: Math.floor(Math.random() * 5) + 1,
+                totalQuestions: source === 'wrong' ? 11 : 15,
+                source: source,
+                filters: source === 'wrong' || source === 'favorites' ? {} : {
+                    subject: '刑法',
+                    years: ['2023', '2024'],
+                    types: ['单选题']
+                },
+                lastQuestionId: Math.floor(Math.random() * 100) + 1
+            };
+            
+            localStorage.setItem('currentAnswerSession', JSON.stringify(session));
+            alert(`创建了${source}测试会话`);
+            checkCurrentSession();
+        }
+
+        // 结束当前会话
+        function endSession() {
+            const currentSessionStr = localStorage.getItem('currentAnswerSession');
+            if (!currentSessionStr) {
+                alert('没有当前会话');
+                return;
+            }
+            
+            const currentSession = JSON.parse(currentSessionStr);
+            currentSession.endTime = new Date().toISOString();
+            
+            // 获取现有会话历史
+            const sessionsStr = localStorage.getItem('answerSessions');
+            let sessions = [];
+            
+            if (sessionsStr) {
+                try {
+                    sessions = JSON.parse(sessionsStr);
+                } catch (e) {
+                    console.error('解析会话历史失败:', e);
+                }
+            }
+            
+            // 添加当前会话到历史
+            sessions.push(currentSession);
+            
+            // 保留最近30个会话
+            if (sessions.length > 30) {
+                sessions = sessions.slice(-30);
+            }
+            
+            // 保存更新后的会话历史
+            localStorage.setItem('answerSessions', JSON.stringify(sessions));
+            
+            // 清除当前会话
+            localStorage.removeItem('currentAnswerSession');
+            
+            // 触发自定义事件
+            window.dispatchEvent(new Event('answerSessionUpdated'));
+            
+            alert('会话已结束并保存到历史');
+            checkCurrentSession();
+            checkSessionHistory();
+        }
+
+        // 清空会话历史
+        function clearSessionHistory() {
+            if (confirm('确定要清空所有会话历史吗？')) {
+                localStorage.removeItem('answerSessions');
+                alert('会话历史已清空');
+                checkSessionHistory();
+            }
+        }
+
+        // 页面加载时自动检查
+        window.onload = function() {
+            checkCurrentSession();
+        };
+    </script>
+</body>
+</html>

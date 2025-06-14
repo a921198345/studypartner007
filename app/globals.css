@@ -2,6 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 流式传输动画 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 打字效果动画 */
+.streaming-text {
+  animation: fadeIn 0.1s ease-in;
+}
+
+/* 延迟动画类 */
+.delay-100 {
+  animation-delay: 0.1s;
+}
+
+.delay-200 {
+  animation-delay: 0.2s;
+}
+
+/* 确保流式文本可见 */
+.streaming-message {
+  color: inherit !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* 底部渐变效果增强 */
+.fade-mask-bottom {
+  mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -109,5 +146,51 @@
 
   .custom-textarea {
     @apply resize-none rounded-lg;
+  }
+  
+  /* 侧边栏过渡效果 */
+  .sidebar-transition {
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+                margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* 输入框聚焦效果 */
+  .input-focus-ring {
+    @apply focus-within:ring-2 focus-within:ring-blue-400 focus-within:ring-offset-2 rounded-xl transition-all;
+  }
+  
+  /* 渐变文字效果 */
+  .gradient-text {
+    @apply bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent;
+  }
+  
+  /* 对话列表项hover效果 */
+  .conversation-item {
+    @apply relative overflow-hidden;
+  }
+  
+  .conversation-item::before {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-r from-transparent via-blue-100/50 to-transparent;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+  
+  .conversation-item:hover::before {
+    transform: translateX(100%);
+  }
+  
+  /* 输入区域阴影效果 */
+  .input-area-shadow {
+    box-shadow: 0 -4px 20px -4px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* 侧边栏折叠按钮动画 */
+  .sidebar-toggle-button {
+    @apply transition-all duration-300 ease-in-out;
+  }
+  
+  .sidebar-toggle-button:hover {
+    @apply scale-110;
   }
 }

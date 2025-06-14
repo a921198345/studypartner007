@@ -4,15 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 // import { useTypewriter } from '@/hooks/useTypewriter';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
-import dynamic from 'next/dynamic';
-
-// 动态导入ReactMarkdown组件，仅在客户端渲染
-const ReactMarkdown = dynamic(() => import('react-markdown'), {
-  ssr: false,
-  loading: () => <div className="whitespace-pre-wrap">加载中...</div>
-});
-
-// 直接导入插件，但只在客户端使用
+import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import remarkGfm from 'remark-gfm';
 
@@ -25,6 +17,7 @@ interface StreamingMessageProps {
   aiAvatar?: string;
   isStreaming?: boolean;
   typingSpeed?: number;
+  imageBase64?: string;
 }
 
 // 记忆化的Markdown组件，减少重渲染
@@ -58,6 +51,7 @@ const StreamingMessage = ({
   aiAvatar = "/placeholder-user.jpg",
   isStreaming = false,
   typingSpeed = 20,
+  imageBase64,
 }: StreamingMessageProps) => {
   // 组合初始文本和流式文本
   const combinedText = useMemo(() => {
@@ -126,14 +120,30 @@ const StreamingMessage = ({
             <span className="absolute -right-2 bottom-0 w-0.5 h-4 bg-blue-500 animate-pulse"></span>
           )}
           
+          {/* 显示图片（如果有） */}
+          {imageBase64 && sender === 'user' && (
+            <div className="mb-3">
+              <div className="inline-block bg-gray-100 rounded-lg p-2">
+                <img 
+                  src={imageBase64} 
+                  alt="用户上传的图片" 
+                  className="max-h-[200px] max-w-full w-auto rounded-md object-contain"
+                  style={{ display: 'block' }}
+                />
+              </div>
+            </div>
+          )}
+          
           {/* 使用Markdown渲染内容或者纯文本 */}
-          {textToDisplay.includes('```') || textToDisplay.includes('#') || textToDisplay.includes('**') ? (
-            <MemoizedMarkdown content={textToDisplay} />
-          ) : (
-            <div className={cn(
-              "whitespace-pre-wrap leading-relaxed",
-              sender === 'user' ? "text-white" : "text-gray-800"
-            )}>{textToDisplay}</div>
+          {textToDisplay && textToDisplay !== '[图片]' && (
+            textToDisplay.includes('```') || textToDisplay.includes('#') || textToDisplay.includes('**') ? (
+              <MemoizedMarkdown content={textToDisplay} />
+            ) : (
+              <div className={cn(
+                "whitespace-pre-wrap leading-relaxed",
+                sender === 'user' ? "text-white" : "text-gray-800"
+              )}>{textToDisplay}</div>
+            )
           )}
         </div>
         

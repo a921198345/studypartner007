@@ -13,6 +13,9 @@ import { Footer } from "@/components/footer"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Link from "next/link"
 import { questionApi, getWrongQuestions, getFavoriteQuestions } from "@/lib/api/questions"
+import { AnswerHistoryV2 as AnswerHistory } from "@/components/question-bank/answer-history-v2"
+import { createAnswerSession } from "@/lib/answer-sessions"
+import { useToast } from "@/components/ui/use-toast"
 
 // 辅助函数：比较两个数组是否内容相同（忽略顺序）
 function arraysEqual(a: any[], b: any[]): boolean {
@@ -32,14 +35,23 @@ function arraysEqual(a: any[], b: any[]): boolean {
 }
 
 export default function QuestionBankPage() {
+  const searchParams = useSearchParams()
+  
+  // 从URL参数初始化状态
   const [searchQuery, setSearchQuery] = useState("")
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("")
+  const [aiKeywords, setAiKeywords] = useState<string[]>([])
+  const [isFromAiChat, setIsFromAiChat] = useState(false)
+  const [isInitialized, setIsInitialized] = useState(false) // 添加初始化标志
+  
+  // 简化初始化逻辑 - 始终默认为"全部"
   const [selectedQuestionTypes, setSelectedQuestionTypes] = useState<string[]>(["全部题型"])
   const [selectedSubject, setSelectedSubject] = useState("all")
-  const [selectedYears, setSelectedYears] = useState<string[]>(["2023", "2024"])
+  const [selectedYears, setSelectedYears] = useState<string[]>(["all"])
   const [questions, setQuestions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [actualTotalQuestions, setActualTotalQuestions] = useState(25)
+  const [actualTotalQuestions, setActualTotalQuestions] = useState(0)
   const [pagination, setPagination] = useState({
     total: 0,
     currentPage: 1,
@@ -53,6 +65,8 @@ export default function QuestionBankPage() {
   const [favoriteQuestions, setFavoriteQuestions] = useState<any[]>([])
   const [loadingFavorites, setLoadingFavorites] = useState(false)
   const [activeTab, setActiveTab] = useState("all")
+  const [isFetchingAllIds, setIsFetchingAllIds] = useState(false)
+  const [isNavigationReady, setIsNavigationReady] = useState(false) // 添加导航数据准备状态
 
   const subjects = [
     { id: "all", name: "全部科目" },
@@ -80,65 +94,351 @@ export default function QuestionBankPage() {
   // const wrongQuestions = [2, 4, 6] // 假设这些ID是错题
 
   const router = useRouter()
+  const { toast } = useToast()
+
+  // 处理从AI聊天跳转过来的情况 - 简化版本
+  useEffect(() => {
+    const source = searchParams.get('source')
+    const keywords = searchParams.get('keywords')
+    const restart = searchParams.get('restart')
+    const filtersParam = searchParams.get('filters')
+    const sessionIdParam = searchParams.get('sessionId')
+    
+    // 处理从答题历史跳转的重新答题
+    if (restart === 'true' && filtersParam) {
+      try {
+        const filters = JSON.parse(decodeURIComponent(filtersParam))
+        console.log('从答题历史重新答题，恢复筛选条件:', filters)
+        
+        // 恢复筛选条件
+        if (filters.subject && filters.subject !== 'all') {
+          setSelectedSubject(filters.subject)
+        }
+        if (filters.years && Array.isArray(filters.years)) {
+          setSelectedYears(filters.years)
+        }
+        if (filters.types && Array.isArray(filters.types)) {
+          setSelectedQuestionTypes(filters.types)
+        }
+        if (filters.search) {
+          setSearchQuery(filters.search)
+          setDebouncedSearchQuery(filters.search)
+        }
+        if (filters.aiKeywords && filters.aiKeywords.length > 0) {
+          setAiKeywords(filters.aiKeywords)
+          setIsFromAiChat(true)
+          sessionStorage.setItem('aiKeywords', JSON.stringify(filters.aiKeywords))
+        }
+        
+        // 如果有sessionId，设置当前会话
+        if (sessionIdParam) {
+          sessionStorage.setItem('currentSessionId', sessionIdParam)
+        }
+        
+        // 显示提示
+        toast({
+          description: "正在加载筛选后的题目...",
+          duration: 3000,
+        })
+      } catch (e) {
+        console.error('解析筛选条件失败:', e)
+      }
+    } else if (source === 'ai-chat' && keywords) {
+      // 解析关键词数组
+      const keywordArray = keywords.split(',').map(k => k.trim()).filter(k => k)
+      setAiKeywords(keywordArray)
+      setIsFromAiChat(true)
+      
+      // 简单保存搜索状态
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('aiKeywords', JSON.stringify(keywordArray))
+      }
+      
+      // 显示提示
+      toast({
+        description: `正在搜索包含"${keywordArray.join('、')}"的题目`,
+        duration: 3000,
+      })
+    } else if (typeof window !== 'undefined') {
+      // 尝试恢复之前的AI搜索关键词
+      const savedKeywords = sessionStorage.getItem('aiKeywords')
+      if (savedKeywords) {
+        try {
+          const keywords = JSON.parse(savedKeywords)
+          if (Array.isArray(keywords) && keywords.length > 0) {
+            setAiKeywords(keywords)
+            setIsFromAiChat(true)
+          }
+        } catch (e) {
+          console.error('恢复AI关键词失败:', e)
+        }
+      }
+    }
+    
+    // 标记初始化完成
+    setIsInitialized(true)
+  }, [searchParams, toast])
+
+  // 处理重新答题时加载完题目后的跳转
+  useEffect(() => {
+    const restart = searchParams.get('restart')
+    const sessionIdParam = searchParams.get('sessionId')
+    
+    if (restart === 'true' && questions.length > 0 && isNavigationReady) {
+      console.log('重新答题：题目加载完成，准备跳转到第一题')
+      
+      // 清除答题历史
+      const historyKey = 'answerHistory'
+      localStorage.setItem(historyKey, JSON.stringify({
+        answered: {},
+        correct: {},
+        results: {},
+        timestamp: Date.now()
+      }))
+      
+      // 获取第一题ID
+      const firstQuestionId = questions[0].id
+      
+      // 构建跳转URL，保留筛选条件
+      const queryParams = new URLSearchParams()
+      
+      if (selectedSubject !== 'all') {
+        queryParams.append('subject', selectedSubject)
+      }
+      if (!selectedYears.includes('all')) {
+        queryParams.append('years', selectedYears.join(','))
+      }
+      if (!selectedQuestionTypes.includes('全部题型')) {
+        queryParams.append('types', selectedQuestionTypes.join(','))
+      }
+      if (debouncedSearchQuery) {
+        queryParams.append('search', debouncedSearchQuery)
+      }
+      if (aiKeywords.length > 0) {
+        queryParams.append('aiKeywords', aiKeywords.join(','))
+      }
+      if (sessionIdParam) {
+        queryParams.append('sessionId', sessionIdParam)
+      }
+      
+      queryParams.append('index', '0')
+      queryParams.append('restart', 'true')
+      
+      // 跳转到第一题
+      const url = `/question-bank/${firstQuestionId}?${queryParams.toString()}`
+      console.log('重新答题跳转URL:', url)
+      router.push(url)
+    }
+  }, [questions, isNavigationReady, selectedSubject, selectedYears, selectedQuestionTypes, debouncedSearchQuery, aiKeywords, router, searchParams])
+
+  // 搜索防抖
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery)
+      // 搜索时重置到第一页
+      if (searchQuery !== debouncedSearchQuery) {
+        setPagination(prev => ({ ...prev, currentPage: 1 }))
+      }
+      // 如果用户手动输入搜索，清除AI关键词
+      if (searchQuery) {
+        setIsFromAiChat(false)
+        setAiKeywords([])
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('aiKeywords')
+        }
+      } else if (!searchQuery && !isFromAiChat) {
+        // 如果清空搜索且不是AI搜索，重置分页
+        setPagination(prev => ({ ...prev, currentPage: 1 }))
+      }
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [searchQuery, debouncedSearchQuery])
 
   useEffect(() => {
     const fetchQuestions = async () => {
+      // 如果还未初始化完成，不发起请求
+      if (!isInitialized) {
+        console.log('等待初始化完成...');
+        return;
+      }
+      
+      // 如果是AI搜索模式但还没有关键词，先不发起请求
+      if (isFromAiChat && aiKeywords.length === 0) {
+        console.log('AI搜索模式但关键词为空，跳过请求');
+        return;
+      }
+      
       try {
         setLoading(true)
         
         // 获取题目列表
         let questionsData;
         try {
-          const response = await questionApi.getQuestions({
-            subject: selectedSubject !== 'all' ? selectedSubject : undefined,
-            year: selectedYears.includes('all') ? undefined : selectedYears,
-            question_type: !selectedQuestionTypes.includes('全部题型') ? selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题' : undefined,
-            page: pagination.currentPage,
-            limit: pagination.perPage
-          });
+          // 如果是从AI聊天来的，使用AI关键词；否则使用搜索框内容
+          let finalQuestions = [];
+          let totalCount = 0;
           
-          questionsData = response;
+          if (isFromAiChat && aiKeywords.length > 0) {
+            console.log('使用AI关键词进行搜索:', aiKeywords);
+            
+            // 统一使用多关键词搜索API
+            console.log(`调用多关键词搜索API: ${aiKeywords.join(', ')}`);
+            
+            const searchResponse = await questionApi.searchWithMultipleKeywords({
+              keywords: aiKeywords,
+              subject: selectedSubject !== 'all' ? selectedSubject : undefined,
+              year: selectedYears,
+              questionType: !selectedQuestionTypes.includes('全部题型') ? 
+                (selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题') : undefined,
+              page: pagination.currentPage,
+              limit: pagination.perPage
+            });
+            
+            if (searchResponse.success) {
+              questionsData = searchResponse;
+              console.log(`多关键词搜索结果: 找到 ${searchResponse.data?.pagination?.total || 0} 道题目`);
+              console.log('搜索调试信息:', searchResponse.data?.debug);
+            } else {
+              console.error('多关键词搜索失败:', searchResponse.message);
+              // 使用空结果
+              questionsData = {
+                success: false,
+                message: searchResponse.message || '搜索失败',
+                data: {
+                  questions: [],
+                  pagination: {
+                    total: 0,
+                    totalPages: 0,
+                    currentPage: pagination.currentPage,
+                    perPage: pagination.perPage
+                  }
+                }
+              };
+            }
+          } else {
+            // 普通搜索
+            console.log('调用API时的搜索参数:', {
+              debouncedSearchQuery,
+              searchQuery,
+              hasSearch: !!debouncedSearchQuery
+            });
+            
+            const response = await questionApi.getQuestions({
+              subject: selectedSubject !== 'all' ? selectedSubject : undefined,
+              year: selectedYears.includes('all') ? undefined : selectedYears,
+              question_type: !selectedQuestionTypes.includes('全部题型') ? selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题' : undefined,
+              search: debouncedSearchQuery || undefined,
+              page: pagination.currentPage,
+              limit: pagination.perPage
+            });
+            
+            questionsData = response;
+          }
           
-          if (response.success) {
-            setQuestions(response.data.questions);
+          if (questionsData.success) {
+            setQuestions(questionsData.data.questions);
             
             // 更新分页信息和题目总数
-            const newTotal = response.data.pagination.total;
+            const newTotal = questionsData.data.pagination.total;
             setPagination(prev => ({
               ...prev,
               total: newTotal,
-              totalPages: response.data.pagination.totalPages
+              totalPages: questionsData.data.pagination.totalPages
             }));
             
             // 更新实际题目总数
-            setActualTotalQuestions(newTotal);
+            // 确保AI搜索的结果总数正确显示
+            setActualTotalQuestions(prevTotal => {
+              if (prevTotal !== newTotal) {
+                console.log(`更新题目总数: ${prevTotal} -> ${newTotal}`);
+              }
+              return newTotal;
+            });
+            
+            // 添加调试日志
+            if (isFromAiChat && aiKeywords.length > 0) {
+              console.log(`AI搜索结果总数: ${newTotal}, 关键词: ${aiKeywords.join(', ')}`);
+            } else if (debouncedSearchQuery) {
+              console.log(`普通搜索结果总数: ${newTotal}, 搜索词: ${debouncedSearchQuery}`);
+            } else {
+              console.log(`全部题目总数: ${newTotal}`);
+            }
+            
+            // 调试日志
+            console.log('搜索响应:', {
+              searchQuery: debouncedSearchQuery,
+              total: newTotal,
+              questions: questionsData.data.questions.length
+            });
             
             // 保存题目总数到localStorage，供其他页面使用
             localStorage.setItem('questionTotalCount', newTotal.toString());
             
             // --- 修改开始: 获取并保存所有筛选后的题目信息 ---
-            if (newTotal > 0) {
-              fetchAllFilteredQuestionInfoAndSave(newTotal, {
-                subject: selectedSubject !== 'all' ? selectedSubject : undefined,
-                year: selectedYears.includes('all') ? undefined : selectedYears,
-                question_type: !selectedQuestionTypes.includes('全部题型') ? (selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题') : undefined,
-              }, response.data.questions); // 传入当前页数据作为降级
-            } else {
+            // 只在第一页时获取完整的题目列表，避免重复请求
+            if (newTotal > 0 && pagination.currentPage === 1) {
+              // 只在有搜索条件或AI关键词时才获取完整列表
+              // 否则使用已经返回的分页数据即可
+              if (isFromAiChat && aiKeywords.length > 0) {
+                // AI搜索模式
+                fetchAllFilteredQuestionInfoAndSave(newTotal, {
+                  subject: selectedSubject !== 'all' ? selectedSubject : undefined,
+                  year: selectedYears.includes('all') ? undefined : selectedYears,
+                  question_type: !selectedQuestionTypes.includes('全部题型') ? (selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题') : undefined,
+                  aiKeywords: aiKeywords,
+                }, questionsData.data.questions, newTotal);
+              } else if (debouncedSearchQuery) {
+                // 普通搜索模式
+                fetchAllFilteredQuestionInfoAndSave(newTotal, {
+                  subject: selectedSubject !== 'all' ? selectedSubject : undefined,
+                  year: selectedYears.includes('all') ? undefined : selectedYears,
+                  question_type: !selectedQuestionTypes.includes('全部题型') ? (selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题') : undefined,
+                  search: debouncedSearchQuery,
+                }, questionsData.data.questions, newTotal);
+              } else if (newTotal <= 200) {
+                // 无搜索条件的普通浏览模式，题目数量不太多时获取完整列表
+                // 提高阈值到200以覆盖更多筛选场景
+                fetchAllFilteredQuestionInfoAndSave(newTotal, {
+                  subject: selectedSubject !== 'all' ? selectedSubject : undefined,
+                  year: selectedYears.includes('all') ? undefined : selectedYears,
+                  question_type: !selectedQuestionTypes.includes('全部题型') ? (selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题') : undefined,
+                }, questionsData.data.questions, newTotal);
+              } else {
+                // 题目数量太多时，只保存基本信息避免性能问题
+                console.log(`筛选结果 ${newTotal} 道题太多，不获取完整列表`);
+                localStorage.setItem('filteredQuestionsList', JSON.stringify({
+                  questions: [], // 空列表，导航将使用备用方案
+                  filters: {
+                    subject: selectedSubject,
+                    years: selectedYears,
+                    types: selectedQuestionTypes,
+                    search: debouncedSearchQuery || '',
+                    aiKeywords: []
+                  },
+                  actualTotal: newTotal, // 保存实际总数
+                  timestamp: Date.now(),
+                  partial: true // 标记为部分数据
+                }));
+              }
+            } else if (newTotal === 0) {
               // 如果筛选结果为0，清空或保存空列表
               localStorage.setItem('filteredQuestionsList', JSON.stringify({
                 questions: [],
                 filters: {
                   subject: selectedSubject,
                   years: selectedYears,
-                  types: selectedQuestionTypes
+                  types: selectedQuestionTypes,
+                  search: debouncedSearchQuery || '',
+                  aiKeywords: isFromAiChat ? aiKeywords : []
                 },
                 timestamp: Date.now()
               }));
             }
             // --- 修改结束 ---
           } else {
-            console.error("获取题目列表API响应失败:", response.message);
-            setError(response.message || "获取题目列表失败");
+            console.error("获取题目列表API响应失败:", questionsData.message);
+            setError(questionsData.message || "获取题目列表失败");
           }
         } catch (questionsError) {
           console.error("获取题目列表请求异常:", questionsError);
@@ -332,47 +632,116 @@ export default function QuestionBankPage() {
     };
     
     // 新增函数：获取所有筛选后的题目信息并保存到 localStorage
-    const fetchAllFilteredQuestionInfoAndSave = async (totalItems: number, filters: any, currentPageData: any[]) => {
+    const fetchAllFilteredQuestionInfoAndSave = async (totalItems: number, filters: any, currentPageData: any[], actualFilteredTotal?: number) => {
+      // 防止重复请求
+      if (isFetchingAllIds) {
+        console.log('已有获取所有ID的请求在进行中，跳过');
+        return;
+      }
+      
+      console.log('fetchAllFilteredQuestionInfoAndSave 被调用，参数:', {
+        totalItems,
+        filters,
+        actualFilteredTotal,
+        hasAiKeywords: !!(filters.aiKeywords && filters.aiKeywords.length > 0),
+        hasSearch: !!filters.search
+      });
+      
       try {
-        // 假设 questionApi.getQuestions 支持一个fetchAllIds: true 或者类似的参数
-        // 或者后端有新的专门接口
-        const response = await questionApi.getQuestions({
-          ...filters,
-          // page: 1, // 根据后端API设计调整
-          // limit: totalItems, // 根据后端API设计调整
-          fetchAllIdsAndCodes: true // 假设的新参数，用于获取所有ID和题号
-        });
-
-        if (response.success && response.data && response.data.questions) {
-          const allFilteredQuestionInfo = response.data.questions.map((q: any) => ({
-            id: q.id,
-            question_code: q.question_code || null
-          }));
-
-          localStorage.setItem('filteredQuestionsList', JSON.stringify({
-            questions: allFilteredQuestionInfo,
-            filters: {
-              subject: filters.subject || 'all',
-              years: filters.year || ['all'],
-              types: filters.question_type ? [filters.question_type] : ['全部题型']
-            },
-            timestamp: Date.now()
-          }));
-          console.log(`成功保存 ${allFilteredQuestionInfo.length} 条筛选后的题目信息到localStorage`);
+        setIsFetchingAllIds(true);
+        // 如果有AI关键词，使用多关键词搜索API获取完整结果
+        if (filters.aiKeywords && filters.aiKeywords.length > 0) {
+          console.log('使用多关键词搜索API获取完整结果，关键词:', filters.aiKeywords);
+          
+          // 调用多关键词搜索API，获取所有结果（不分页）
+          const response = await questionApi.searchWithMultipleKeywords({
+            keywords: filters.aiKeywords,
+            subject: filters.subject && filters.subject !== 'all' ? filters.subject : undefined,
+            year: filters.year || ['all'],
+            questionType: filters.question_type,
+            page: 1,
+            limit: 1000 // 获取所有结果
+          });
+          
+          if (response.success && response.data && response.data.questions) {
+            console.log('多关键词搜索API响应:', {
+              returnedCount: response.data.questions.length,
+              total: response.data.pagination?.total,
+              page: response.data.pagination?.currentPage,
+              perPage: response.data.pagination?.perPage
+            });
+            
+            const allFilteredQuestionInfo = response.data.questions.map((q: any) => ({
+              id: q.id,
+              question_code: q.question_code || null
+            }));
+            
+            const dataToSave = {
+              questions: allFilteredQuestionInfo,
+              filters: {
+                subject: filters.subject || 'all',
+                years: filters.year || ['all'],
+                types: filters.question_type ? [filters.question_type] : ['全部题型'],
+                search: filters.aiKeywords.join(', '),
+                aiKeywords: filters.aiKeywords
+              },
+              actualTotal: actualFilteredTotal || allFilteredQuestionInfo.length,
+              timestamp: Date.now()
+            };
+            localStorage.setItem('filteredQuestionsList', JSON.stringify(dataToSave));
+            console.log(`成功保存 ${allFilteredQuestionInfo.length} 条多关键词搜索结果到localStorage`);
+            console.log(`实际筛选总数: ${actualFilteredTotal || allFilteredQuestionInfo.length}`);
+            console.log('保存的前10个题目ID:', allFilteredQuestionInfo.slice(0, 10).map(q => q.id));
+            console.log('保存的数据结构:', {
+              questionsLength: dataToSave.questions.length,
+              actualTotal: dataToSave.actualTotal,
+              filters: dataToSave.filters
+            });
+            
+            // 标记导航数据已准备好
+            setIsNavigationReady(true);
+          }
         } else {
-          console.warn("获取所有筛选题目ID和题号失败，将使用当前页数据作为导航降级。", response.message);
-          // 降级：只保存当前页的题目信息
-          const currentFilteredQuestions = currentPageData.map((q: any) => ({ id: q.id, question_code: q.question_code || null }));
-          localStorage.setItem('filteredQuestionsList', JSON.stringify({
-            questions: currentFilteredQuestions,
-            filters: {
-              subject: filters.subject || 'all',
-              years: filters.year || ['all'],
-              types: filters.question_type ? [filters.question_type] : ['全部题型']
-            },
-            page: pagination.currentPage, // 保留当前页信息，因为列表不完整
-            timestamp: Date.now()
-          }));
+          // 普通搜索
+          const response = await questionApi.getQuestions({
+            ...filters,
+            fetchAllIdsAndCodes: true
+          });
+
+          if (response.success && response.data && response.data.questions) {
+            const allFilteredQuestionInfo = response.data.questions.map((q: any) => ({
+              id: q.id,
+              question_code: q.question_code || null
+            }));
+
+            localStorage.setItem('filteredQuestionsList', JSON.stringify({
+              questions: allFilteredQuestionInfo,
+              filters: {
+                subject: filters.subject || 'all',
+                years: filters.year || ['all'],
+                types: filters.question_type ? [filters.question_type] : ['全部题型'],
+                search: filters.search || ''
+              },
+              timestamp: Date.now()
+            }));
+            console.log(`成功保存 ${allFilteredQuestionInfo.length} 条筛选后的题目信息到localStorage`);
+            setIsNavigationReady(true);
+          } else {
+            console.warn("获取所有筛选题目ID和题号失败，将使用当前页数据作为导航降级。", response.message);
+            // 降级：只保存当前页的题目信息
+            const currentFilteredQuestions = currentPageData.map((q: any) => ({ id: q.id, question_code: q.question_code || null }));
+            localStorage.setItem('filteredQuestionsList', JSON.stringify({
+              questions: currentFilteredQuestions,
+              filters: {
+                subject: filters.subject || 'all',
+                years: filters.year || ['all'],
+                types: filters.question_type ? [filters.question_type] : ['全部题型'],
+                search: filters.search || ''
+              },
+              page: pagination.currentPage, // 保留当前页信息，因为列表不完整
+              timestamp: Date.now()
+            }));
+          }
         }
       } catch (error) {
         console.error("请求所有筛选题目ID和题号时出错:", error);
@@ -383,16 +752,21 @@ export default function QuestionBankPage() {
           filters: {
             subject: filters.subject || 'all',
             years: filters.year || ['all'],
-            types: filters.question_type ? [filters.question_type] : ['全部题型']
+            types: filters.question_type ? [filters.question_type] : ['全部题型'],
+            search: filters.search || '',
+            aiKeywords: filters.aiKeywords || []
           },
           page: pagination.currentPage, // 保留当前页信息，因为列表不完整
           timestamp: Date.now()
         }));
+      } finally {
+        setIsFetchingAllIds(false);
+        setIsNavigationReady(true);
       }
     };
 
     fetchQuestions();
-  }, [selectedSubject, selectedYears, selectedQuestionTypes, pagination.currentPage, pagination.perPage]);
+  }, [selectedSubject, selectedYears, selectedQuestionTypes, pagination.currentPage, pagination.perPage, debouncedSearchQuery, isFromAiChat, aiKeywords, isInitialized]);
 
   // 加载错题集函数
   const loadWrongQuestions = async () => {
@@ -604,30 +978,26 @@ export default function QuestionBankPage() {
   // 处理年份选择变化
   const handleYearChange = (yearId: string, checked: boolean) => {
     setSelectedYears(prev => {
+      let newYears;
       if (yearId === 'all') {
-        // 如果选择"全部年份"，清除其他选择
-        return checked ? ['all'] : [];
+        newYears = checked ? ['all'] : [];
       } else {
-        // 如果选择具体年份，移除"全部年份"
-        let newYears = prev.filter(y => y !== 'all');
+        newYears = prev.filter(y => y !== 'all');
         
         if (checked) {
-          // 添加选中的年份
           if (!newYears.includes(yearId)) {
             newYears.push(yearId);
           }
         } else {
-          // 移除取消选中的年份
           newYears = newYears.filter(y => y !== yearId);
         }
 
-        // 如果没有选择任何年份，默认选择"全部年份"
         if (newYears.length === 0) {
-          return ['all'];
+          newYears = ['all'];
         }
-
-        return newYears;
       }
+      
+      return newYears;
     });
     // 重置分页
     setPagination(prev => ({ ...prev, currentPage: 1 }));
@@ -646,7 +1016,43 @@ export default function QuestionBankPage() {
   };
 
   // 处理点击题目进入详情页的函数
-  const handleQuestionClick = (questionId: number, fromTab?: string) => {
+  const handleQuestionClick = async (questionId: number, fromTab?: string) => {
+    // 如果正在获取完整列表，等待一下
+    if (isFetchingAllIds) {
+      console.log('正在获取完整题目列表，请稍候...');
+      // 等待最多2秒
+      let waitTime = 0;
+      while (isFetchingAllIds && waitTime < 2000) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        waitTime += 100;
+      }
+    }
+    // 创建新的答题会话（如果是开始练习）
+    // 创建答题会话（异步处理，不阻塞跳转）
+    const createSessionAsync = async () => {
+      if (!fromTab || fromTab === 'all') {
+        const currentFilters = {
+          subject: selectedSubject,
+          years: selectedYears,
+          types: selectedQuestionTypes,
+          search: debouncedSearchQuery || ''
+        }
+        // 传入当前筛选条件下的总题数和来源
+        await createAnswerSession(currentFilters, actualTotalQuestions, 'all')
+      } else if (fromTab === 'wrong') {
+        // 错题练习会话
+        await createAnswerSession({}, wrongQuestions.length, 'wrong')
+      } else if (fromTab === 'favorite') {
+        // 收藏练习会话
+        await createAnswerSession({}, favoriteQuestions.length, 'favorites')
+      }
+    }
+    
+    // 异步创建会话，不阻塞页面跳转
+    createSessionAsync().catch(error => {
+      console.error('创建答题会话失败:', error)
+    })
+    
     // 检查localStorage中是否已存在完整的筛选列表数据
     try {
       const existingFilteredListStr = localStorage.getItem('filteredQuestionsList');
@@ -664,7 +1070,11 @@ export default function QuestionBankPage() {
             // 检查筛选条件是否匹配当前条件
             existingFilteredData.filters.subject === selectedSubject &&
             arraysEqual(existingFilteredData.filters.years, selectedYears) &&
-            arraysEqual(existingFilteredData.filters.types, selectedQuestionTypes)) {
+            arraysEqual(existingFilteredData.filters.types, selectedQuestionTypes) &&
+            // 检查搜索条件：要么都是AI搜索，要么都是普通搜索
+            ((isFromAiChat && existingFilteredData.filters.aiKeywords && 
+              arraysEqual(existingFilteredData.filters.aiKeywords, aiKeywords)) ||
+             (!isFromAiChat && existingFilteredData.filters.search === (debouncedSearchQuery || '')))) {
           
           console.log(`找到有效的完整筛选列表，包含 ${existingFilteredData.questions.length} 题，不覆盖它`);
           
@@ -701,7 +1111,8 @@ export default function QuestionBankPage() {
         filters: {
           subject: selectedSubject,
           years: selectedYears,
-          types: selectedQuestionTypes
+          types: selectedQuestionTypes,
+          search: debouncedSearchQuery || ''
         },
         currentPage: pagination.currentPage,
         totalPages: pagination.totalPages,
@@ -730,6 +1141,11 @@ export default function QuestionBankPage() {
     // 题型参数（如果不是"全部题型"）
     if (!selectedQuestionTypes.includes('全部题型')) {
       queryParams.append('types', selectedQuestionTypes.join(','));
+    }
+    
+    // 搜索参数
+    if (debouncedSearchQuery) {
+      queryParams.append('search', debouncedSearchQuery);
     }
     
     // 当前页码
@@ -805,12 +1221,37 @@ export default function QuestionBankPage() {
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="search"
-                  placeholder="搜索题目..."
-                  className="w-[350px] pl-8"
+                  placeholder="搜索题目内容..."
+                  className="w-[350px] pl-8 pr-10"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      // 直接触发搜索，不等待防抖
+                      setDebouncedSearchQuery(searchQuery)
+                    }
+                  }}
                 />
+                {searchQuery && (
+                  <button
+                    className="absolute right-2 top-2 p-0.5 hover:bg-gray-100 rounded"
+                    onClick={() => {
+                      setSearchQuery('')
+                      setDebouncedSearchQuery('')
+                    }}
+                  >
+                    <svg className="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
               </div>
+              {debouncedSearchQuery && (
+                <div className="text-sm text-muted-foreground">
+                  正在搜索: "{debouncedSearchQuery}"
+                </div>
+              )}
             </div>
           </div>
 
@@ -869,12 +1310,13 @@ export default function QuestionBankPage() {
                             className="rounded text-primary"
                             checked={selectedQuestionTypes.includes(type)}
                             onChange={(e) => {
+                              let newTypes;
                               if (type === "全部题型") {
                                 // 当选择"全部题型"时，取消其他选项
-                                setSelectedQuestionTypes(e.target.checked ? ["全部题型"] : []);
+                                newTypes = e.target.checked ? ["全部题型"] : [];
                               } else {
                                 // 当选择具体题型时，取消"全部题型"选项
-                                let newTypes = [...selectedQuestionTypes];
+                                newTypes = [...selectedQuestionTypes];
                                 if (e.target.checked) {
                                   newTypes = newTypes.filter(t => t !== "全部题型");
                                   newTypes.push(type);
@@ -885,8 +1327,10 @@ export default function QuestionBankPage() {
                                     newTypes = ["全部题型"];
                                   }
                                 }
-                                setSelectedQuestionTypes(newTypes);
                               }
+                              setSelectedQuestionTypes(newTypes);
+                              // 保存选择状态
+                              sessionStorage.setItem('selectedQuestionTypes', JSON.stringify(newTypes));
                               // 重置分页
                               setPagination(prev => ({ ...prev, currentPage: 1 }));
                             }}
@@ -899,46 +1343,7 @@ export default function QuestionBankPage() {
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardContent className="p-4">
-                  <h3 className="font-medium mb-4 flex items-center">
-                    <BookOpen className="h-4 w-4 mr-2 text-primary" />
-                    学习统计
-                  </h3>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>已做题目</span>
-                        <span id="stats-answered" className="font-medium">0/500</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-1.5">
-                        <div className="bg-primary h-1.5 rounded-full" style={{ width: "0%" }}></div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>正确率</span>
-                        <span id="stats-correct-rate" className="font-medium">0%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-1.5">
-                        <div className="bg-green-500 h-1.5 rounded-full" style={{ width: "0%" }}></div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 pt-2">
-                      <div className="bg-gray-50 p-2 rounded text-center">
-                        <div id="stats-wrong-count" className="text-lg font-semibold text-red-500">0</div>
-                        <div className="text-xs text-gray-500">错题数</div>
-                      </div>
-                      <div className="bg-gray-50 p-2 rounded text-center">
-                        <div className="text-lg font-semibold text-amber-500">0</div>
-                        <div className="text-xs text-gray-500">收藏数</div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <AnswerHistory />
             </div>
 
             <div className="md:col-span-3">
@@ -960,14 +1365,32 @@ export default function QuestionBankPage() {
                       >
                         继续练习
                       </Button>
-                      <Button onClick={() => questions.length > 0 && router.push(`/question-bank/${questions[0].id}`)}>
+                      <Button onClick={() => {
+                        if (questions.length > 0) {
+                          // 创建新会话并传入总题数
+                          const currentFilters = {
+                            subject: selectedSubject,
+                            years: selectedYears,
+                            types: selectedQuestionTypes,
+                            search: debouncedSearchQuery || ''
+                          }
+                          createAnswerSession(currentFilters, actualTotalQuestions)
+                          handleQuestionClick(questions[0].id)
+                        }
+                      }}>
                         开始练习
                       </Button>
                     </div>
                   )}
                   
                   {activeTab === "wrong" && wrongQuestions.length > 0 && (
-                    <Button onClick={() => wrongQuestions.length > 0 && router.push(`/question-bank/${wrongQuestions[0].id}?source=wrong&wrongIndex=0&resetWrong=true`)}>
+                    <Button onClick={() => {
+                      if (wrongQuestions.length > 0) {
+                        // 创建错题练习会话
+                        createAnswerSession({}, wrongQuestions.length, 'wrong')
+                        router.push(`/question-bank/${wrongQuestions[0].id}?source=wrong&wrongIndex=0&resetWrong=true`)
+                      }
+                    }}>
                       开始练习
                     </Button>
                   )}
@@ -1029,7 +1452,7 @@ export default function QuestionBankPage() {
                       >
                         继续练习
                       </Button>
-                      <Button onClick={() => {
+                      <Button onClick={async () => {
                         // 保存收藏题目列表到localStorage
                         const favoritesList = {
                           questions: favoriteQuestions.map(q => ({
@@ -1045,6 +1468,12 @@ export default function QuestionBankPage() {
                         };
                         localStorage.setItem('favoriteQuestionsList', JSON.stringify(favoritesList));
                         
+                        // 创建收藏练习会话
+                        try {
+                          await createAnswerSession({}, favoriteQuestions.length, 'favorites');
+                        } catch (error) {
+                          console.error('创建收藏会话失败:', error);
+                        }
                         // 跳转到第一个收藏题目 - 移除continue=true参数，确保重置状态
                         router.push(`/question-bank/${favoriteQuestions[0].id}?source=favorites&index=0`);
                       }}>
@@ -1055,6 +1484,39 @@ export default function QuestionBankPage() {
                 </div>
 
                 <TabsContent value="all">
+                  {/* AI搜索提示和清除按钮 */}
+                  {isFromAiChat && aiKeywords.length > 0 && (
+                    <div className="bg-blue-50 p-3 mb-4 rounded-md flex items-center justify-between">
+                      <div className="text-sm">
+                        <span className="text-gray-600">正在显示 </span>
+                        <span className="font-medium text-blue-600">{aiKeywords.join('、')}</span>
+                        <span className="text-gray-600"> 的相关题目</span>
+                        {isFetchingAllIds && (
+                          <span className="ml-2 text-blue-500">（正在加载完整列表...）</span>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setIsFromAiChat(false)
+                          setAiKeywords([])
+                          if (typeof window !== 'undefined') {
+                            sessionStorage.removeItem('aiKeywords')
+                          }
+                          toast({
+                            description: "已清除AI关键词筛选",
+                            duration: 2000,
+                          })
+                        }}
+                        className="text-xs"
+                      >
+                        清除筛选
+                      </Button>
+                    </div>
+                  )}
+                  
+                  
                   {loading ? (
                     <div className="text-center py-8">加载中...</div>
                   ) : error ? (
@@ -1064,37 +1526,80 @@ export default function QuestionBankPage() {
                   ) : (
                     <div className="space-y-4">
                       <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-medium">共 {actualTotalQuestions} 道题目</h3>
+                        <h3 className="font-medium">
+                          {isFromAiChat && aiKeywords.length > 0 ? (
+                            <>
+                              共 {actualTotalQuestions} 道题目
+                              <span className="text-sm text-gray-600 ml-2">
+                                （以下是 <span className="text-blue-600 font-semibold">{aiKeywords.join('、')}</span> 的相关题目）
+                              </span>
+                            </>
+                          ) : debouncedSearchQuery ? (
+                            <>搜索 "{debouncedSearchQuery}" 共找到 {actualTotalQuestions} 道题目</>
+                          ) : (
+                            <>共 {actualTotalQuestions} 道题目</>
+                          )}
+                        </h3>
                       </div>
                       
                       {questions.map((question) => (
                         <div 
                           key={question.id}
-                          className="cursor-pointer"
-                          onClick={() => handleQuestionClick(question.id)}
+                          className={`cursor-pointer ${isFetchingAllIds ? 'opacity-50 pointer-events-none' : ''}`}
+                          onClick={() => {
+                            if (!isFetchingAllIds) {
+                              handleQuestionClick(question.id)
+                            }
+                          }}
                         >
                           <Card className="h-full">
                         <CardContent className="p-4">
                               <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-2">
-                                  <Badge variant={question.question_type === "单选题" ? "default" : "secondary"}>
-                                    {question.question_type === "单选题" ? "单选" : "多选"}
-                              </Badge>
+                                <div className="flex items-center space-x-2">
+                                  {question.year && (
+                                    <Badge variant="outline">{question.year}</Badge>
+                                  )}
                                   
                                   {question.subject && (
                                     <Badge variant="secondary">{question.subject}</Badge>
                                   )}
                                   
-                                  {question.year && (
-                                    <Badge variant="outline">{question.year}</Badge>
-                                  )}
+                                  <Badge>
+                                    {question.question_type === "单选题" ? "单选题" : "多选题"}
+                                  </Badge>
                             </div>
                                 
                                 <div className="text-sm text-gray-500">
                                   {question.question_code || `题号: ${question.id}`}
                             </div>
                           </div>
-                              <p className="text-sm">{question.question_text}</p>
+                              <p className="text-sm">
+                                {(() => {
+                                  // 高亮关键词逻辑
+                                  let highlightedText = question.question_text;
+                                  const keywordsToHighlight = isFromAiChat && aiKeywords.length > 0 
+                                    ? aiKeywords 
+                                    : (debouncedSearchQuery ? [debouncedSearchQuery] : []);
+                                  
+                                  if (keywordsToHighlight.length > 0) {
+                                    // 对每个关键词进行高亮
+                                    keywordsToHighlight.forEach((keyword, index) => {
+                                      if (keyword) {
+                                        const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                                        const className = index === 0 ? 'bg-yellow-200' : 'bg-blue-200';
+                                        highlightedText = highlightedText.replace(
+                                          new RegExp(`(${escapedKeyword})`, 'gi'),
+                                          `<mark class="${className}">$1</mark>`
+                                        );
+                                      }
+                                    });
+                                    
+                                    return <span dangerouslySetInnerHTML={{ __html: highlightedText }} />;
+                                  }
+                                  
+                                  return question.question_text;
+                                })()}
+                              </p>
                             </CardContent>
                           </Card>
                         </div>
@@ -1184,7 +1689,7 @@ export default function QuestionBankPage() {
                         <h3 className="text-lg font-medium mb-2">错题收集中</h3>
                         <p className="text-gray-500 mb-4">您需要先做题才能收集错题</p>
                         <div className="flex justify-center space-x-2">
-                          <Button onClick={() => questions.length > 0 && router.push(`/question-bank/${questions[0].id}`)}>
+                          <Button onClick={() => questions.length > 0 && handleQuestionClick(questions[0].id)}>
                             开始练习
                           </Button>
                         </div>
@@ -1230,7 +1735,7 @@ export default function QuestionBankPage() {
                         <h3 className="text-lg font-medium mb-2">收藏夹为空</h3>
                         <p className="text-gray-500 mb-4">您可以在做题时收藏您认为重要的题目</p>
                         <div className="flex justify-center space-x-2">
-                          <Button onClick={() => questions.length > 0 && router.push(`/question-bank/${questions[0].id}`)}>
+                          <Button onClick={() => questions.length > 0 && handleQuestionClick(questions[0].id)}>
                             开始练习
                           </Button>
                         </div>
@@ -1247,24 +1752,24 @@ export default function QuestionBankPage() {
                             onClick={() => handleQuestionClick(question.id, 'favorite')}
                             className="p-4 border rounded-lg hover:border-primary hover:bg-gray-50 transition-colors cursor-pointer"
                           >
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center space-x-2">
-                                  <Badge variant="outline">
-                                    {question.year ? question.year : '未知年份'}
-                                  </Badge>
-                                  <Badge variant="secondary">
-                                    {question.subject || '未分类'}
-                                  </Badge>
-                                  <Badge>
-                                    {question.question_type === 1 || question.question_type === '单选题' ? 
-                                      "单选题" : (question.question_type === 2 || question.question_type === '多选题' ? 
-                                        "多选题" : "未知类型")}
-                                  </Badge>
-                                </div>
-                                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center space-x-2">
+                                <Badge variant="outline">
+                                  {question.year ? question.year : '未知年份'}
+                                </Badge>
+                                <Badge variant="secondary">
+                                  {question.subject || '未分类'}
+                                </Badge>
+                                <Badge>
+                                  {question.question_type === 1 || question.question_type === '单选题' ? 
+                                    "单选题" : (question.question_type === 2 || question.question_type === '多选题' ? 
+                                      "多选题" : "未知类型")}
+                                </Badge>
                               </div>
-                              <p className="text-sm">{question.question_text || '题目内容未加载'}</p>
+                              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                             </div>
+                            <p className="text-sm">{question.question_text || '题目内容未加载'}</p>
+                          </div>
                         ))}
                       </>
                     )}

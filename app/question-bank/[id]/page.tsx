@@ -14,6 +14,7 @@ import { AnswerCard } from "@/components/question-bank/answer-card"
 import { questionApi, addToWrongQuestions, isQuestionFavorited } from "@/lib/api/questions"
 import { CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
+import { updateCurrentSession, endCurrentSession, getCurrentSession } from "@/lib/answer-sessions"
 
 // 获取当前页面模式（普通、错题、收藏）
 const getCurrentPageMode = (searchParams: URLSearchParams | null): string => {
@@ -209,8 +210,14 @@ export default function QuestionPage() {
       const filteredListStr = localStorage.getItem('filteredQuestionsList');
       if (filteredListStr) {
         const filteredData = JSON.parse(filteredListStr);
+        console.log("原始筛选数据:", {
+          questionsLength: filteredData.questions?.length,
+          actualTotal: filteredData.actualTotal,
+          partial: filteredData.partial,
+          filters: filteredData.filters
+        });
         if (filteredData && filteredData.timestamp && (Date.now() - filteredData.timestamp < 3600000)) {
-          console.log(`找到有效的筛选题目列表，共${filteredData.questions?.length || 0}题`);
+          console.log(`找到有效的筛选题目列表，共${filteredData.questions?.length || 0}题，实际总数${filteredData.actualTotal || '未知'}`);
           return filteredData;
         }
       }
@@ -302,26 +309,47 @@ export default function QuestionPage() {
         } catch (e) {
           console.error("解析收藏列表数据失败:", e);
         }
-      } else if (filteredData && filteredData.questions && filteredData.questions.length > 0) {
-        console.log(`从localStorage加载筛选后的题目列表，共${filteredData.questions.length}题`);
-        questionsToDisplay = [...filteredData.questions];
-        
-        if (urlIndex) {
-          const parsedUrlIndex = parseInt(urlIndex);
-          if (!isNaN(parsedUrlIndex) && parsedUrlIndex >= 0 && parsedUrlIndex < questionsToDisplay.length && questionsToDisplay[parsedUrlIndex].id === currentId) {
-            currentIndex = parsedUrlIndex;
+      } else if (filteredData) {
+        // 处理筛选数据
+        if (filteredData.questions && filteredData.questions.length > 0) {
+          // 有完整的题目列表
+          console.log(`从localStorage加载筛选后的题目列表，共${filteredData.questions.length}题`);
+          console.log('前10个题目ID:', filteredData.questions.slice(0, 10).map(q => q.id));
+          questionsToDisplay = [...filteredData.questions];
+          
+          if (urlIndex) {
+            const parsedUrlIndex = parseInt(urlIndex);
+            if (!isNaN(parsedUrlIndex) && parsedUrlIndex >= 0 && parsedUrlIndex < questionsToDisplay.length && questionsToDisplay[parsedUrlIndex].id === currentId) {
+              currentIndex = parsedUrlIndex;
+            }
+          }
+          if (currentIndex === -1) {
+            currentIndex = questionsToDisplay.findIndex(q => q.id === currentId);
+          }
+
+          if (currentIndex === -1) { 
+            console.log(`题目ID ${currentId} 不在筛选列表中，尝试添加到列表`);
+            questionsToDisplay.push({ id: currentId, question_code: `Q${currentId}` }); // 确保当前题目在列表中
+            currentIndex = questionsToDisplay.findIndex(q => q.id === currentId); // 重新查找索引
+          }
+        } else if (filteredData.actualTotal) {
+          // 没有完整列表但有实际总数（性能优化情况）
+          console.log(`筛选数据包含实际总数: ${filteredData.actualTotal}，但没有完整列表`);
+          // 创建虚拟列表用于导航
+          const totalCount = filteredData.actualTotal;
+          questionsToDisplay = Array.from({ length: totalCount }, (_, i) => ({ 
+            id: i + 1, 
+            question_code: `题目${i + 1}` 
+          }));
+          
+          // 确保当前题目在合理范围内
+          if (currentId > 0 && currentId <= totalCount) {
+            currentIndex = currentId - 1;
+          } else {
+            currentIndex = 0;
+            console.warn(`当前题目ID ${currentId} 超出筛选范围 1-${totalCount}`);
           }
         }
-        if (currentIndex === -1) {
-          currentIndex = questionsToDisplay.findIndex(q => q.id === currentId);
-        }
-
-        if (currentIndex === -1) { 
-          console.log(`题目ID ${currentId} 不在筛选列表中，尝试添加到列表`);
-          questionsToDisplay.push({ id: currentId, question_code: `Q${currentId}` }); // 确保当前题目在列表中
-          currentIndex = questionsToDisplay.findIndex(q => q.id === currentId); // 重新查找索引
-        }
-
       } else {
         console.log("没有筛选后的题目列表或列表为空，创建备用导航");
         // 使用已通过 fetchTotalQuestions 获取的 totalAllQuestions，如果它大于0
@@ -404,6 +432,108 @@ export default function QuestionPage() {
     console.log(`页面加载，题目ID: ${questionId}`);
 
     const init = async () => {
+      // 检查URL参数中是否有筛选条件（从答题历史跳转过来的情况）
+      const filtersParam = searchParams.get('filters');
+      const sessionIdParam = searchParams.get('sessionId');
+      
+      if (filtersParam) {
+        try {
+          const filters = JSON.parse(decodeURIComponent(filtersParam));
+          console.log('从URL参数恢复筛选条件:', filters);
+          
+          // 根据筛选条件重新获取题目列表
+          if (filters.aiKeywords && filters.aiKeywords.length > 0) {
+            // AI关键词搜索
+            console.log('使用AI关键词重新获取题目列表:', filters.aiKeywords);
+            const response = await questionApi.searchWithMultipleKeywords({
+              keywords: filters.aiKeywords,
+              subject: filters.subject,
+              year: filters.year,
+              questionType: filters.question_type,
+              page: 1,
+              limit: 1000
+            });
+            
+            if (response.success && response.data && response.data.questions) {
+              const questions = response.data.questions.map(q => ({
+                id: q.id,
+                question_code: q.question_code || `Q${q.id}`
+              }));
+              
+              // 保存到localStorage供导航使用
+              localStorage.setItem('filteredQuestionsList', JSON.stringify({
+                questions: questions,
+                filters: filters,
+                actualTotal: questions.length,
+                timestamp: Date.now()
+              }));
+              console.log(`恢复了${questions.length}道筛选题目到localStorage`);
+            }
+          } else if (filters.search) {
+            // 普通搜索
+            console.log('使用搜索关键词重新获取题目列表:', filters.search);
+            const response = await questionApi.searchQuestions({
+              keyword: filters.search,
+              subject: filters.subject,
+              year: filters.year,
+              questionType: filters.question_type,
+              page: 1,
+              limit: 1000
+            });
+            
+            if (response.success && response.data && response.data.questions) {
+              const questions = response.data.questions.map(q => ({
+                id: q.id,
+                question_code: q.question_code || `Q${q.id}`
+              }));
+              
+              // 保存到localStorage供导航使用
+              localStorage.setItem('filteredQuestionsList', JSON.stringify({
+                questions: questions,
+                filters: filters,
+                actualTotal: questions.length,
+                timestamp: Date.now()
+              }));
+              console.log(`恢复了${questions.length}道筛选题目到localStorage`);
+            }
+          } else {
+            // 其他筛选条件
+            console.log('使用普通筛选条件重新获取题目列表:', filters);
+            const response = await questionApi.getQuestions({
+              page: 1,
+              limit: 1000,
+              subject: filters.subject,
+              year: filters.year,
+              questionType: filters.question_type
+            });
+            
+            if (response.success && response.data && response.data.questions) {
+              const questions = response.data.questions.map(q => ({
+                id: q.id,
+                question_code: q.question_code || `Q${q.id}`
+              }));
+              
+              // 保存到localStorage供导航使用
+              localStorage.setItem('filteredQuestionsList', JSON.stringify({
+                questions: questions,
+                filters: filters,
+                actualTotal: questions.length,
+                timestamp: Date.now()
+              }));
+              console.log(`恢复了${questions.length}道筛选题目到localStorage`);
+            }
+          }
+          
+          // 如果有sessionId，设置当前会话
+          if (sessionIdParam) {
+            sessionStorage.setItem('currentSessionId', sessionIdParam);
+            console.log('恢复会话ID:', sessionIdParam);
+          }
+        } catch (e) {
+          console.error('解析筛选条件失败:', e);
+        }
+      }
+      
       await fetchTotalQuestions(); // 先获取全局总数
       initializeNavigation();     // 然后用这个总数（如果需要）初始化导航
       
@@ -414,7 +544,7 @@ export default function QuestionPage() {
     };
 
     init();
-  }, [questionId, initializeNavigation]); // initializeNavigation 现在依赖 totalAllQuestions，所以它会正确地在其更新后运行
+  }, [questionId, searchParams]); // 添加 searchParams 依赖
 
   const fetchAnswerHistory = async () => {
     // 获取当前页面的模式
@@ -883,6 +1013,37 @@ export default function QuestionPage() {
           // 保存到常规模式记录中以保持数据一致性
           updateNormalModeHistory(questionId, formattedAnswer, result.data);
         }
+        
+        // 更新当前答题会话（所有模式都需要更新）
+        // 根据不同模式获取正确的统计数据
+        let sessionAnsweredCount = 0;
+        let sessionCorrectCount = 0;
+        
+        if (currentMode === 'wrong' || currentMode === 'favorites') {
+          // 错题和收藏模式：使用历史记录计算（与普通模式一致）
+          sessionAnsweredCount = Object.keys(history.answered || {}).length;
+          sessionCorrectCount = Object.keys(history.correct || {}).filter(qId => history.correct[qId]).length;
+          
+          console.log(`[会话统计] ${currentMode}模式 - 历史记录:`, {
+            answered: Object.keys(history.answered || {}),
+            correct: Object.keys(history.correct || {}).filter(qId => history.correct[qId]),
+            sessionAnsweredCount,
+            sessionCorrectCount
+          });
+        } else {
+          // 普通模式：使用历史记录
+          sessionAnsweredCount = Object.keys(history.answered || {}).length;
+          sessionCorrectCount = Object.keys(history.correct || {}).filter(qId => history.correct[qId]).length;
+        }
+        
+        const updateData = {
+          questionsAnswered: sessionAnsweredCount,
+          correctCount: sessionCorrectCount,
+          lastQuestionId: parseInt(questionId)
+        };
+        
+        console.log(`[会话更新] 更新当前会话 - 模式: ${currentMode}, 数据:`, updateData);
+        updateCurrentSession(updateData);
         
         // 更新状态管理
         setSessionAnswers(prev => {
@@ -1464,50 +1625,54 @@ export default function QuestionPage() {
     if (totalNavPages <= 1) return null;
     
     return (
-      <div className="flex justify-between mt-4">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          disabled={currentNavPage === 1}
-          onClick={() => handleNavPageChange(currentNavPage - 1)}
-        >
-          上一页
-        </Button>
-        <div className="text-sm flex items-center">
-          {Array.from({ length: Math.min(5, totalNavPages) }, (_, i) => {
-            let pageToShow;
-            
-            if (totalNavPages <= 5) {
-              pageToShow = i + 1;
-            } else {
-              const offset = Math.min(
-                Math.max(1, currentNavPage - 2), 
-                totalNavPages - 4
+      <div className="mt-4">
+        <div className="flex justify-between items-center">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            disabled={currentNavPage === 1}
+            onClick={() => handleNavPageChange(currentNavPage - 1)}
+            className="text-xs px-2"
+          >
+            上一页
+          </Button>
+          <div className="text-xs flex items-center">
+            {Array.from({ length: Math.min(5, totalNavPages) }, (_, i) => {
+              let pageToShow;
+              
+              if (totalNavPages <= 5) {
+                pageToShow = i + 1;
+              } else {
+                const offset = Math.min(
+                  Math.max(1, currentNavPage - 2), 
+                  totalNavPages - 4
+                );
+                pageToShow = offset + i;
+              }
+              
+              return (
+                <Button
+                  key={`page-${pageToShow}`}
+                  variant={currentNavPage === pageToShow ? "default" : "outline"}
+                  size="sm"
+                  className="w-6 h-6 mx-0.5 p-0 text-xs"
+                  onClick={() => handleNavPageChange(pageToShow)}
+                >
+                  {pageToShow}
+                </Button>
               );
-              pageToShow = offset + i;
-            }
-            
-            return (
-              <Button
-                key={`page-${pageToShow}`}
-                variant={currentNavPage === pageToShow ? "default" : "outline"}
-                size="sm"
-                className="w-8 h-8 mx-1 p-0"
-                onClick={() => handleNavPageChange(pageToShow)}
-              >
-                {pageToShow}
-              </Button>
-            );
-          })}
+            })}
+          </div>
+          <Button
+            variant="outline" 
+            size="sm"
+            disabled={currentNavPage === totalNavPages}
+            onClick={() => handleNavPageChange(currentNavPage + 1)}
+            className="text-xs px-2"
+          >
+            下一页
+          </Button>
         </div>
-        <Button
-          variant="outline" 
-          size="sm"
-          disabled={currentNavPage === totalNavPages}
-          onClick={() => handleNavPageChange(currentNavPage + 1)}
-        >
-          下一页
-        </Button>
       </div>
     );
   }, [currentNavPage, filteredTotalCount, questionsPerPage]);
@@ -1668,11 +1833,19 @@ export default function QuestionPage() {
     ensureWrongQuestionsValidity();
   }, [ensureWrongQuestionsValidity]);
 
-  // 处理退出答题页面时移除答对的错题
+  // 处理退出答题页面时移除答对的错题和保存答题会话
   useEffect(() => {
     const handleBeforeUnload = async () => {
       try {
         const source = searchParams.get('source');
+        
+        // 结束并保存当前答题会话（所有模式都保存）
+        console.log('退出答题页面，保存答题会话');
+        console.log('当前会话信息:', {
+          source: source,
+          currentSession: getCurrentSession()
+        });
+        endCurrentSession();
         
         // 如果是从收藏页面退出且不是继续模式，清理会话标记
         if (source === 'favorites' && searchParams.get('continue') !== 'true') {
@@ -1724,6 +1897,59 @@ export default function QuestionPage() {
     };
   }, [searchParams]);
 
+
+  // 显示加载状态
+  if (loading) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="container flex h-16 items-center">
+            <MainNav />
+          </div>
+        </header>
+        <main className="flex-1">
+          <div className="container mx-auto py-6">
+            <div className="flex items-center justify-center min-h-[400px]">
+              <div className="text-center">
+                <div className="text-lg mb-2">加载题目中...</div>
+                <div className="text-sm text-gray-500">请稍候</div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // 显示错误状态
+  if (error || !question) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="container flex h-16 items-center">
+            <MainNav />
+          </div>
+        </header>
+        <main className="flex-1">
+          <div className="container mx-auto py-6">
+            <div className="flex items-center justify-center min-h-[400px]">
+              <div className="text-center">
+                <div className="text-lg text-red-600 mb-2">
+                  {error || '题目加载失败'}
+                </div>
+                <div className="text-sm text-gray-500 mb-4">
+                  题目ID: {questionId}
+                </div>
+                <Button onClick={() => router.back()}>
+                  返回题库
+                </Button>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -1793,7 +2019,7 @@ export default function QuestionPage() {
                     selectedAnswer={selectedAnswer}
                     submittedAnswer={submittedAnswer}
                     onSelectAnswer={handleSelectAnswer}
-                    answerResult={answerResult}
+                    answerResult={null} // 不在组件内部显示答案解析
                     disabled={!!submittedAnswer}
                     totalQuestions={totalAllQuestions}
                     currentIndex={parseInt(questionId) - 1}
@@ -1801,35 +2027,84 @@ export default function QuestionPage() {
                   />
 
                   <div className="mt-6 flex justify-between">
-                    <Button
-                      variant="outline"
-                      onClick={handlePrevQuestion}
-                      className="flex items-center"
-                      disabled={filteredQuestions.length > 0 && currentQuestionIndex <= 0} // 仅当是筛选列表中的第一题时才禁用
-                    >
-                      <ChevronLeft className="h-4 w-4 mr-1" />
-                      上一题
-                    </Button>
-
-                    {submittedAnswer ? (
-                      <Button
-                        onClick={handleNextQuestion}
-                        className="flex items-center"
-                        disabled={filteredQuestions.length > 0 && currentQuestionIndex >= filteredQuestions.length - 1} // 仅当是筛选列表中的最后一题时才禁用
-                      >
-                        下一题
-                        <ChevronRight className="h-4 w-4 ml-1" />
-                      </Button>
-                    ) : (
+                    {!submittedAnswer ? (
                       <Button
                         onClick={handleSubmitAnswer}
                         disabled={!selectedAnswer || submitting}
+                        className="mx-auto"
                       >
                         {submitting ? "提交中..." : "提交答案"}
                       </Button>
+                    ) : (
+                      <>
+                        <Button
+                          variant="outline"
+                          onClick={handlePrevQuestion}
+                          className="flex items-center"
+                          disabled={filteredQuestions.length > 0 && currentQuestionIndex <= 0}
+                        >
+                          <ChevronLeft className="h-4 w-4 mr-1" />
+                          上一题
+                        </Button>
+
+                        <Button
+                          onClick={handleNextQuestion}
+                          className="flex items-center"
+                          disabled={filteredQuestions.length > 0 && currentQuestionIndex >= filteredQuestions.length - 1}
+                        >
+                          下一题
+                          <ChevronRight className="h-4 w-4 ml-1" />
+                        </Button>
+                      </>
                     )}
                   </div>
 
+                  {/* 答案解析区域 */}
+                  {answerResult && (
+                    <div className="mt-6 space-y-4 bg-gray-50 p-4 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-medium">答案解析</h3>
+                        <div className="flex items-center">
+                          {answerResult.is_correct ? (
+                            <div className="flex items-center text-green-500">
+                              <CheckCircle className="h-5 w-5 mr-1" />
+                              <span>回答正确</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center text-red-500">
+                              <XCircle className="h-5 w-5 mr-1" />
+                              <span>回答错误</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="text-sm">
+                          <span className="font-medium">正确答案：</span>
+                          {Array.isArray(answerResult.correct_answer) 
+                            ? answerResult.correct_answer.join(', ') 
+                            : (typeof answerResult.correct_answer === 'string' 
+                               ? answerResult.correct_answer 
+                               : answerResult.correct_answer !== undefined 
+                                 ? String(answerResult.correct_answer) 
+                                 : "未提供正确答案")}
+                        </div>
+                        <div className="text-sm">
+                          <span className="font-medium">你的答案：</span>
+                          {Array.isArray(submittedAnswer) 
+                            ? submittedAnswer.join(', ') 
+                            : submittedAnswer}
+                        </div>
+                        <div className="mt-4">
+                          <div className="font-medium text-sm mb-2">解析：</div>
+                          <p className="text-sm text-gray-700 whitespace-pre-line">{answerResult.explanation || "暂无解析"}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 答题进度统计 */}
                   {answerResult && (
                     <div className="mt-6">
                       <Card className="mb-6">

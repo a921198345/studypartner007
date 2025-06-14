@@ -90,11 +90,36 @@ export async function POST(req: NextRequest) {
     
     // 创建一个可读流，用于流式传输响应
     const encoder = new TextEncoder();
+    let controllerClosed = false; // 添加标志位跟踪controller状态
+    
     const stream = new ReadableStream({
       async start(controller) {
+        // 安全的enqueue函数，避免在closed后写入
+        const safeEnqueue = (data: string) => {
+          if (!controllerClosed) {
+            try {
+              controller.enqueue(encoder.encode(data));
+            } catch (error) {
+              console.error('Enqueue error:', error);
+            }
+          }
+        };
+        
+        // 安全的close函数，避免重复关闭
+        const safeClose = () => {
+          if (!controllerClosed) {
+            controllerClosed = true;
+            try {
+              controller.close();
+            } catch (error) {
+              console.error('Close error:', error);
+            }
+          }
+        };
+        
         try {
           // 立即发送一个初始响应，确保连接建立
-          controller.enqueue(encoder.encode(`data: {"type": "init", "content": ""}\n\n`));
+          safeEnqueue(`data: {"type": "init", "content": ""}\n\n`);
           // 立即开始，不显示多余的状态消息
           console.log('🚀 开始处理用户问题');
           
@@ -145,7 +170,7 @@ export async function POST(req: NextRequest) {
             .map(chunk => chunk.original_text);
           
           // 6. 构建完整的提示词
-          const fullPrompt = buildPrompt(question, contextTexts);
+          const fullPrompt = buildPrompt(question || '请分析这张图片', contextTexts, imageBase64);
           console.log('构建的提示词长度:', fullPrompt.length);
           
           // 7. 调用DeepSeek生成流式回答 (如果没有API密钥则使用模拟回答)
@@ -155,7 +180,7 @@ export async function POST(req: NextRequest) {
             console.log('NODE_ENV:', process.env.NODE_ENV);
             console.log('MOCK_AI_RESPONSE:', process.env.MOCK_AI_RESPONSE);
             
-            const deepseekStream = await generateAnswerStream(fullPrompt);
+            const deepseekStream = await generateAnswerStream(fullPrompt, imageBase64);
             
             if (!deepseekStream) {
               throw new Error('DeepSeek流式响应为空');
@@ -170,10 +195,10 @@ export async function POST(req: NextRequest) {
             const textDecoder = new TextDecoder();
             let buffer = '';
             
-            while (true) {
+            while (!controllerClosed) { // 检查是否已关闭
               const { done, value } = await reader.read();
               
-              if (done) {
+              if (done || controllerClosed) {
                 break;
               }
               
@@ -209,7 +234,7 @@ export async function POST(req: NextRequest) {
                         console.log('📝 发送内容片段:', content.substring(0, 50));
                         // 转发给客户端
                         const data = JSON.stringify({ content });
-                        controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+                        safeEnqueue(`data: ${data}\n\n`);
                       } else if (choice.finish_reason) {
                         console.log('DeepSeek响应完成:', choice.finish_reason);
                       }
@@ -223,7 +248,7 @@ export async function POST(req: NextRequest) {
                     // 如果解析失败，尝试直接使用内容
                     if (dataContent && dataContent.trim() && !dataContent.includes('{')) {
                       const data = JSON.stringify({ content: dataContent });
-                      controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+                      safeEnqueue(`data: ${data}\n\n`);
                     }
                   }
                 }
@@ -235,13 +260,13 @@ export async function POST(req: NextRequest) {
             
             // 直接向用户展示具体的API错误
             const errorMessage = aiError.message || 'API调用失败';
-            controller.enqueue(encoder.encode(`data: {"content": "\\n\\n⚠️ **API错误**\\n\\n"}\n\n`));
-            controller.enqueue(encoder.encode(`data: {"content": "错误信息: ${errorMessage}\\n\\n"}\n\n`));
+            safeEnqueue(`data: {"content": "\\n\\n⚠️ **API错误**\\n\\n"}\n\n`);
+            safeEnqueue(`data: {"content": "错误信息: ${errorMessage}\\n\\n"}\n\n`);
             
             // 如果是认证错误，提供更详细的信息
             if (errorMessage.includes('Authentication') || errorMessage.includes('401')) {
-              controller.enqueue(encoder.encode(`data: {"content": "请检查 API 密钥配置是否正确。\\n"}\n\n`));
-              controller.enqueue(encoder.encode(`data: {"content": "当前使用的密钥后4位: ${process.env.DEEPSEEK_API_KEY?.slice(-4) || '未设置'}\\n\\n"}\n\n`));
+              safeEnqueue(`data: {"content": "请检查 API 密钥配置是否正确。\\n"}\n\n`);
+              safeEnqueue(`data: {"content": "当前使用的密钥后4位: ${process.env.DEEPSEEK_API_KEY?.slice(-4) || '未设置'}\\n\\n"}\n\n`);
             }
             
             let fallbackAnswer = '';
@@ -293,27 +318,34 @@ ${contextTexts.slice(0, 2).map((text, index) => `${index + 1}. ${text.substring(
               // 如果分割失败，按段落分割
               const paragraphs = fallbackAnswer.split('\\n\\n').filter(p => p.trim());
               for (const paragraph of paragraphs) {
-                controller.enqueue(encoder.encode(`data: {"content": "${paragraph.replace(/"/g, '\\"')}\\n\\n"}\n\n`));
+                if (controllerClosed) break; // 检查是否已关闭
+                safeEnqueue(`data: {"content": "${paragraph.replace(/"/g, '\\"')}\\n\\n"}\n\n`);
                 await new Promise(resolve => setTimeout(resolve, 200));
               }
             } else {
               for (const chunk of chunks) {
-                controller.enqueue(encoder.encode(`data: {"content": "${chunk.replace(/"/g, '\\"')}"}\n\n`));
+                if (controllerClosed) break; // 检查是否已关闭
+                safeEnqueue(`data: {"content": "${chunk.replace(/"/g, '\\"')}"}\n\n`);
                 await new Promise(resolve => setTimeout(resolve, 300));
               }
             }
           }
           
           // 9. 发送完成标记
-          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-          controller.close();
+          safeEnqueue('data: [DONE]\n\n');
+          safeClose();
           
         } catch (error) {
           console.error("流式响应生成错误:", error);
-          controller.enqueue(encoder.encode(`data: {"content": "生成回答时出现错误，请稍后重试。"}\n\n`));
-          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-          controller.close();
+          safeEnqueue(`data: {"content": "生成回答时出现错误，请稍后重试。"}\n\n`);
+          safeEnqueue('data: [DONE]\n\n');
+          safeClose();
         }
+      },
+      cancel() {
+        // 当客户端断开连接时调用
+        console.log('客户端断开连接，清理资源');
+        controllerClosed = true;
       }
     });
     

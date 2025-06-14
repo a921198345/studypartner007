@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Card } from "@/components/ui/card"
-import { PlusCircle, MessageCircle, Trash2, Clock } from "lucide-react"
+import { PlusCircle, MessageCircle, Trash2, Clock, AlertCircle } from "lucide-react"
 import { format } from "date-fns"
 import { zhCN } from "date-fns/locale"
 import {
@@ -159,6 +159,14 @@ export function ConversationSidebar({
           )}
         </div>
       </ScrollArea>
+      
+      {/* 存储空间提示 */}
+      <div className="p-4 border-t bg-gray-50 text-xs text-gray-500">
+        <div className="flex items-center gap-2">
+          <AlertCircle className="h-3 w-3" />
+          <span>存储空间有限，系统会自动清理旧对话</span>
+        </div>
+      </div>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
