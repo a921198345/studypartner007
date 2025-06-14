@@ -1,21 +1,6 @@
 import { NextResponse } from 'next/server';
-import mysql from 'mysql2/promise';
-
-// 数据库连接配置 - 使用环境变量或默认值
-const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '3306', 10),
-  user: process.env.DB_USER || 'law_app_user',
-  password: process.env.DB_PASSWORD || 'pass@123',
-  database: process.env.DB_NAME || 'law_exam_assistant',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-  connectTimeout: 30000 // 连接超时时间设置为30秒
-};
-
-// 创建数据库连接池
-const pool = mysql.createPool(dbConfig);
+import { pool } from '@/lib/db';
+import { isPreciseLegalTerm, filterRelevantQuestions, sortQuestionsByRelevance } from '@/lib/search-utils';
 
 // 简单测试连接函数
 async function testConnection() {
@@ -51,8 +36,19 @@ export async function GET(request) {
     const page = parseInt(searchParams.get('page') || '1', 10);
     const limit = parseInt(searchParams.get('limit') || '10', 10);
     const questionType = searchParams.get('question_type');
+    const searchQuery = searchParams.get('search'); // 新增搜索参数
     // 新增参数: 获取所有ID和题号
     const fetchAllIdsAndCodes = searchParams.get('fetchAllIdsAndCodes') === 'true';
+    
+    // 调试日志
+    console.log('API收到的搜索参数:', {
+      subject,
+      yearParam,
+      questionType,
+      searchQuery,
+      fetchAllIdsAndCodes,
+      url: request.url
+    });
     
     // 计算偏移量
     const offset = (page - 1) * limit;
@@ -92,10 +88,70 @@ export async function GET(request) {
       }
     }
     
+    // 处理搜索参数
+    if (searchQuery && searchQuery.trim()) {
+      const keyword = searchQuery.trim();
+      
+      // 精确法律术语列表
+      const preciseLegalTerms = [
+        '故意杀人', '故意伤害', '强奸', '抢劫', '盗窃', '诈骗', '抢夺',
+        '职务侵占', '挪用资金', '敲诈勒索', '贪污', '受贿', '行贿',
+        '交通肇事', '危险驾驶', '绑架', '非法拘禁',
+        '正当防卫', '紧急避险', '共同犯罪', '犯罪中止', '犯罪未遂', '犯罪预备',
+        '合同的保全', '代位权', '撤销权', '债权人代位权', '债权人撤销权'
+      ];
+      
+      // 判断是否为精确法律术语
+      const isPreciseTerm = preciseLegalTerms.some(term => 
+        term === keyword || 
+        term + '罪' === keyword ||
+        keyword === term + '罪'
+      );
+      
+      if (isPreciseTerm) {
+        // 对于精确术语，构建更严格的搜索条件
+        const searchConditions = [];
+        const searchParams = [];
+        
+        // 添加各种可能的匹配模式
+        const patterns = [
+          `%${keyword}%`,           // 基本匹配
+          `% ${keyword} %`,         // 前后有空格
+          `%${keyword}，%`,         // 后面是逗号
+          `%${keyword}。%`,         // 后面是句号
+          `%${keyword}？%`,         // 后面是问号
+          `%${keyword}、%`,         // 后面是顿号
+          `%"${keyword}"%`,         // 在引号中
+          `%（${keyword}）%`,       // 在括号中
+          `%【${keyword}】%`,       // 在方括号中
+          `%${keyword}罪%`          // 罪名形式
+        ];
+        
+        // 对题目文本和选项进行精确匹配
+        const questionConditions = patterns.map(() => 'question_text LIKE ?').join(' OR ');
+        const optionsConditions = patterns.map(() => 'options_json LIKE ?').join(' OR ');
+        searchConditions.push(`(${questionConditions} OR ${optionsConditions})`);
+        searchParams.push(...patterns, ...patterns);  // 两次patterns，分别用于question_text和options_json
+        
+        conditions.push(`(${searchConditions.join(' OR ')})`);
+        params.push(...searchParams);
+      } else {
+        // 对于非精确术语，在题干和选项中搜索
+        conditions.push('(question_text LIKE ? OR options_json LIKE ?)');
+        const searchPattern = `%${keyword}%`;
+        params.push(searchPattern, searchPattern);
+      }
+    }
+    
     // 组合WHERE子句
     const whereClause = conditions.length > 0
       ? `WHERE ${conditions.join(' AND ')}`
       : '';
+    
+    // 调试日志
+    console.log('构建的WHERE条件:', conditions);
+    console.log('WHERE子句:', whereClause);
+    console.log('查询参数:', params);
     
     // 查询总数
     const countQuery = `
@@ -110,8 +166,8 @@ export async function GET(request) {
     try {
       // 获取总数
       const [totalResult] = await connection.execute(countQuery, params);
-      const total = totalResult[0]?.total || 0;
-      const totalPages = Math.ceil(total / limit);
+      let total = totalResult[0]?.total || 0;
+      let totalPages = Math.ceil(total / limit);
       
       // 根据fetchAllIdsAndCodes参数决定返回方式
       if (fetchAllIdsAndCodes) {
@@ -134,18 +190,62 @@ export async function GET(request) {
         
         console.log(`查询到 ${allQuestions.length} 条记录，共 ${total} 条记录`);
         
+        // 暂时禁用二次筛选，保持一致性
+        let finalQuestions = allQuestions;
+        // if (searchQuery && isPreciseLegalTerm(searchQuery.trim())) {
+        //   console.log(`对精确术语 "${searchQuery}" 进行二次筛选（fetchAllIdsAndCodes模式）`);
+        //   
+        //   // 需要获取完整数据进行筛选
+        //   const fullDataQuery = `
+        //     SELECT 
+        //       id, 
+        //       question_code,
+        //       question_text, 
+        //       options_json
+        //     FROM questions 
+        //     ${whereClause} 
+        //     ORDER BY id
+        //   `;
+        //   
+        //   const [fullQuestions] = await connection.execute(fullDataQuery, params);
+        //   
+        //   // 格式化数据
+        //   const formattedFullQuestions = fullQuestions.map(q => ({
+        //     id: q.id,
+        //     question_code: q.question_code,
+        //     question_text: q.question_text,
+        //     options: typeof q.options_json === 'string' 
+        //       ? JSON.parse(q.options_json) 
+        //       : q.options_json
+        //   }));
+        //   
+        //   // 进行精确筛选
+        //   const beforeFilter = formattedFullQuestions.length;
+        //   const filteredQuestions = filterRelevantQuestions(formattedFullQuestions, searchQuery.trim());
+        //   console.log(`筛选前: ${beforeFilter} 条，筛选后: ${filteredQuestions.length} 条`);
+        //   
+        //   // 只保留ID和题号
+        //   finalQuestions = filteredQuestions.map(q => ({
+        //     id: q.id,
+        //     question_code: q.question_code || null
+        //   }));
+        //   
+        //   // 更新总数
+        //   total = filteredQuestions.length;
+        // }
+        
         // 构建响应数据
         const response = {
           success: true,
           message: "获取所有题目ID和题号成功",
           data: {
-            questions: allQuestions.map(q => ({
+            questions: finalQuestions.map(q => ({
               id: q.id,
               question_code: q.question_code || null
             })),
             pagination: {
               total,
-              totalItems: allQuestions.length
+              totalItems: finalQuestions.length
             }
           }
         };
@@ -178,25 +278,41 @@ export async function GET(request) {
         const [questions] = await connection.execute(dataQuery, queryParams);
     
         console.log(`查询到 ${questions.length} 条记录，共 ${total} 条记录`);
-    
-    // 构建响应数据
-    const response = {
-      success: true,
-      message: "获取题目成功",
-      data: {
-        questions: questions.map(q => ({
+        
+        // 格式化题目数据
+        let formattedQuestions = questions.map(q => ({
           id: q.id,
           question_code: q.question_code,
           subject: q.subject,
           year: q.year,
-          question_type: q.question_type,
+          question_type: q.question_type === 1 ? "单选题" : "多选题",
           question_text: q.question_text,
           options: typeof q.options_json === 'string' 
             ? JSON.parse(q.options_json) 
             : q.options_json,
           correct_answer: q.correct_answer,
           explanation: q.explanation_text || "暂无解析"
-        })),
+        }));
+        
+        // 暂时禁用二次筛选，保持与多关键词搜索API一致
+        // if (searchQuery && isPreciseLegalTerm(searchQuery.trim())) {
+        //   console.log(`对精确术语 "${searchQuery}" 进行二次筛选`);
+        //   const beforeFilter = formattedQuestions.length;
+        //   formattedQuestions = filterRelevantQuestions(formattedQuestions, searchQuery.trim());
+        //   formattedQuestions = sortQuestionsByRelevance(formattedQuestions, searchQuery.trim());
+        //   console.log(`筛选前: ${beforeFilter} 条，筛选后: ${formattedQuestions.length} 条`);
+        //   
+        //   // 更新总数和分页信息
+        //   total = formattedQuestions.length;
+        //   totalPages = Math.ceil(total / limit);
+        // }
+    
+    // 构建响应数据
+    const response = {
+      success: true,
+      message: "获取题目成功",
+      data: {
+        questions: formattedQuestions,
         pagination: {
           total,
           totalPages,

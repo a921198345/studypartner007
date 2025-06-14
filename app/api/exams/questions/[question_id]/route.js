@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { pool } from '@/db';
+import { pool } from '@/lib/db';
 
 // 处理GET请求 - 获取单个题目详情
 export async function GET(request, { params }) {

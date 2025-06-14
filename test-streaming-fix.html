@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>流式传输测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .input-area {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        #response {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 20px;
+            min-height: 200px;
+            background: #f9f9f9;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            position: relative;
+        }
+        .status {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        .error {
+            color: red;
+        }
+        .success {
+            color: green;
+        }
+        .streaming {
+            display: inline-block;
+            width: 2px;
+            height: 16px;
+            background: #007bff;
+            animation: blink 1s infinite;
+            vertical-align: middle;
+            margin-left: 2px;
+        }
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        .debug-info {
+            margin-top: 20px;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>法考AI流式传输测试</h1>
+        
+        <div class="input-area">
+            <input type="text" id="question" placeholder="请输入您的法考问题..." value="什么是民法中的善意取得制度？">
+            <button id="sendBtn" onclick="sendQuestion()">发送</button>
+            <button id="stopBtn" onclick="stopStreaming()" disabled>停止</button>
+        </div>
+        
+        <div class="status" id="status">等待输入...</div>
+        
+        <div id="response">
+            <span id="responseText"></span>
+            <span id="cursor" class="streaming" style="display:none;"></span>
+        </div>
+        
+        <div class="debug-info" id="debug">
+            <strong>调试信息：</strong><br>
+            <span id="debugText">-</span>
+        </div>
+    </div>
+
+    <script>
+        let reader = null;
+        let isStreaming = false;
+        let fullResponse = '';
+        let charCount = 0;
+        let startTime = null;
+        let debugLogs = [];
+        
+        function addDebugLog(message) {
+            const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+            debugLogs.push(`[${timestamp}] ${message}`);
+            if (debugLogs.length > 10) debugLogs.shift();
+            document.getElementById('debugText').innerHTML = debugLogs.join('<br>');
+        }
+        
+        async function sendQuestion() {
+            const question = document.getElementById('question').value.trim();
+            if (!question) {
+                alert('请输入问题');
+                return;
+            }
+            
+            // 重置状态
+            fullResponse = '';
+            charCount = 0;
+            startTime = Date.now();
+            document.getElementById('responseText').textContent = '';
+            document.getElementById('status').textContent = '正在连接服务器...';
+            document.getElementById('status').className = 'status';
+            document.getElementById('sendBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('cursor').style.display = 'inline-block';
+            isStreaming = true;
+            
+            addDebugLog(`发送请求: ${question.substring(0, 30)}...`);
+            
+            try {
+                const response = await fetch('/api/ai/ask/stream', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ question })
+                });
+                
+                addDebugLog(`响应状态: ${response.status} ${response.statusText}`);
+                document.getElementById('status').textContent = `服务器响应: ${response.status}`;
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                // 检查响应头
+                const contentType = response.headers.get('content-type');
+                addDebugLog(`Content-Type: ${contentType}`);
+                
+                if (!contentType || !contentType.includes('text/event-stream')) {
+                    throw new Error('服务器未返回流式响应');
+                }
+                
+                reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                
+                document.getElementById('status').textContent = '正在接收数据...';
+                addDebugLog('开始读取流式数据');
+                
+                while (isStreaming) {
+                    const { done, value } = await reader.read();
+                    
+                    if (done) {
+                        addDebugLog('流式传输完成');
+                        break;
+                    }
+                    
+                    const chunk = decoder.decode(value, { stream: true });
+                    buffer += chunk;
+                    
+                    // 按行处理
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.substring(6).trim();
+                            
+                            if (data === '[DONE]') {
+                                addDebugLog('收到完成标记');
+                                isStreaming = false;
+                                break;
+                            }
+                            
+                            if (data) {
+                                try {
+                                    const jsonData = JSON.parse(data);
+                                    if (jsonData.content) {
+                                        fullResponse += jsonData.content;
+                                        charCount += jsonData.content.length;
+                                        document.getElementById('responseText').textContent = fullResponse;
+                                        
+                                        // 每100个字符记录一次
+                                        if (charCount % 100 === 0) {
+                                            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+                                            addDebugLog(`已接收 ${charCount} 字符, 耗时 ${elapsed}s`);
+                                        }
+                                    }
+                                } catch (e) {
+                                    addDebugLog(`解析错误: ${e.message}`);
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
+                document.getElementById('status').textContent = `完成！共 ${charCount} 字符，耗时 ${totalTime} 秒`;
+                document.getElementById('status').className = 'status success';
+                addDebugLog(`传输完成: ${charCount} 字符, ${totalTime} 秒`);
+                
+            } catch (error) {
+                console.error('错误:', error);
+                document.getElementById('status').textContent = `错误: ${error.message}`;
+                document.getElementById('status').className = 'status error';
+                addDebugLog(`错误: ${error.message}`);
+            } finally {
+                // 清理状态
+                isStreaming = false;
+                document.getElementById('sendBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+                document.getElementById('cursor').style.display = 'none';
+                reader = null;
+            }
+        }
+        
+        function stopStreaming() {
+            if (reader && isStreaming) {
+                addDebugLog('用户停止流式传输');
+                isStreaming = false;
+                reader.cancel().then(() => {
+                    addDebugLog('成功取消读取器');
+                }).catch(err => {
+                    addDebugLog(`取消失败: ${err.message}`);
+                });
+                document.getElementById('status').textContent = '已停止';
+                document.getElementById('status').className = 'status';
+            }
+        }
+        
+        // 回车发送
+        document.getElementById('question').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !document.getElementById('sendBtn').disabled) {
+                sendQuestion();
+            }
+        });
+    </script>
+</body>
+</html>

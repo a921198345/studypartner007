@@ -1,0 +1,374 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import re
+import json
+import sys
+import os
+import argparse
+from datetime import datetime
+from docx import Document
+
+def clean_text(text):
+    """智能清理文本中的异常空白"""
+    if not text:
+        return text
+    
+    # 1. 替换全角空格为半角空格
+    text = text.replace('　', ' ')
+    
+    # 2. 替换多个连续空格为单个空格
+    text = re.sub(r' +', ' ', text)
+    
+    # 3. 清理行内的异常空白（保留正常的段落结构）
+    lines = text.split('\n')
+    cleaned_lines = []
+    
+    for line in lines:
+        # 去除行首尾空白
+        line = line.strip()
+        
+        # 处理选项中的异常空白，如 "A .选项" -> "A.选项"
+        line = re.sub(r'([A-D])\s+\.', r'\1.', line)
+        
+        # 处理标点符号前的异常空白
+        line = re.sub(r'\s+([，。！？；：、）】》"''])', r'\1', line)
+        
+        # 处理标点符号后的异常空白（但保留句号后的正常空格）
+        line = re.sub(r'([（【《"''])\s+', r'\1', line)
+        
+        # 处理中英文之间的空格（可选，根据需要调整）
+        # line = re.sub(r'([\u4e00-\u9fa5])\s+([\u4e00-\u9fa5])', r'\1\2', line)
+        
+        cleaned_lines.append(line)
+    
+    # 4. 处理多余的空行（连续3个或以上换行符）
+    text = '\n'.join(cleaned_lines)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    
+    return text
+
+def smart_fix_options(options_dict):
+    """智能修复选项中的问题"""
+    fixed_options = {}
+    
+    for key, value in options_dict.items():
+        # 清理选项文本
+        value = clean_text(value)
+        
+        # 如果选项为空或只有空白，标记为异常
+        if not value or value.isspace():
+            value = "[选项内容缺失]"
+        
+        fixed_options[key] = value
+    
+    return fixed_options
+
+def validate_question_format(text):
+    """严格验证题目格式"""
+    issues = []
+    
+    # 先清理文本
+    cleaned_text = clean_text(text)
+    
+    # 检查题号格式
+    if not re.search(r'【\d{8}】', cleaned_text):
+        issues.append("题号格式不正确，应为【8位数字】")
+    
+    # 检查选项数量 - 必须正好4个
+    options = re.findall(r'[A-D]\.', cleaned_text)
+    if len(options) != 4:
+        issues.append(f"选项数量错误：需要4个选项(A-D)，实际只有{len(options)}个")
+    
+    # 检查选项格式统一性 - 必须包含所有A、B、C、D
+    if not all(option in cleaned_text for option in ["A.", "B.", "C.", "D."]):
+        missing = []
+        for opt in ["A", "B", "C", "D"]:
+            if f"{opt}." not in cleaned_text:
+                missing.append(opt)
+        issues.append(f"缺少选项: {', '.join(missing)}")
+    
+    # 检查解析标记
+    if "【解析】" not in cleaned_text:
+        issues.append("缺少【解析】标记")
+    
+    # 检查是否有答案标识
+    has_answer = any(pattern in cleaned_text for pattern in [
+        "答案：", "正确答案", "故选", "本题答案", "【答案】"
+    ])
+    if not has_answer:
+        issues.append("解析中缺少明确的答案标识")
+    
+    return issues
+   
+def parse_question(text):
+    """解析单个题目文本，严格要求4个选项，智能处理空白"""
+    # 先清理文本
+    text = clean_text(text)
+    
+    # 正则表达式匹配题号
+    question_id_match = re.search(r'【(\d+)】', text)
+    if not question_id_match:
+        return None
+    
+    question_id = question_id_match.group(1)
+    
+    # 提取年份
+    year = int(question_id[:4])
+    
+    # 分离题干、选项和解析
+    parts = text.split('【解析】')
+    if len(parts) != 2:
+        return None
+    
+    question_part = parts[0]
+    analysis = parts[1].strip()
+    
+    # 清理解析文本
+    analysis = clean_text(analysis)
+    
+    # 提取选项
+    options_pattern = r'([A-D]\..*?)(?=[A-D]\.|【解析】|$)'
+    options_matches = re.findall(options_pattern, question_part, re.DOTALL)
+    
+    if not options_matches:
+        return None
+    
+    # 严格检查是否有4个选项
+    if len(options_matches) != 4:
+        return None  # 不符合要求，返回None
+    
+    # 提取题干（题号之后到第一个选项之前的文本）
+    question_text_match = re.search(r'】(.*?)(?=[A-D]\.)', question_part, re.DOTALL)
+    if not question_text_match:
+        return None
+    
+    question_text = question_text_match.group(1).strip()
+    question_text = clean_text(question_text)
+    
+    # 格式化选项为JSON
+    options_dict = {}
+    for option in options_matches:
+        option = option.strip()
+        if option:
+            key = option[0]  # 选项字母A、B、C、D
+            value = option[2:].strip()  # 选项内容
+            value = clean_text(value)  # 清理选项文本
+            options_dict[key] = value
+    
+    # 智能修复选项
+    options_dict = smart_fix_options(options_dict)
+    
+    # 再次确认有4个选项
+    if len(options_dict) != 4 or set(options_dict.keys()) != {'A', 'B', 'C', 'D'}:
+        return None
+               
+    # 初始化 correct_answer 变量
+    correct_answer = ""
+                   
+    # 查找答案 - 最直接的方法：找最明确的【答案】标记
+    answer_explicit = re.search(r'【答案】\s*([A-D]+)', text)
+    if answer_explicit:
+        correct_answer = answer_explicit.group(1).strip()
+    else:
+        # 尝试其他格式
+        answer_patterns = [
+            r'答案[：:]\s*([A-D]+)',           # "答案：B" 或 "答案:B"
+            r'正确答案[是为：:]\s*([A-D]+)',    # "正确答案是B"
+            r'故\s*(?:选择|选)?\s*([A-D]+)[。，,\.]', # "故选B。"
+            r'本题(?:答案)?(?:是|为|选)\s*([A-D]+)', # "本题为B"
+            r'综上所述\s*[，,]?\s*本题的?正确答案[为是:：]?\s*([A-D]+)', # "综上所述，本题正确答案为B"
+            r'[，,\s]([A-D])\s*[选]?项?正确[。，,\s]',  # "，B项正确，"
+        ]
+        
+        for pattern in answer_patterns:
+            answer_match = re.search(pattern, analysis, re.IGNORECASE)
+            if answer_match:
+                correct_answer = answer_match.group(1).strip()
+                break
+
+    # 如果使用上面的方法仍然没找到答案，尝试最后一段文本
+    if not correct_answer:
+        # 获取解析的最后一段
+        last_paragraph = analysis.split('\n')[-1].strip()
+        # 查找单个字母形式的答案（通常在最后一段）
+        answer_match = re.search(r'[^A-D]([A-D])[^A-D]', last_paragraph)
+        if answer_match:
+            correct_answer = answer_match.group(1)
+
+    # 根据答案长度判断题型
+    if correct_answer and len(correct_answer) > 1:
+        question_type = 2  # 多选
+    else:
+        question_type = 1  # 单选
+    
+    return {
+        'question_id': question_id,
+        'year': year,
+        'question_text': question_text,
+        'options': json.dumps(options_dict, ensure_ascii=False),
+        'correct_answer': correct_answer,
+        'analysis': analysis,
+        'question_type': question_type
+    }
+
+def extract_questions_from_doc(file_path, subject, validate=True):
+    """从Word文档中提取所有题目，严格验证格式，智能处理空白"""
+    try:
+        # 检查文件是否存在
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"文件不存在: {file_path}")
+            
+        # 尝试打开文档
+        doc = Document(file_path)
+    except Exception as e:
+        # 如果是"Package not found"错误，说明文件格式有问题
+        if "Package not found" in str(e):
+            raise Exception(f"文档格式错误，请确保是标准的.docx文件: {e}")
+        else:
+            raise Exception(f"无法打开文档: {e}")
+    
+    full_text = ""
+    
+    # 将所有段落合并为一个文本
+    for para in doc.paragraphs:
+        full_text += para.text + "\n"
+    
+    # 先清理整个文档的文本
+    full_text = clean_text(full_text)
+    
+    # 按题号分割文本
+    question_pattern = r'【\d+】.*?(?=【\d+】|$)'
+    questions_text = re.findall(question_pattern, full_text, re.DOTALL)
+    
+    parsed_questions = []
+    format_issues = {}
+    auto_fixed_count = 0  # 记录自动修复的数量
+    
+    for q_text in questions_text:
+        # 验证格式
+        issues = validate_question_format(q_text)
+        
+        # 获取题号
+        question_id_match = re.search(r'【(\d+)】', q_text)
+        question_id = question_id_match.group(1) if question_id_match else "未知题号"
+        
+        if issues:
+            # 记录格式问题
+            format_issues[question_id] = {
+                "text": q_text[:200] + "...",
+                "issues": issues
+            }
+            continue  # 跳过格式有问题的题目
+        
+        # 解析题目
+        parsed = parse_question(q_text)
+        if parsed:
+            parsed['subject'] = subject
+            
+            # 检查是否有自动修复的内容
+            if "[选项内容缺失]" in parsed['options']:
+                auto_fixed_count += 1
+                parsed['auto_fixed'] = True
+            
+            parsed_questions.append(parsed)
+        else:
+            # 解析失败也记录为格式问题
+            format_issues[question_id] = {
+                "text": q_text[:200] + "...",
+                "issues": ["解析失败，可能是格式不规范"]
+            }
+       
+    return parsed_questions, format_issues, auto_fixed_count
+
+def apply_manual_answers(questions):
+    """应用手动指定的答案规则"""
+    manual_answers = {
+        "20210201": "B",
+    }
+    
+    for q in questions:
+        if q['question_id'] in manual_answers:
+            q['correct_answer'] = manual_answers[q['question_id']]
+    
+    return questions
+   
+def main():
+    parser = argparse.ArgumentParser(description='解析法考题目(严格要求4个选项，智能处理空白)')
+    parser.add_argument('file_path', help='Word文件路径')
+    parser.add_argument('subject', help='学科名称')
+    parser.add_argument('--output-json', action='store_true', help='以JSON格式输出结果')
+    args = parser.parse_args()
+    
+    file_path = args.file_path
+    subject = args.subject
+    output_json = args.output_json
+    
+    if not os.path.exists(file_path):
+        error_msg = f"错误: 文件 '{file_path}' 不存在"
+        if output_json:
+            print(json.dumps({"error": error_msg}, ensure_ascii=False))
+        else:
+            print(error_msg)
+        return
+    
+    try:
+        # 始终验证格式
+        questions, format_issues, auto_fixed_count = extract_questions_from_doc(file_path, subject, validate=True)
+        questions = apply_manual_answers(questions)
+        
+        # 准备输出信息
+        result = {
+            "success": True,
+            "message": f"成功解析 {len(questions)} 个题目",
+            "total_questions": len(questions) + len(format_issues),
+            "parsed_questions": len(questions),
+            "format_issues": format_issues,
+            "questions": questions,
+            "auto_fixed_count": auto_fixed_count
+        }
+        
+        # 添加统计信息
+        if auto_fixed_count > 0:
+            result["message"] += f"（自动修复了{auto_fixed_count}个异常空白问题）"
+        
+        if format_issues:
+            result["message"] += f"，{len(format_issues)} 个题目存在格式错误"
+            
+            # 统计错误类型
+            error_types = {}
+            for q_id, issue_data in format_issues.items():
+                for issue in issue_data['issues']:
+                    if issue not in error_types:
+                        error_types[issue] = []
+                    error_types[issue].append(q_id)
+            
+            result["error_summary"] = error_types
+        
+        # 输出结果
+        if output_json:
+            print(json.dumps(result, ensure_ascii=False))
+        else:
+            print(f"共解析出 {len(questions)} 个题目")
+            if auto_fixed_count > 0:
+                print(f"自动修复了 {auto_fixed_count} 个异常空白问题")
+            if format_issues:
+                print(f"\n发现 {len(format_issues)} 个题目存在格式问题：")
+                for q_id, issue in list(format_issues.items())[:10]:
+                    print(f"\n题目 {q_id}:")
+                    for err in issue['issues']:
+                        print(f"  - {err}")
+                if len(format_issues) > 10:
+                    print(f"\n... 还有 {len(format_issues) - 10} 个题目存在问题")
+    
+    except Exception as e:
+        error_msg = f"程序出错: {e}"
+        if output_json:
+            print(json.dumps({"error": error_msg}, ensure_ascii=False))
+        else:
+            print(error_msg)
+            import traceback
+            traceback.print_exc()
+   
+if __name__ == "__main__":
+    main()

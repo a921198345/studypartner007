@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>滚动行为修复测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .feature-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .feature-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #1e40af;
+            margin-bottom: 10px;
+        }
+        
+        .feature-list {
+            list-style: none;
+            padding: 0;
+            margin: 10px 0;
+        }
+        
+        .feature-list li {
+            padding: 8px 0;
+            padding-left: 25px;
+            position: relative;
+        }
+        
+        .feature-list li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #10b981;
+            font-weight: bold;
+        }
+        
+        .test-steps {
+            background: #fef3c7;
+            border: 2px solid #f59e0b;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .test-steps h3 {
+            color: #d97706;
+            margin-top: 0;
+        }
+        
+        .test-steps ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        
+        .test-steps li {
+            margin: 8px 0;
+        }
+        
+        .behavior-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        
+        .behavior-table th,
+        .behavior-table td {
+            border: 1px solid #e5e7eb;
+            padding: 12px;
+            text-align: left;
+        }
+        
+        .behavior-table th {
+            background: #f3f4f6;
+            font-weight: 600;
+        }
+        
+        .behavior-table tr:nth-child(even) {
+            background: #f9fafb;
+        }
+        
+        .success-badge {
+            display: inline-block;
+            background: #10b981;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📜 滚动行为修复测试</h1>
+        <p>暂停后可以自由滚动查看历史消息</p>
+    </div>
+    
+    <div class="feature-card">
+        <div class="feature-title">🎯 修复的功能</div>
+        <ul class="feature-list">
+            <li>暂停AI回答后，对话框不会自动滚动到底部</li>
+            <li>用户可以手动向上滚动查看历史消息</li>
+            <li>当用户滚动离开底部时，显示"回到底部"按钮</li>
+            <li>发送新消息时自动滚动到底部</li>
+            <li>AI正在回答时，如果用户在底部则自动滚动</li>
+        </ul>
+    </div>
+    
+    <div class="feature-card">
+        <div class="feature-title">🔧 技术实现</div>
+        <p><strong>1. 添加了自动滚动状态管理：</strong></p>
+        <pre style="background: #f3f4f6; padding: 10px; border-radius: 4px; overflow-x: auto;">
+const [autoScroll, setAutoScroll] = useState(true);
+        </pre>
+        
+        <p><strong>2. 监听用户滚动行为：</strong></p>
+        <pre style="background: #f3f4f6; padding: 10px; border-radius: 4px; overflow-x: auto;">
+const handleScroll = useCallback(() => {
+  const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+  if (!isAtBottom && !isStreaming) {
+    setAutoScroll(false);
+  }
+}, [isStreaming]);
+        </pre>
+        
+        <p><strong>3. 暂停时关闭自动滚动：</strong></p>
+        <pre style="background: #f3f4f6; padding: 10px; border-radius: 4px; overflow-x: auto;">
+const handleStopGeneration = () => {
+  // ... 暂停逻辑
+  setAutoScroll(false);
+};
+        </pre>
+    </div>
+    
+    <div class="test-steps">
+        <h3>🧪 测试步骤</h3>
+        <ol>
+            <li>在法考问答页面发送一个会产生长回答的问题</li>
+            <li>等待AI开始生成回答</li>
+            <li>点击暂停按钮（红色方块图标）</li>
+            <li>尝试向上滚动查看历史消息</li>
+            <li>验证对话框不会自动跳回底部</li>
+            <li>滚动离开底部后，查看是否出现"回到底部"按钮</li>
+            <li>点击"回到底部"按钮，验证是否滚动到底部</li>
+        </ol>
+    </div>
+    
+    <div class="feature-card">
+        <div class="feature-title">📊 预期行为对照表</div>
+        <table class="behavior-table">
+            <thead>
+                <tr>
+                    <th>场景</th>
+                    <th>自动滚动</th>
+                    <th>显示回到底部按钮</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>AI正在回答（用户在底部）</td>
+                    <td>✅ 是</td>
+                    <td>❌ 否</td>
+                </tr>
+                <tr>
+                    <td>AI正在回答（用户滚动离开）</td>
+                    <td>❌ 否</td>
+                    <td>✅ 是</td>
+                </tr>
+                <tr>
+                    <td>点击暂停后</td>
+                    <td>❌ 否</td>
+                    <td>❌ 否（除非用户滚动）</td>
+                </tr>
+                <tr>
+                    <td>发送新消息</td>
+                    <td>✅ 是</td>
+                    <td>❌ 否</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="feature-card" style="background: #f0fdf4; border: 2px solid #10b981;">
+        <div style="text-align: center;">
+            <span class="success-badge">修复完成</span>
+            <h3 style="color: #059669; margin: 15px 0;">滚动体验优化成功！</h3>
+            <p>现在暂停后可以自由查看历史消息，不会被强制滚动到底部</p>
+        </div>
+    </div>
+</body>
+</html>

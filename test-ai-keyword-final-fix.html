@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI关键词题目数量最终修复测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .code-block {
+            background: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+        }
+        .success {
+            color: #22c55e;
+            font-weight: bold;
+        }
+        .error {
+            color: #ef4444;
+            font-weight: bold;
+        }
+        .button {
+            display: inline-block;
+            padding: 8px 16px;
+            background: #3b82f6;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            margin: 5px;
+        }
+        .expected-result {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .log-output {
+            background: #fef3c7;
+            border: 1px solid #fcd34d;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>AI关键词题目数量最终修复测试</h1>
+
+    <div class="test-section">
+        <h2 class="test-title">最新修复内容</h2>
+        <ol>
+            <li><span class="success">✓</span> 修复 fetchAllIdsAndCodes API 端点对精确术语的二次筛选</li>
+            <li><span class="success">✓</span> 传递实际筛选后的总数到 fetchAllFilteredQuestionInfoAndSave</li>
+            <li><span class="success">✓</span> 添加防抖机制防止重复请求</li>
+            <li><span class="success">✓</span> 保存实际筛选总数到 localStorage</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h2 class="test-title">预期日志输出</h2>
+        <div class="log-output">
+收到的搜索参数: { searchQuery: '盗窃', ... }<br>
+查询到 51 条记录，共 51 条记录<br>
+对精确术语 "盗窃" 进行二次筛选<br>
+筛选前: 10 条，筛选后: 8 条<br>
+AI搜索结果总数: 8, 关键词: 盗窃<br>
+成功保存 8 条AI筛选后的题目信息到localStorage<br>
+实际筛选总数: 8
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2 class="test-title">测试链接</h2>
+        <a href="/question-bank?subject=刑法&keywords=盗窃&source=ai-chat" class="button" target="_blank">
+            测试刑法 - 盗窃（应显示8道题）
+        </a>
+        <a href="/question-bank?subject=刑法&keywords=正当防卫&source=ai-chat" class="button" target="_blank">
+            测试刑法 - 正当防卫
+        </a>
+        <a href="/question-bank?subject=民法&keywords=合同的保全&source=ai-chat" class="button" target="_blank">
+            测试民法 - 合同的保全
+        </a>
+    </div>
+
+    <div class="test-section">
+        <h2 class="test-title">验证步骤</h2>
+        <ol>
+            <li>
+                <strong>检查控制台日志</strong>
+                <div class="expected-result">
+                    应该看到 "AI搜索结果总数: 8" 而不是 51 或 226
+                </div>
+            </li>
+            <li>
+                <strong>检查页面显示</strong>
+                <div class="expected-result">
+                    页面应显示 "共 8 道题目（以下是盗窃的相关题目）"
+                </div>
+            </li>
+            <li>
+                <strong>检查 localStorage</strong>
+                <div class="code-block">
+// 在控制台执行
+const data = JSON.parse(localStorage.getItem('filteredQuestionsList'));
+console.log('保存的题目数:', data.questions.length);
+console.log('实际总数:', data.actualTotal);
+console.log('AI搜索状态:', JSON.parse(sessionStorage.getItem('aiSearchState')));
+                </div>
+            </li>
+            <li>
+                <strong>检查防抖效果</strong>
+                <div class="expected-result">
+                    控制台不应出现 "已有获取所有ID的请求在进行中，跳过" 的提示
+                </div>
+            </li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h2 class="test-title">问题排查</h2>
+        <div class="code-block">
+// 如果显示仍然不正确，检查以下内容：
+// 1. API响应
+fetch('/api/exams/questions?subject=刑法&search=盗窃&page=1&limit=10')
+  .then(r => r.json())
+  .then(data => console.log('API响应总数:', data.data.pagination.total));
+
+// 2. fetchAllIdsAndCodes 响应
+fetch('/api/exams/questions?subject=刑法&search=盗窃&fetchAllIdsAndCodes=true')
+  .then(r => r.json())
+  .then(data => console.log('全部ID响应:', data.data.pagination.total, '条'));
+
+// 3. 当前状态
+console.log('actualTotalQuestions 值:', document.querySelector('h3')?.textContent);
+        </div>
+    </div>
+</body>
+</html>

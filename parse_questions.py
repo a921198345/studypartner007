@@ -1,10 +1,45 @@
-   import re
-   import json
-   import sys
-   import os
-   import mysql.connector
-   from datetime import datetime
-   from docx import Document
+import re
+import json
+import sys
+import os
+import mysql.connector
+import argparse
+from datetime import datetime
+from docx import Document
+
+def validate_question_format(text):
+    """验证题目格式并返回问题列表"""
+    issues = []
+    
+    # 检查题号格式
+    if not re.search(r'【\d{8}】', text):
+        issues.append("题号格式不正确，应为【8位数字】")
+    
+    # 检查选项数量
+    options = re.findall(r'[A-D]\.', text)
+    if len(options) != 4:
+        issues.append(f"选项数量不正确，应有4个选项(A-D)，实际有{len(options)}个")
+    
+    # 检查选项格式统一性
+    if not all(option in text for option in ["A.", "B.", "C.", "D."]):
+        issues.append("选项标识不完整或格式不统一")
+    
+    # 检查解析标记
+    if "【解析】" not in text:
+        issues.append("缺少【解析】标记")
+    
+    # 检查是否有答案标识
+    has_answer = any(pattern in text for pattern in [
+        "答案：", "正确答案", "故选", "本题答案", "【答案】"
+    ])
+    if not has_answer:
+        issues.append("解析中缺少明确的答案标识")
+    
+    # 检查多余空行
+    if "\n\n\n" in text:
+        issues.append("存在多余空行")
+    
+    return issues
    
 def parse_question(text):
     """解析单个题目文本，提取题号、题干、选项、答案和解析"""
@@ -79,13 +114,13 @@ def parse_question(text):
         last_paragraph = analysis.split('\n')[-1].strip()
         # 查找单个字母形式的答案（通常在最后一段）
         answer_match = re.search(r'[^A-D]([A-D])[^A-D]', last_paragraph)
-                   if answer_match:
+        if answer_match:
             correct_answer = answer_match.group(1)
 
     # 根据答案长度判断题型 (现在 correct_answer 一定有值)
     if correct_answer and len(correct_answer) > 1:
         question_type = 2  # 多选
-                       else:
+    else:
         question_type = 1  # 单选
     
     return {
@@ -98,7 +133,7 @@ def parse_question(text):
         'question_type': question_type
     }
 
-def extract_questions_from_doc(file_path, subject):
+def extract_questions_from_doc(file_path, subject, validate=False):
     """从Word文档中提取所有题目"""
     doc = Document(file_path)
     full_text = ""
@@ -112,18 +147,32 @@ def extract_questions_from_doc(file_path, subject):
     questions_text = re.findall(question_pattern, full_text, re.DOTALL)
     
     parsed_questions = []
+    format_issues = {}
+    
     for q_text in questions_text:
+        # 如果需要验证格式
+        if validate:
+            issues = validate_question_format(q_text)
+            if issues:
+                # 获取题号
+                question_id_match = re.search(r'【(\d+)】', q_text)
+                question_id = question_id_match.group(1) if question_id_match else "未知题号"
+                format_issues[question_id] = {
+                    "text": q_text[:100] + "...",
+                    "issues": issues
+                }
+        
         parsed = parse_question(q_text)
         if parsed:
             parsed['subject'] = subject
             parsed_questions.append(parsed)
        
-    return parsed_questions
+    return parsed_questions, format_issues
    
 def save_to_database(questions, db_config):
     """将解析后的题目保存到数据库"""
-           conn = mysql.connector.connect(**db_config)
-           cursor = conn.cursor()
+    conn = mysql.connector.connect(**db_config)
+    cursor = conn.cursor()
            
     for question in questions:
         # 检查是否已存在该题目
@@ -138,14 +187,14 @@ def save_to_database(questions, db_config):
                 UPDATE questions
                 SET subject = %s, year = %s, question_text = %s, options_json = %s,
                     correct_answer = %s, explanation_text = %s, question_type = %s
-           WHERE question_code = %s
+                WHERE question_code = %s
             """, (
                 question['subject'], question['year'], question['question_text'],
                 question['options'], question['correct_answer'], question['analysis'],
                 question['question_type'], question['question_id']
-                   ))
-               else:
-                   # 插入新题目
+            ))
+        else:
+            # 插入新题目
             cursor.execute("""
                 INSERT INTO questions
                 (question_code, subject, year, question_text, options_json, correct_answer, explanation_text, question_type)
@@ -154,11 +203,11 @@ def save_to_database(questions, db_config):
                 question['question_id'], question['subject'], question['year'],
                 question['question_text'], question['options'], question['correct_answer'],
                 question['analysis'], question['question_type']
-                   ))
+            ))
            
-           conn.commit()
-               cursor.close()
-               conn.close()
+    conn.commit()
+    cursor.close()
+    conn.close()
    
     missing_answers = 0
     for question in questions:
@@ -183,37 +232,72 @@ def apply_manual_answers(questions):
     
     return questions
    
-   def main():
-       if len(sys.argv) < 3:
-           print("用法: python parse_exam_questions.py <Word文件路径> <学科名称>")
-           print("例如: python parse_exam_questions.py 民法.docx 民法")
-           return
-       
-       file_path = sys.argv[1]
-       subject = sys.argv[2]
-       
-       if not os.path.exists(file_path):
-           print(f"错误: 文件 '{file_path}' 不存在")
-           return
-       
-       # 数据库配置
-       db_config = {
+def main():
+    # 使用argparse解析命令行参数
+    parser = argparse.ArgumentParser(description='解析法考题目并存入数据库')
+    parser.add_argument('file_path', help='Word文件路径')
+    parser.add_argument('subject', help='学科名称')
+    parser.add_argument('--validate', action='store_true', help='验证题目格式并输出问题')
+    parser.add_argument('--output-json', action='store_true', help='以JSON格式输出结果')
+    args = parser.parse_args()
+    
+    file_path = args.file_path
+    subject = args.subject
+    validate = args.validate
+    output_json = args.output_json
+    
+    if not os.path.exists(file_path):
+        error_msg = f"错误: 文件 '{file_path}' 不存在"
+        if output_json:
+            print(json.dumps({"error": error_msg}, ensure_ascii=False))
+        else:
+            print(error_msg)
+        return
+    
+    # 数据库配置
+    db_config = {
         'host': '8.141.4.192',  # 或者宝塔面板中的数据库地址
         'user': 'law_user',  # 替换为你的数据库用户名
         'password': 'Accd0726351x.',  # 替换为你的数据库密码
-           'database': 'law_exam_assistant'  # 替换为你的数据库名
-       }
-       
-       try:
-           print(f"正在解析文件: {file_path}...")
-        questions = extract_questions_from_doc(file_path, subject)
+        'database': 'law_exam_assistant'  # 替换为你的数据库名
+    }
+    
+    try:
+        print(f"正在解析文件: {file_path}...")
+        questions, format_issues = extract_questions_from_doc(file_path, subject, validate)
         questions = apply_manual_answers(questions)  # 应用手动规则
-           print(f"共解析出 {len(questions)} 个题目")
-           
-           print(f"正在将题目保存到数据库...")
-        save_to_database(questions, db_config)
-       except Exception as e:
-           print(f"程序出错: {e}")
+        
+        # 准备输出信息
+        result = {
+            "success": True,
+            "message": f"成功解析 {len(questions)} 个题目" + (f"，但有 {len(format_issues)} 个题目存在格式问题" if format_issues else ""),
+            "total_questions": len(questions) + len(format_issues),
+            "parsed_questions": len(questions),
+            "format_issues": format_issues if validate else {}
+        }
+        
+        # 总是保存成功解析的题目到数据库，无论是否有格式问题
+        if len(questions) > 0:
+            print(f"正在将 {len(questions)} 个成功解析的题目保存到数据库...")
+            save_to_database(questions, db_config)
+            print(f"成功保存 {len(questions)} 个题目到数据库")
+        
+        # 输出结果
+        if output_json:
+            print(json.dumps(result, ensure_ascii=False))
+        else:
+            print(f"共解析出 {len(questions)} 个题目")
+            if format_issues:
+                print(f"发现 {len(format_issues)} 个题目存在格式问题")
+                for q_id, issue in format_issues.items():
+                    print(f"题目 {q_id}: {', '.join(issue['issues'])}")
+    
+    except Exception as e:
+        error_msg = f"程序出错: {e}"
+        if output_json:
+            print(json.dumps({"error": error_msg}, ensure_ascii=False))
+        else:
+            print(error_msg)
    
-   if __name__ == "__main__":
-       main()
+if __name__ == "__main__":
+    main()

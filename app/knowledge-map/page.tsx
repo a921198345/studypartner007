@@ -3,6 +3,7 @@
 import React from 'react';
 import dynamic from 'next/dynamic';
 import { useState, useRef, useCallback, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -19,14 +20,61 @@ const MindMapViewer = dynamic(
 );
 
 export default function KnowledgeMapPage() {
-  const [selectedSubject, setSelectedSubject] = useState("民法")
+  const searchParams = useSearchParams()
+  const urlSubject = searchParams.get('subject') || "civil"
+  const urlSearch = searchParams.get('search') || ""
+  
+  // 解析多个搜索关键词（用逗号分隔）
+  const searchKeywords = urlSearch ? urlSearch.split(',').map(k => k.trim()).filter(k => k) : []
+  
+  // 科目ID到中文名称的映射
+  const subjectIdToName: Record<string, string> = {
+    'civil': '民法',
+    'criminal': '刑法',
+    'administrative': '行政法',
+    'constitutional': '宪法',
+    'civilProcedure': '民事诉讼法',
+    'criminalProcedure': '刑事诉讼法',
+    'economic': '经济法',
+    'international': '国际法',
+    'theory': '法理学'
+  }
+  
+  // 获取科目的中文名称
+  const getSubjectName = (subjectId: string) => {
+    return subjectIdToName[subjectId] || subjectId
+  }
+  
+  const [selectedSubject, setSelectedSubject] = useState(urlSubject)
+  const [selectedSubjectName, setSelectedSubjectName] = useState(getSubjectName(urlSubject))
   const [zoomLevel, setZoomLevel] = useState(1.0); // 添加缩放级别状态
-  const [searchTerm, setSearchTerm] = useState(""); // 添加搜索词状态
-  const [inputValue, setInputValue] = useState(""); // 添加输入框值状态
+  const [searchTerm, setSearchTerm] = useState(urlSearch); // 添加搜索词状态
+  const [inputValue, setInputValue] = useState(''); // 从AI聊天跳转时不显示在搜索框
   const [totalNodeCount, setTotalNodeCount] = useState(0); // 添加知识点总数状态
+  const [isFromAIChat, setIsFromAIChat] = useState(false); // 标记是否从AI聊天跳转
   
   // 创建引用，用于访问SVG元素或知识导图容器
   const mindMapRef = useRef<HTMLDivElement>(null);
+  
+  // 监听URL参数变化
+  useEffect(() => {
+    const subject = searchParams.get('subject')
+    const search = searchParams.get('search')
+    
+    if (subject) {
+      setSelectedSubject(subject)
+      setSelectedSubjectName(getSubjectName(subject))
+    }
+    
+    if (search) {
+      // 如果有搜索参数，说明是从AI聊天跳转来的
+      setIsFromAIChat(true)
+      setSearchTerm(search)
+      // 不设置inputValue，保持搜索框为空
+    } else {
+      setIsFromAIChat(false)
+    }
+  }, [searchParams])
   
   // 缩放处理函数
   const handleZoomIn = () => {
@@ -59,10 +107,11 @@ export default function KnowledgeMapPage() {
     { id: "criminal", name: "刑法", free: false },
     { id: "civilProcedure", name: "民事诉讼法", free: false },
     { id: "criminalProcedure", name: "刑事诉讼法", free: false },
-    { id: "commercial", name: "商法与经济法", free: false },
-    { id: "theory", name: "理论法学", free: false },
-    { id: "administrative", name: "行政法与行政诉讼法", free: false },
-    { id: "international", name: "三国法", free: false },
+    { id: "economic", name: "经济法", free: false },
+    { id: "theory", name: "法理学", free: false },
+    { id: "administrative", name: "行政法", free: false },
+    { id: "constitutional", name: "宪法", free: false },
+    { id: "international", name: "国际法", free: false },
   ]
 
   return (
@@ -118,7 +167,7 @@ export default function KnowledgeMapPage() {
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-semibold flex items-center">
                     <Brain className="mr-2 h-5 w-5 text-[#E9B949]" />
-                    {selectedSubject}知识导图
+                    {selectedSubjectName}知识导图
                   </h2>
                   <Badge className="badge-outline">共 {totalNodeCount} 个知识点</Badge>
                 </div>
@@ -129,7 +178,7 @@ export default function KnowledgeMapPage() {
                   style={{ height: "75vh" }} 
                 >
                   <MindMapViewer 
-                    subject={selectedSubject} 
+                    subject={selectedSubjectName} 
                     customZoom={zoomLevel} 
                     searchTerm={searchTerm} 
                     onNodeCountUpdate={handleNodeCountUpdate}
@@ -165,9 +214,12 @@ export default function KnowledgeMapPage() {
                   <Card
                     key={subject.id}
                     className={`cursor-pointer transition-all feature-card ${
-                      selectedSubject === subject.name ? "border-[#E9B949]" : ""
+                      selectedSubject === subject.id ? "border-[#E9B949]" : ""
                     }`}
-                    onClick={() => setSelectedSubject(subject.name)}
+                    onClick={() => {
+                      setSelectedSubject(subject.id)
+                      setSelectedSubjectName(subject.name)
+                    }}
                   >
                     <CardContent className="p-4 flex flex-col items-center text-center">
                       <div className="h-16 w-16 rounded-full bg-[#E9B949]/10 flex items-center justify-center mb-3">

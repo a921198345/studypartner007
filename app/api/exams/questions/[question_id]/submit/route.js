@@ -1,23 +1,7 @@
 import { NextResponse } from 'next/server';
-import mysql from 'mysql2/promise';
+import { pool } from '@/lib/db';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-
-// 数据库连接配置 - 使用环境变量或默认值
-const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '3306', 10),
-  user: process.env.DB_USER || 'law_app_user',
-  password: process.env.DB_PASSWORD || 'pass@123',
-  database: process.env.DB_NAME || 'law_exam_assistant',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-  connectTimeout: 30000 // 连接超时时间设置为30秒
-};
-
-// 创建数据库连接池
-const pool = mysql.createPool(dbConfig);
 
 // 简单测试连接函数
 async function testConnection() {
@@ -105,7 +89,7 @@ export async function POST(request, { params }) {
 
     // 解析请求体获取用户提交的答案
     const requestData = await request.json();
-    const { submitted_answer } = requestData;
+    const { submitted_answer, session_id } = requestData;
 
     if (!submitted_answer) {
       return NextResponse.json({
@@ -153,22 +137,65 @@ export async function POST(request, { params }) {
       
       // 记录用户答题历史
       const session = await getServerSession(authOptions);
-      if (session && session.user) {
-        try {
-          const userId = session.user.id;
+      const userId = session?.user?.id || null;
+      
+      try {
+        // 无论是否登录都记录答题历史（使用会话ID关联）
+        if (session_id) {
+          console.log('准备插入答题记录，参数:', {
+            userId: userId || null,
+            session_id,
+            questionId,
+            submitted_answer,
+            is_correct: isCorrect ? 1 : 0
+          });
           
-          // 记录答题历史
+          const [insertResult] = await connection.execute(
+            `INSERT INTO user_answers (user_id, session_id, question_id, submitted_answer, is_correct) 
+             VALUES (?, ?, ?, ?, ?)`,
+            [userId, session_id, questionId, submitted_answer, isCorrect ? 1 : 0]
+          );
+          
+          console.log(`答题记录插入结果:`, insertResult);
+          console.log(`答题记录已保存 - 用户: ${userId || '未登录'}, 会话: ${session_id}`);
+          
+          // 更新会话统计信息
+          console.log('准备更新会话统计，参数:', {
+            correct_increment: isCorrect ? 1 : 0,
+            last_question_id: questionId,
+            session_id
+          });
+          
+          const [updateResult] = await connection.execute(
+            `UPDATE answer_sessions 
+             SET questions_answered = questions_answered + 1,
+                 correct_count = correct_count + ?,
+                 last_question_id = ?,
+                 updated_at = NOW()
+             WHERE session_id = ?`,
+            [isCorrect ? 1 : 0, questionId, session_id]
+          );
+          
+          console.log(`会话更新结果:`, updateResult);
+        } else if (userId) {
+          // 兼容旧的没有会话ID的情况
           await connection.execute(
-            `INSERT INTO user_answers (user_id, question_id, submitted_answer, is_correct) 
-             VALUES (?, ?, ?, ?)`,
+            `INSERT INTO user_answers (user_id, session_id, question_id, submitted_answer, is_correct) 
+             VALUES (?, NULL, ?, ?, ?)`,
             [userId, questionId, submitted_answer, isCorrect ? 1 : 0]
           );
           
-          console.log(`用户 ${userId} 的答题记录已保存`);
-        } catch (userRecordError) {
-          console.error("保存用户答题记录失败:", userRecordError);
-          // 不影响主流程，仅记录错误
+          console.log(`用户 ${userId} 的答题记录已保存（无会话）`);
         }
+      } catch (userRecordError) {
+        console.error("保存答题记录失败 - 详细错误:", {
+          error: userRecordError.message,
+          code: userRecordError.code,
+          sqlMessage: userRecordError.sqlMessage,
+          sql: userRecordError.sql,
+          stack: userRecordError.stack
+        });
+        // 不影响主流程，仅记录错误
       }
       
       // 格式化解析文本

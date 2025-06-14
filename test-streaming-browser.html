@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>法考AI流式传输最终测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .start-btn {
+            background: #4CAF50;
+            color: white;
+        }
+        .stop-btn {
+            background: #f44336;
+            color: white;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        #response {
+            margin-top: 20px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            background: white;
+            font-family: 'Courier New', monospace;
+        }
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.info { background: #d1ecf1; color: #0c5460; }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .metric-box {
+            text-align: center;
+            padding: 15px;
+            background: #e9ecef;
+            border-radius: 5px;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .metric-label {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 法考AI流式传输最终测试</h1>
+        
+        <div class="test-section">
+            <h2>测试流式传输效果</h2>
+            <div>
+                <button class="start-btn" onclick="startTest()" id="startBtn">开始测试</button>
+                <button class="stop-btn" onclick="stopTest()" id="stopBtn" disabled>暂停生成</button>
+            </div>
+            
+            <div id="status" class="status info">准备就绪</div>
+            
+            <div id="response"></div>
+            
+            <div class="metrics">
+                <div class="metric-box">
+                    <div class="metric-value" id="charCount">0</div>
+                    <div class="metric-label">字符数</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-value" id="speed">0</div>
+                    <div class="metric-label">字符/秒</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-value" id="elapsed">0</div>
+                    <div class="metric-label">耗时(秒)</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>测试结果</h2>
+            <div id="testResult" style="white-space: pre-wrap; font-family: monospace;">
+等待测试开始...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let abortController = null;
+        let startTime = null;
+        let charCount = 0;
+        let updateInterval = null;
+        
+        async function startTest() {
+            // 重置UI
+            document.getElementById('response').textContent = '';
+            document.getElementById('status').textContent = '正在连接...';
+            document.getElementById('status').className = 'status info';
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('testResult').textContent = '测试开始...\n';
+            
+            // 重置计数
+            charCount = 0;
+            startTime = Date.now();
+            
+            // 启动更新定时器
+            updateInterval = setInterval(updateMetrics, 100);
+            
+            // 创建 AbortController
+            abortController = new AbortController();
+            
+            try {
+                const response = await fetch('/api/ai/ask/stream', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        question: '什么是善意取得？请详细解释这个法律概念。'
+                    }),
+                    signal: abortController.signal
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                document.getElementById('status').textContent = '正在接收数据...';
+                addTestLog(`✅ 连接成功，状态码: ${response.status}`);
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let firstChunk = true;
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    
+                    if (done) break;
+                    
+                    if (firstChunk) {
+                        addTestLog('✅ 开始接收流式数据');
+                        firstChunk = false;
+                    }
+                    
+                    const chunk = decoder.decode(value, { stream: true });
+                    buffer += chunk;
+                    
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.substring(6).trim();
+                            
+                            if (data === '[DONE]') {
+                                addTestLog('✅ 流式传输完成');
+                                finishTest(true);
+                                return;
+                            }
+                            
+                            if (data) {
+                                try {
+                                    const json = JSON.parse(data);
+                                    if (json.content) {
+                                        // 实时显示内容
+                                        document.getElementById('response').textContent += json.content;
+                                        charCount += json.content.length;
+                                    }
+                                } catch (e) {
+                                    addTestLog(`❌ 解析错误: ${e.message}`);
+                                }
+                            }
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    document.getElementById('status').textContent = '已暂停';
+                    document.getElementById('status').className = 'status info';
+                    addTestLog('⏸️ 用户暂停了生成');
+                } else {
+                    document.getElementById('status').textContent = `错误: ${error.message}`;
+                    document.getElementById('status').className = 'status error';
+                    addTestLog(`❌ 错误: ${error.message}`);
+                }
+                finishTest(false);
+            }
+        }
+        
+        function stopTest() {
+            if (abortController) {
+                abortController.abort();
+                abortController = null;
+            }
+        }
+        
+        function updateMetrics() {
+            if (startTime) {
+                const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+                const speed = elapsed > 0 ? Math.round(charCount / elapsed) : 0;
+                
+                document.getElementById('charCount').textContent = charCount;
+                document.getElementById('speed').textContent = speed;
+                document.getElementById('elapsed').textContent = elapsed;
+            }
+        }
+        
+        function finishTest(success) {
+            clearInterval(updateInterval);
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            
+            if (success) {
+                document.getElementById('status').textContent = '测试成功！';
+                document.getElementById('status').className = 'status success';
+            }
+            
+            const totalTime = ((Date.now() - startTime) / 1000).toFixed(2);
+            const avgSpeed = Math.round(charCount / totalTime);
+            
+            addTestLog(`\n📊 最终统计:`);
+            addTestLog(`   - 总字符数: ${charCount}`);
+            addTestLog(`   - 总耗时: ${totalTime}秒`);
+            addTestLog(`   - 平均速度: ${avgSpeed}字符/秒`);
+            addTestLog(`   - 测试结果: ${success ? '✅ 成功' : '❌ 失败'}`);
+        }
+        
+        function addTestLog(message) {
+            const testResult = document.getElementById('testResult');
+            testResult.textContent += `[${new Date().toLocaleTimeString()}] ${message}\n`;
+            testResult.scrollTop = testResult.scrollHeight;
+        }
+        
+        // 页面加载完成
+        window.onload = () => {
+            addTestLog('🚀 测试页面已就绪');
+            addTestLog('💡 点击"开始测试"按钮测试流式传输效果');
+        };
+    </script>
+</body>
+</html>

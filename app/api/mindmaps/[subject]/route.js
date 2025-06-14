@@ -314,6 +314,9 @@ export async function GET(request, { params }) {
       
       // 尝试插入默认数据到数据库
       try {
+        const tableInfo = await getTableInfo();
+        const { subjectColumnName, contentColumnName } = tableInfo;
+        
         await db.query(
           `INSERT INTO mind_maps (${subjectColumnName}, ${contentColumnName}) VALUES (?, ?) 
            ON DUPLICATE KEY UPDATE ${contentColumnName} = VALUES(${contentColumnName})`,

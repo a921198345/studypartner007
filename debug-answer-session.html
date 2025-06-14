@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>调试答题会话</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background: #1890ff;
+            color: white;
+        }
+        button:hover {
+            background: #40a9ff;
+        }
+        .info-box {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .error {
+            color: #ff4d4f;
+            font-weight: bold;
+        }
+        .success {
+            color: #52c41a;
+            font-weight: bold;
+        }
+        .warning {
+            color: #faad14;
+            font-weight: bold;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f5f5f5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>答题会话调试工具</h1>
+        
+        <div>
+            <button onclick="checkCurrentSession()">检查当前会话</button>
+            <button onclick="checkSessionHistory()">检查会话历史</button>
+            <button onclick="checkAnswerHistory()">检查答题历史</button>
+            <button onclick="simulateEndSession()">模拟结束会话</button>
+            <button onclick="clearAllData()">清除所有数据</button>
+        </div>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        function checkCurrentSession() {
+            const resultDiv = document.getElementById('result');
+            
+            try {
+                const data = localStorage.getItem('currentAnswerSession');
+                if (!data) {
+                    resultDiv.innerHTML = '<div class="error">未找到当前答题会话</div>';
+                    return;
+                }
+                
+                const session = JSON.parse(data);
+                let html = '<h2>当前答题会话</h2>';
+                
+                html += '<div class="info-box">';
+                html += `<span class="success">找到当前会话</span>\n\n`;
+                html += `会话ID: ${session.sessionId}\n`;
+                html += `开始时间: ${new Date(session.startTime).toLocaleString()}\n`;
+                html += `已答题数: ${session.questionsAnswered}\n`;
+                html += `答对题数: ${session.correctCount}\n`;
+                html += `总题数: ${session.totalQuestions || '未设置'}\n`;
+                html += `来源: ${session.source || 'all'}\n`;
+                html += `最后题目ID: ${session.lastQuestionId}\n`;
+                html += `\n筛选条件:\n`;
+                html += JSON.stringify(session.filters, null, 2);
+                html += '</div>';
+                
+                resultDiv.innerHTML = html;
+                
+            } catch (e) {
+                resultDiv.innerHTML = `<div class="error">解析当前会话时出错: ${e.message}</div>`;
+            }
+        }
+        
+        function checkSessionHistory() {
+            const resultDiv = document.getElementById('result');
+            
+            try {
+                const data = localStorage.getItem('answerSessions');
+                if (!data) {
+                    resultDiv.innerHTML = '<div class="error">未找到会话历史</div>';
+                    return;
+                }
+                
+                const sessions = JSON.parse(data);
+                let html = '<h2>答题会话历史</h2>';
+                
+                html += '<div class="info-box">';
+                html += `<span class="success">找到 ${sessions.length} 个历史会话</span>\n\n`;
+                
+                sessions.forEach((session, index) => {
+                    html += `\n会话 ${index + 1}:\n`;
+                    html += `  ID: ${session.sessionId}\n`;
+                    html += `  时间: ${new Date(session.startTime).toLocaleString()}`;
+                    if (session.endTime) {
+                        html += ` - ${new Date(session.endTime).toLocaleString()}`;
+                    }
+                    html += `\n`;
+                    html += `  答题: ${session.questionsAnswered}/${session.totalQuestions || '?'}\n`;
+                    html += `  正确: ${session.correctCount}\n`;
+                    html += `  来源: ${session.source || 'all'}\n`;
+                });
+                
+                html += '</div>';
+                
+                resultDiv.innerHTML = html;
+                
+            } catch (e) {
+                resultDiv.innerHTML = `<div class="error">解析会话历史时出错: ${e.message}</div>`;
+            }
+        }
+        
+        function checkAnswerHistory() {
+            const resultDiv = document.getElementById('result');
+            
+            try {
+                const normalHistory = localStorage.getItem('answerHistory');
+                const wrongHistory = localStorage.getItem('wrongAnswerHistory');
+                const favoritesHistory = localStorage.getItem('favoritesAnswerHistory');
+                
+                let html = '<h2>答题历史数据</h2>';
+                
+                // 普通答题历史
+                if (normalHistory) {
+                    const data = JSON.parse(normalHistory);
+                    html += '<h3>普通答题历史</h3>';
+                    html += '<div class="info-box">';
+                    html += `已答题数: ${Object.keys(data.answered || {}).length}\n`;
+                    html += `答对题数: ${Object.keys(data.correct || {}).filter(id => data.correct[id]).length}\n`;
+                    html += `时间戳: ${new Date(data.timestamp).toLocaleString()}\n`;
+                    html += '</div>';
+                } else {
+                    html += '<div class="warning">未找到普通答题历史</div>';
+                }
+                
+                // 错题答题历史
+                if (wrongHistory) {
+                    const data = JSON.parse(wrongHistory);
+                    html += '<h3>错题答题历史</h3>';
+                    html += '<div class="info-box">';
+                    html += `已答题数: ${Object.keys(data.answered || {}).length}\n`;
+                    html += `答对题数: ${Object.keys(data.correct || {}).filter(id => data.correct[id]).length}\n`;
+                    html += '</div>';
+                }
+                
+                // 收藏答题历史
+                if (favoritesHistory) {
+                    const data = JSON.parse(favoritesHistory);
+                    html += '<h3>收藏答题历史</h3>';
+                    html += '<div class="info-box">';
+                    html += `已答题数: ${Object.keys(data.answered || {}).length}\n`;
+                    html += `答对题数: ${Object.keys(data.correct || {}).filter(id => data.correct[id]).length}\n`;
+                    html += '</div>';
+                }
+                
+                resultDiv.innerHTML = html;
+                
+            } catch (e) {
+                resultDiv.innerHTML = `<div class="error">解析答题历史时出错: ${e.message}</div>`;
+            }
+        }
+        
+        function simulateEndSession() {
+            const currentSessionStr = localStorage.getItem('currentAnswerSession');
+            if (!currentSessionStr) {
+                document.getElementById('result').innerHTML = '<div class="error">没有当前会话可以结束</div>';
+                return;
+            }
+            
+            try {
+                const currentSession = JSON.parse(currentSessionStr);
+                currentSession.endTime = new Date().toISOString();
+                
+                // 获取现有会话历史
+                const sessionsStr = localStorage.getItem('answerSessions');
+                let sessions = [];
+                
+                if (sessionsStr) {
+                    sessions = JSON.parse(sessionsStr);
+                }
+                
+                // 添加当前会话到历史
+                sessions.push(currentSession);
+                
+                // 保存更新后的会话历史
+                localStorage.setItem('answerSessions', JSON.stringify(sessions));
+                
+                // 清除当前会话
+                localStorage.removeItem('currentAnswerSession');
+                
+                document.getElementById('result').innerHTML = 
+                    '<div class="success">成功结束当前会话并保存到历史</div>';
+                
+                // 触发自定义事件
+                window.dispatchEvent(new Event('answerSessionUpdated'));
+                
+            } catch (e) {
+                document.getElementById('result').innerHTML = 
+                    `<div class="error">结束会话时出错: ${e.message}</div>`;
+            }
+        }
+        
+        function clearAllData() {
+            if (confirm('确定要清除所有答题相关数据吗？')) {
+                localStorage.removeItem('currentAnswerSession');
+                localStorage.removeItem('answerSessions');
+                localStorage.removeItem('answerHistory');
+                localStorage.removeItem('wrongAnswerHistory');
+                localStorage.removeItem('favoritesAnswerHistory');
+                
+                document.getElementById('result').innerHTML = 
+                    '<div class="success">已清除所有答题相关数据</div>';
+            }
+        }
+        
+        // 页面加载时自动检查
+        window.addEventListener('DOMContentLoaded', () => {
+            checkCurrentSession();
+        });
+    </script>
+</body>
+</html>

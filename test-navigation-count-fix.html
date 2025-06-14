@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>题目导航数量修复测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .primary {
+            background: #1890ff;
+            color: white;
+        }
+        .primary:hover {
+            background: #40a9ff;
+        }
+        .success {
+            background: #52c41a;
+            color: white;
+        }
+        .danger {
+            background: #ff4d4f;
+            color: white;
+        }
+        .info-box {
+            background: #e6f7ff;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+            border: 1px solid #91d5ff;
+        }
+        .warning-box {
+            background: #fffbe6;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+            border: 1px solid #ffe58f;
+        }
+        .log-area {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+            font-family: monospace;
+            font-size: 13px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .status-item {
+            margin: 10px 0;
+            padding: 10px;
+            background: #fafafa;
+            border-radius: 4px;
+        }
+        .status-label {
+            font-weight: bold;
+            color: #666;
+        }
+        .status-value {
+            color: #1890ff;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>题目导航数量修复测试</h1>
+        
+        <div class="test-section">
+            <h2>1. 模拟筛选场景</h2>
+            <p>模拟在题库页面进行筛选，然后保存筛选结果到localStorage</p>
+            
+            <div class="button-group">
+                <button class="primary" onclick="simulateFilter(33)">
+                    模拟筛选33道题
+                </button>
+                <button class="primary" onclick="simulateFilter(55)">
+                    模拟筛选55道题（盗窃）
+                </button>
+                <button class="primary" onclick="simulateFilter(100)">
+                    模拟筛选100道题
+                </button>
+                <button class="primary" onclick="simulateFilter(958)">
+                    模拟全部题目
+                </button>
+            </div>
+            
+            <div id="filterStatus" class="info-box" style="display:none;"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>2. 检查localStorage数据</h2>
+            <p>查看当前localStorage中保存的筛选数据</p>
+            
+            <div class="button-group">
+                <button class="success" onclick="checkLocalStorage()">
+                    检查筛选数据
+                </button>
+                <button class="danger" onclick="clearFilterData()">
+                    清除筛选数据
+                </button>
+            </div>
+            
+            <div id="storageStatus" class="status-item" style="display:none;"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>3. 模拟进入题目详情页</h2>
+            <p>模拟从题库页面点击题目进入详情页，检查导航数量是否正确</p>
+            
+            <div class="button-group">
+                <button class="primary" onclick="simulateEnterQuestion(151)">
+                    进入题目#151
+                </button>
+                <button class="primary" onclick="simulateEnterQuestion(215)">
+                    进入题目#215
+                </button>
+            </div>
+            
+            <div id="navigationStatus" class="warning-box" style="display:none;"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>调试日志</h2>
+            <div id="logArea" class="log-area"></div>
+        </div>
+    </div>
+
+    <script>
+        // 日志记录函数
+        function log(message, type = 'info') {
+            const logArea = document.getElementById('logArea');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] [${type.toUpperCase()}] ${message}\n`;
+            logArea.textContent += logEntry;
+            logArea.scrollTop = logArea.scrollHeight;
+            console.log(message);
+        }
+
+        // 模拟筛选并保存数据
+        function simulateFilter(count) {
+            log(`开始模拟筛选 ${count} 道题目`);
+            
+            // 生成模拟的题目列表
+            const questions = [];
+            for (let i = 1; i <= count; i++) {
+                questions.push({
+                    id: i,
+                    question_code: `Q${i}`
+                });
+            }
+            
+            // 模拟筛选条件
+            const filters = {
+                subject: '全部科目',
+                years: ['all'],
+                types: ['全部题型'],
+                search: count === 55 ? '盗窃' : '',
+                aiKeywords: count === 55 ? ['盗窃'] : []
+            };
+            
+            // 保存到localStorage（模拟题库页面的行为）
+            const filteredData = {
+                questions: questions,
+                filters: filters,
+                actualTotal: count,
+                timestamp: Date.now()
+            };
+            
+            localStorage.setItem('filteredQuestionsList', JSON.stringify(filteredData));
+            log(`成功保存 ${count} 道题目到 localStorage`);
+            
+            // 显示状态
+            const statusDiv = document.getElementById('filterStatus');
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = `
+                <strong>筛选完成！</strong><br>
+                总题数：${count}<br>
+                筛选条件：${JSON.stringify(filters, null, 2)}
+            `;
+        }
+
+        // 检查localStorage数据
+        function checkLocalStorage() {
+            log('检查localStorage中的筛选数据');
+            
+            try {
+                const filteredListStr = localStorage.getItem('filteredQuestionsList');
+                const statusDiv = document.getElementById('storageStatus');
+                statusDiv.style.display = 'block';
+                
+                if (filteredListStr) {
+                    const filteredData = JSON.parse(filteredListStr);
+                    const age = Date.now() - filteredData.timestamp;
+                    const ageMinutes = Math.floor(age / 60000);
+                    
+                    statusDiv.innerHTML = `
+                        <div class="status-label">筛选数据状态：</div>
+                        <div>题目数量：<span class="status-value">${filteredData.questions?.length || 0}</span></div>
+                        <div>实际总数：<span class="status-value">${filteredData.actualTotal || '未设置'}</span></div>
+                        <div>数据年龄：<span class="status-value">${ageMinutes} 分钟前</span></div>
+                        <div>筛选条件：<pre class="status-value">${JSON.stringify(filteredData.filters, null, 2)}</pre></div>
+                    `;
+                    
+                    log(`找到筛选数据：${filteredData.questions?.length || 0} 道题目`);
+                } else {
+                    statusDiv.innerHTML = '<div style="color: #ff4d4f;">未找到筛选数据</div>';
+                    log('localStorage中没有筛选数据', 'warning');
+                }
+            } catch (e) {
+                log(`解析筛选数据失败：${e.message}`, 'error');
+            }
+        }
+
+        // 清除筛选数据
+        function clearFilterData() {
+            localStorage.removeItem('filteredQuestionsList');
+            localStorage.removeItem('questionTotalCount');
+            log('已清除筛选数据');
+            
+            const statusDiv = document.getElementById('storageStatus');
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '<div style="color: #52c41a;">筛选数据已清除</div>';
+        }
+
+        // 模拟进入题目详情页
+        function simulateEnterQuestion(questionId) {
+            log(`模拟进入题目 #${questionId}`);
+            
+            try {
+                // 读取筛选数据（模拟题目详情页的行为）
+                const filteredListStr = localStorage.getItem('filteredQuestionsList');
+                const navStatus = document.getElementById('navigationStatus');
+                navStatus.style.display = 'block';
+                
+                if (filteredListStr) {
+                    const filteredData = JSON.parse(filteredListStr);
+                    const totalQuestions = filteredData.questions?.length || 0;
+                    const currentIndex = filteredData.questions?.findIndex(q => q.id === questionId) || -1;
+                    
+                    navStatus.innerHTML = `
+                        <strong>题目导航信息：</strong><br>
+                        当前题目ID：${questionId}<br>
+                        导航总题数：<span style="font-size: 20px; color: #1890ff;">${totalQuestions}</span><br>
+                        当前索引：${currentIndex + 1} / ${totalQuestions}<br>
+                        <br>
+                        <strong>预期行为：</strong><br>
+                        - 导航应显示 ${totalQuestions} 道题<br>
+                        - 当前题目应高亮为第 ${currentIndex + 1} 题
+                    `;
+                    
+                    log(`导航应显示：${totalQuestions} 道题，当前为第 ${currentIndex + 1} 题`);
+                    
+                    // 模拟导航页计算
+                    const questionsPerPage = 25;
+                    const navPage = Math.ceil((currentIndex + 1) / questionsPerPage);
+                    const totalNavPages = Math.ceil(totalQuestions / questionsPerPage);
+                    log(`导航分页：第 ${navPage} / ${totalNavPages} 页`);
+                    
+                } else {
+                    navStatus.innerHTML = `
+                        <div style="color: #ff4d4f;">
+                            <strong>错误：未找到筛选数据！</strong><br>
+                            这会导致导航显示全部题目数量（958）而不是筛选后的数量
+                        </div>
+                    `;
+                    log('未找到筛选数据，导航将显示错误的题目数量', 'error');
+                }
+            } catch (e) {
+                log(`模拟进入题目失败：${e.message}`, 'error');
+            }
+        }
+
+        // 页面加载时自动检查
+        window.addEventListener('DOMContentLoaded', () => {
+            log('页面加载完成，开始检查环境');
+            checkLocalStorage();
+        });
+    </script>
+</body>
+</html>

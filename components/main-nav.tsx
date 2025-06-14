@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import { usePathname } from "next/navigation"
 import { BookOpen, Brain, FileText, MessageCircle, User, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { BookBuddyLogo5 } from "@/components/BookBuddyLogo5"
 
 export function MainNav({ className, ...props }: React.HTMLAttributes<HTMLElement>) {
   const pathname = usePathname()
@@ -53,7 +54,7 @@ export function MainNav({ className, ...props }: React.HTMLAttributes<HTMLElemen
   return (
     <div className="flex w-full items-center justify-between">
       <Link href="/" className="flex items-center space-x-2 font-bold text-xl">
-        <Brain className="h-6 w-6 text-primary" />
+        <BookBuddyLogo5 className="text-primary" size={32} />
         <span>学习搭子</span>
       </Link>
       <nav className={cn("flex items-center justify-end space-x-6", className)} {...props}>

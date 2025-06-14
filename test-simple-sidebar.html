@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简化侧边栏测试</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        .demo-wrapper {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        
+        /* 侧边栏容器 */
+        .sidebar-container {
+            width: 240px; /* w-60 = 15rem = 240px */
+            height: 500px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* 顶部区域 */
+        .sidebar-header {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .header-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        
+        .header-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: #374151;
+        }
+        
+        /* 新建对话按钮 */
+        .new-chat-btn {
+            width: 100%;
+            padding: 8px 12px;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        
+        .new-chat-btn:hover {
+            background: #f3f4f6;
+        }
+        
+        /* 对话列表容器 */
+        .conversation-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+        
+        /* 对话项 */
+        .conversation-item {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            margin-bottom: 4px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .conversation-item:hover {
+            background: #f3f4f6;
+        }
+        
+        .conversation-item.active {
+            background: #dbeafe;
+        }
+        
+        /* 图标 */
+        .icon {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+            color: #6b7280;
+        }
+        
+        /* 标题容器 - 关键部分 */
+        .title-container {
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        .title {
+            font-size: 14px;
+            color: #374151;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        /* 删除按钮 */
+        .delete-btn {
+            padding: 4px;
+            border-radius: 4px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            display: none;
+            transition: all 0.2s;
+        }
+        
+        .delete-btn:hover {
+            background: #e5e7eb;
+        }
+        
+        .conversation-item:hover .delete-btn,
+        .conversation-item.active .delete-btn {
+            display: block;
+        }
+        
+        .delete-icon {
+            width: 12px;
+            height: 12px;
+            color: #6b7280;
+        }
+        
+        /* 说明区域 */
+        .explanation {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .feature-list {
+            list-style: none;
+            margin-top: 10px;
+        }
+        
+        .feature-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .feature-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .check {
+            color: #10b981;
+            margin-right: 8px;
+        }
+        
+        code {
+            background: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 简化侧边栏实现</h1>
+        
+        <div class="demo-wrapper">
+            <!-- 侧边栏演示 -->
+            <div class="sidebar-container">
+                <div class="sidebar-header">
+                    <div class="header-row">
+                        <h2 class="header-title">对话历史</h2>
+                        <button>◀</button>
+                    </div>
+                    <button class="new-chat-btn">
+                        <span>+</span>
+                        <span>新对话</span>
+                    </button>
+                </div>
+                
+                <div class="conversation-list">
+                    <!-- 正常长度的对话 -->
+                    <div class="conversation-item">
+                        <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+                        </svg>
+                        <div class="title-container">
+                            <p class="title">什么是合同？</p>
+                        </div>
+                        <button class="delete-btn">
+                            <svg class="delete-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    
+                    <!-- 长标题的对话（会显示省略号） -->
+                    <div class="conversation-item active">
+                        <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+                        </svg>
+                        <div class="title-container">
+                            <p class="title" title="解释下有名合同和要式合同的区别">解释下有名合同和要式合同的区别</p>
+                        </div>
+                        <button class="delete-btn">
+                            <svg class="delete-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    
+                    <!-- 超长标题 -->
+                    <div class="conversation-item">
+                        <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+                        </svg>
+                        <div class="title-container">
+                            <p class="title" title="承揽合同和委托合同的区别是什么？请详细解释两者的定义、成立要件、典型例子以及在实务中的应用">承揽合同和委托合同的区别是什么？请详细解释两者的定义、成立要件、典型例子以及在实务中的应用</p>
+                        </div>
+                        <button class="delete-btn">
+                            <svg class="delete-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 说明 -->
+            <div class="explanation" style="flex: 1;">
+                <h2>✨ 简化实现的关键点</h2>
+                
+                <h3 style="margin-top: 20px;">1. HTML 结构（简单直接）</h3>
+                <pre style="background: #f3f4f6; padding: 15px; border-radius: 6px; margin: 10px 0;">
+&lt;div className="conversation-item"&gt;
+  &lt;MessageSquare className="icon" /&gt;
+  
+  &lt;!-- 标题容器 - 关键 --&gt;
+  &lt;div className="flex-1 overflow-hidden"&gt;
+    &lt;p className="text-sm truncate" title={title}&gt;
+      {title}
+    &lt;/p&gt;
+  &lt;/div&gt;
+  
+  &lt;!-- 删除按钮 - 条件渲染 --&gt;
+  {(isHovered || isActive) && (
+    &lt;button onClick={handleDelete}&gt;
+      &lt;Trash2 /&gt;
+    &lt;/button&gt;
+  )}
+&lt;/div&gt;</pre>
+
+                <h3>2. 核心 CSS 类</h3>
+                <ul class="feature-list">
+                    <li><code>flex-1</code> - 让标题容器占据剩余空间</li>
+                    <li><code>overflow-hidden</code> - 隐藏溢出内容（必须）</li>
+                    <li><code>truncate</code> - 相当于：
+                        <ul style="margin-left: 20px; margin-top: 5px;">
+                            <li><code>overflow: hidden</code></li>
+                            <li><code>text-overflow: ellipsis</code></li>
+                            <li><code>white-space: nowrap</code></li>
+                        </ul>
+                    </li>
+                </ul>
+
+                <h3>3. 实现的功能</h3>
+                <ul class="feature-list">
+                    <li><span class="check">✓</span>长标题自动显示省略号</li>
+                    <li><span class="check">✓</span>鼠标悬浮显示完整标题（title 属性）</li>
+                    <li><span class="check">✓</span>删除按钮在悬浮或激活时显示</li>
+                    <li><span class="check">✓</span>删除按钮不影响标题布局</li>
+                    <li><span class="check">✓</span>简单的状态管理（只用 hoveredId）</li>
+                </ul>
+
+                <h3>4. 为什么这次能成功？</h3>
+                <ul class="feature-list">
+                    <li><strong>去掉复杂性：</strong>不再使用绝对定位，直接用条件渲染</li>
+                    <li><strong>正确的容器结构：</strong>flex-1 + overflow-hidden 是关键组合</li>
+                    <li><strong>足够的宽度：</strong>240px 提供足够空间显示内容</li>
+                    <li><strong>简单的交互：</strong>悬浮状态用简单的 state 管理</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

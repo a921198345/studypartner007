@@ -146,7 +146,7 @@ export function SaveNoteButton({ question, answer, chatId }: SaveNoteButtonProps
         variant="ghost"
         size="sm"
         onClick={() => setOpen(true)}
-        className="text-xs"
+        className="text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200"
       >
         <BookmarkPlus className="h-3 w-3 mr-1" />
         保存为笔记

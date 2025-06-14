@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多关键词搜索功能测试（修复版）</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+        }
+        .test-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .test-controls select, .test-controls input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .test-controls button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .test-controls button:hover {
+            background-color: #45a049;
+        }
+        .results {
+            margin-top: 20px;
+        }
+        .result-item {
+            background-color: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+        }
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #e8f5e9;
+            border-radius: 4px;
+        }
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2e7d32;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+        }
+        .error {
+            color: #d32f2f;
+            background-color: #ffebee;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .success {
+            color: #2e7d32;
+            background-color: #e8f5e9;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .debug-info {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .comparison-box {
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .comparison-box h4 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>多关键词搜索功能测试（修复版）</h1>
+        
+        <!-- 测试1：单关键词搜索对比 -->
+        <div class="test-section">
+            <h2>测试1：单关键词搜索（使用多关键词API vs 原API）</h2>
+            <div class="test-controls">
+                <select id="subject1">
+                    <option value="all">全部科目</option>
+                    <option value="刑法" selected>刑法</option>
+                    <option value="民法">民法</option>
+                    <option value="行政法">行政法</option>
+                </select>
+                <input type="text" id="keyword1" value="盗窃" placeholder="输入关键词">
+                <button onclick="testSingleKeyword()">执行测试</button>
+            </div>
+            <div class="comparison-grid" id="comparison1"></div>
+        </div>
+
+        <!-- 测试2：多关键词搜索 -->
+        <div class="test-section">
+            <h2>测试2：多关键词并集搜索</h2>
+            <div class="test-controls">
+                <select id="subject2">
+                    <option value="all">全部科目</option>
+                    <option value="刑法" selected>刑法</option>
+                    <option value="民法">民法</option>
+                    <option value="行政法">行政法</option>
+                </select>
+                <input type="text" id="keywords2" value="盗窃,抢劫" placeholder="输入多个关键词，用逗号分隔">
+                <button onclick="testMultipleKeywords()">执行测试</button>
+            </div>
+            <div id="results2"></div>
+        </div>
+
+        <!-- 测试3：科目切换一致性 -->
+        <div class="test-section">
+            <h2>测试3：科目切换一致性测试</h2>
+            <div class="test-controls">
+                <input type="text" id="keyword3" value="盗窃" placeholder="输入关键词">
+                <button onclick="testSubjectConsistency()">执行测试</button>
+            </div>
+            <div id="results3"></div>
+        </div>
+
+        <!-- 测试4：搜索结果验证 -->
+        <div class="test-section">
+            <h2>测试4：搜索结果详细验证</h2>
+            <div class="test-controls">
+                <select id="subject4">
+                    <option value="all">全部科目</option>
+                    <option value="刑法" selected>刑法</option>
+                    <option value="民法">民法</option>
+                    <option value="行政法">行政法</option>
+                </select>
+                <input type="text" id="keywords4" value="盗窃" placeholder="输入关键词">
+                <input type="number" id="limit4" value="10" min="1" max="100" placeholder="显示条数">
+                <button onclick="testDetailedResults()">执行测试</button>
+            </div>
+            <div id="results4"></div>
+        </div>
+    </div>
+
+    <script>
+        // 多关键词搜索API
+        async function searchWithMultipleKeywords(keywords, subject, limit = 100) {
+            try {
+                const response = await fetch('/api/exams/questions/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        keywords: Array.isArray(keywords) ? keywords : [keywords],
+                        subject: subject !== 'all' ? subject : undefined,
+                        page: 1,
+                        limit: limit
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('搜索失败:', error);
+                return { success: false, error: error.message };
+            }
+        }
+
+        // 原API搜索
+        async function searchWithOriginalAPI(keyword, subject, limit = 100) {
+            try {
+                const params = new URLSearchParams({
+                    search: keyword,
+                    page: 1,
+                    limit: limit
+                });
+                
+                if (subject !== 'all') {
+                    params.append('subject', subject);
+                }
+                
+                const response = await fetch(`/api/exams/questions?${params}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('原API搜索失败:', error);
+                return { success: false, error: error.message };
+            }
+        }
+
+        // 测试1：单关键词搜索对比
+        async function testSingleKeyword() {
+            const subject = document.getElementById('subject1').value;
+            const keyword = document.getElementById('keyword1').value.trim();
+            const container = document.getElementById('comparison1');
+            
+            container.innerHTML = '<div style="grid-column: 1/-1; text-align: center;">搜索中...</div>';
+            
+            // 同时调用两个API
+            const [multiResult, originalResult] = await Promise.all([
+                searchWithMultipleKeywords([keyword], subject),
+                searchWithOriginalAPI(keyword, subject)
+            ]);
+            
+            let html = '';
+            
+            // 多关键词API结果
+            html += '<div class="comparison-box">';
+            html += '<h4>多关键词搜索API结果</h4>';
+            if (multiResult.success) {
+                const total = multiResult.data?.pagination?.total || 0;
+                const returned = multiResult.data?.questions?.length || 0;
+                html += `<div class="stats">`;
+                html += `<div class="stat-item"><div class="stat-value">${total}</div><div class="stat-label">总数</div></div>`;
+                html += `<div class="stat-item"><div class="stat-value">${returned}</div><div class="stat-label">返回数</div></div>`;
+                html += `</div>`;
+                if (multiResult.data?.debug) {
+                    html += `<div class="debug-info">调试信息: ${JSON.stringify(multiResult.data.debug, null, 2)}</div>`;
+                }
+            } else {
+                html += `<div class="error">错误: ${multiResult.error || '未知错误'}</div>`;
+            }
+            html += '</div>';
+            
+            // 原API结果
+            html += '<div class="comparison-box">';
+            html += '<h4>原搜索API结果</h4>';
+            if (originalResult.success) {
+                const total = originalResult.data?.pagination?.total || 0;
+                const returned = originalResult.data?.questions?.length || 0;
+                html += `<div class="stats">`;
+                html += `<div class="stat-item"><div class="stat-value">${total}</div><div class="stat-label">总数</div></div>`;
+                html += `<div class="stat-item"><div class="stat-value">${returned}</div><div class="stat-label">返回数</div></div>`;
+                html += `</div>`;
+            } else {
+                html += `<div class="error">错误: ${originalResult.error || '未知错误'}</div>`;
+            }
+            html += '</div>';
+            
+            container.innerHTML = html;
+        }
+
+        // 测试2：多关键词搜索
+        async function testMultipleKeywords() {
+            const subject = document.getElementById('subject2').value;
+            const keywordsStr = document.getElementById('keywords2').value;
+            const keywords = keywordsStr.split(',').map(k => k.trim()).filter(k => k);
+            const container = document.getElementById('results2');
+            
+            container.innerHTML = '<div>搜索中...</div>';
+            
+            const result = await searchWithMultipleKeywords(keywords, subject);
+            
+            let html = '';
+            if (result.success) {
+                const total = result.data?.pagination?.total || 0;
+                const returned = result.data?.questions?.length || 0;
+                
+                html += `<div class="success">搜索成功！关键词: ${keywords.join(', ')}</div>`;
+                html += `<div class="stats">`;
+                html += `<div class="stat-item"><div class="stat-value">${total}</div><div class="stat-label">找到题目总数</div></div>`;
+                html += `<div class="stat-item"><div class="stat-value">${returned}</div><div class="stat-label">当前页显示</div></div>`;
+                html += `<div class="stat-item"><div class="stat-value">${keywords.length}</div><div class="stat-label">关键词数量</div></div>`;
+                html += `</div>`;
+                
+                if (result.data?.debug) {
+                    html += `<div class="debug-info">调试信息:\n${JSON.stringify(result.data.debug, null, 2)}</div>`;
+                }
+                
+                // 显示前5条结果
+                if (result.data?.questions && result.data.questions.length > 0) {
+                    html += '<h4>前5条搜索结果：</h4>';
+                    result.data.questions.slice(0, 5).forEach((q, index) => {
+                        html += `<div class="result-item">`;
+                        html += `<div class="result-header">`;
+                        html += `<span>${index + 1}. ${q.question_code || `题目${q.id}`}</span>`;
+                        html += `<span>${q.subject} - ${q.year}年</span>`;
+                        html += `</div>`;
+                        html += `<div>${q.question_text.substring(0, 100)}...</div>`;
+                        if (q.matched_keyword) {
+                            html += `<div style="color: #666; font-size: 12px; margin-top: 5px;">匹配关键词: ${q.matched_keyword}</div>`;
+                        }
+                        html += `</div>`;
+                    });
+                }
+            } else {
+                html += `<div class="error">搜索失败: ${result.error || result.message || '未知错误'}</div>`;
+            }
+            
+            container.innerHTML = html;
+        }
+
+        // 测试3：科目切换一致性
+        async function testSubjectConsistency() {
+            const keyword = document.getElementById('keyword3').value.trim();
+            const container = document.getElementById('results3');
+            const subjects = ['all', '刑法', '民法', '行政法'];
+            
+            container.innerHTML = '<div>测试中...</div>';
+            
+            let html = '<h4>各科目搜索结果对比：</h4>';
+            html += '<table style="width: 100%; border-collapse: collapse;">';
+            html += '<tr><th style="border: 1px solid #ddd; padding: 8px;">科目</th><th style="border: 1px solid #ddd; padding: 8px;">找到题目数</th><th style="border: 1px solid #ddd; padding: 8px;">状态</th></tr>';
+            
+            let totalSum = 0;
+            const subjectResults = {};
+            
+            for (const subject of subjects) {
+                const result = await searchWithMultipleKeywords([keyword], subject);
+                
+                if (result.success) {
+                    const count = result.data?.pagination?.total || 0;
+                    subjectResults[subject] = count;
+                    if (subject !== 'all') {
+                        totalSum += count;
+                    }
+                    html += `<tr>`;
+                    html += `<td style="border: 1px solid #ddd; padding: 8px;">${subject}</td>`;
+                    html += `<td style="border: 1px solid #ddd; padding: 8px;">${count}</td>`;
+                    html += `<td style="border: 1px solid #ddd; padding: 8px; color: green;">✓</td>`;
+                    html += `</tr>`;
+                } else {
+                    html += `<tr>`;
+                    html += `<td style="border: 1px solid #ddd; padding: 8px;">${subject}</td>`;
+                    html += `<td style="border: 1px solid #ddd; padding: 8px;">-</td>`;
+                    html += `<td style="border: 1px solid #ddd; padding: 8px; color: red;">✗ 失败</td>`;
+                    html += `</tr>`;
+                }
+            }
+            
+            html += '</table>';
+            
+            // 一致性检查
+            const allCount = subjectResults['all'] || 0;
+            const isConsistent = Math.abs(allCount - totalSum) <= 1; // 允许1的误差
+            
+            if (isConsistent) {
+                html += `<div class="success" style="margin-top: 15px;">✓ 一致性检查通过！全部科目(${allCount}) ≈ 各科目之和(${totalSum})</div>`;
+            } else {
+                html += `<div class="error" style="margin-top: 15px;">✗ 一致性检查失败！全部科目(${allCount}) ≠ 各科目之和(${totalSum})</div>`;
+            }
+            
+            container.innerHTML = html;
+        }
+
+        // 测试4：搜索结果详细验证
+        async function testDetailedResults() {
+            const subject = document.getElementById('subject4').value;
+            const keywordsStr = document.getElementById('keywords4').value;
+            const keywords = keywordsStr.split(',').map(k => k.trim()).filter(k => k);
+            const limit = parseInt(document.getElementById('limit4').value) || 10;
+            const container = document.getElementById('results4');
+            
+            container.innerHTML = '<div>搜索中...</div>';
+            
+            const result = await searchWithMultipleKeywords(keywords, subject, limit);
+            
+            let html = '';
+            if (result.success && result.data?.questions) {
+                html += `<div class="success">找到 ${result.data.pagination.total} 道题目，显示前 ${result.data.questions.length} 条</div>`;
+                
+                result.data.questions.forEach((q, index) => {
+                    html += `<div class="result-item">`;
+                    html += `<div class="result-header">`;
+                    html += `<span>${index + 1}. ${q.question_code || `题目${q.id}`}</span>`;
+                    html += `<span>${q.subject} - ${q.year}年 - ${q.question_type}</span>`;
+                    html += `</div>`;
+                    html += `<div style="margin-bottom: 10px;">${q.question_text}</div>`;
+                    
+                    // 显示选项
+                    if (q.options && typeof q.options === 'object') {
+                        html += '<div style="margin-left: 20px; color: #666;">';
+                        Object.entries(q.options).forEach(([key, value]) => {
+                            html += `<div>${key}. ${value}</div>`;
+                        });
+                        html += '</div>';
+                    }
+                    
+                    html += `<div style="margin-top: 10px; color: #4CAF50;">正确答案: ${q.correct_answer}</div>`;
+                    
+                    if (q.matched_keyword) {
+                        html += `<div style="color: #2196F3; font-size: 12px; margin-top: 5px;">匹配关键词: ${q.matched_keyword}</div>`;
+                    }
+                    if (q.relevance_score !== undefined) {
+                        html += `<div style="color: #FF9800; font-size: 12px;">相关性得分: ${q.relevance_score}</div>`;
+                    }
+                    html += `</div>`;
+                });
+            } else {
+                html += `<div class="error">搜索失败: ${result.error || result.message || '未知错误'}</div>`;
+            }
+            
+            container.innerHTML = html;
+        }
+
+        // 页面加载时执行第一个测试
+        window.onload = function() {
+            testSingleKeyword();
+        };
+    </script>
+</body>
+</html>

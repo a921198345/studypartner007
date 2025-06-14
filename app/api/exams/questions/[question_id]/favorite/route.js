@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth.ts';
-import { pool } from '@/db';
+import { pool } from '@/lib/db';
 
 export async function POST(request, { params }) {
   try {

@@ -38,6 +38,7 @@ interface ChatState {
   switchConversation: (id: string) => void; // 切换对话
   deleteConversation: (id: string) => void; // 删除对话
   updateConversationTitle: (id: string, title: string) => void; // 更新对话标题
+  cleanupEmptyConversations: () => void;    // 清理空对话
 }
 
 // 创建状态管理存储
@@ -50,33 +51,53 @@ export const useChatStore = create<ChatState>()(
       
       // 添加新消息到当前对话
       addMessage: (message) => set((state) => {
-        if (!state.currentConversationId) return state;
+        // console.log('📝 添加消息:', { messageId: message.id, role: message.role });
+        
+        if (!state.currentConversationId) {
+          // console.warn('没有当前对话ID');
+          return state;
+        }
         
         const currentConv = state.conversations.find(c => c.id === state.currentConversationId);
-        if (!currentConv) return state;
+        if (!currentConv) {
+          // console.warn('找不到当前对话');
+          return state;
+        }
         
+        // 更新对话中的消息
+        const updatedMessages = [...currentConv.messages, message];
         const updatedConversations = state.conversations.map(conv => {
           if (conv.id === state.currentConversationId) {
             return {
               ...conv,
-              messages: [...conv.messages, message],
+              messages: updatedMessages,
               updatedAt: new Date().toISOString()
             };
           }
           return conv;
         });
         
+        // console.log('📝 消息添加完成，当前消息数:', updatedMessages.length);
+        
         return {
-          messages: [...state.messages, message],
+          messages: updatedMessages, // 确保使用更新后的消息列表
           conversations: updatedConversations
         };
       }),
       
       // 更新现有消息
       updateMessage: (id, update) => set((state) => {
-        console.log('🔄 更新消息:', { id, update, messageCount: state.messages.length });
+        // console.log('🔄 更新消息:', { id, update: update.content?.substring(0, 50), messageCount: state.messages.length });
         
-        const updatedMessages = state.messages.map((msg) => 
+        // 找到当前对话
+        const currentConv = state.conversations.find(c => c.id === state.currentConversationId);
+        if (!currentConv) {
+          // console.warn('更新消息时找不到当前对话');
+          return state;
+        }
+        
+        // 更新对话中的消息
+        const updatedMessages = currentConv.messages.map((msg) => 
           msg.id === id ? { ...msg, ...update } : msg
         );
         
@@ -84,17 +105,17 @@ export const useChatStore = create<ChatState>()(
           if (conv.id === state.currentConversationId) {
             return {
               ...conv,
-              messages: conv.messages.map((msg) => 
-                msg.id === id ? { ...msg, ...update } : msg
-              ),
+              messages: updatedMessages,
               updatedAt: new Date().toISOString()
             };
           }
           return conv;
         });
         
+        // console.log('🔄 消息更新完成，更新后消息数:', updatedMessages.length);
+        
         return {
-          messages: updatedMessages,
+          messages: updatedMessages, // 确保使用更新后的消息列表
           conversations: updatedConversations
         };
       }),
@@ -187,14 +208,61 @@ export const useChatStore = create<ChatState>()(
         conversations: state.conversations.map(conv => 
           conv.id === id ? { ...conv, title, updatedAt: new Date().toISOString() } : conv
         )
-      }))
+      })),
+      
+      // 清理空对话
+      cleanupEmptyConversations: () => set((state) => {
+        // 过滤掉没有实质内容的对话
+        const updatedConversations = state.conversations.filter(conv => {
+          // 如果没有消息，直接过滤掉
+          if (conv.messages.length === 0) {
+            return false;
+          }
+          
+          // 保留有实质内容的对话（至少有一条用户消息，且用户消息不为空）
+          const hasValidUserMessage = conv.messages.some(msg => 
+            msg.role === 'user' && msg.content && msg.content.trim().length > 0
+          );
+          
+          // 只保留有有效用户消息的对话
+          return hasValidUserMessage;
+        });
+        
+        // 如果当前对话被清理了，重置当前对话ID
+        const currentConvExists = updatedConversations.some(c => c.id === state.currentConversationId);
+        
+        return {
+          conversations: updatedConversations,
+          currentConversationId: currentConvExists ? state.currentConversationId : null,
+          messages: currentConvExists ? state.messages : []
+        };
+      })
     }),
     {
       name: 'law-chat-storage', // 本地存储的键名
-      partialize: (state) => ({ 
-        conversations: state.conversations,
-        currentConversationId: state.currentConversationId
-      }), // 持久化对话数据
+      partialize: (state) => {
+        // 限制只保存最近的 10 个对话
+        const MAX_CONVERSATIONS = 10;
+        const sortedConversations = [...state.conversations]
+          .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+          .slice(0, MAX_CONVERSATIONS);
+        
+        return {
+          // 只持久化对话元数据，不包含图片
+          conversations: sortedConversations.map(conv => ({
+            ...conv,
+            messages: conv.messages.map(msg => ({
+              ...msg,
+              // 保留图片标记但不存储实际数据
+              imageBase64: msg.imageBase64 ? 'IMAGE_PLACEHOLDER' : undefined,
+              // 保存完整内容，避免影响按钮显示
+              content: msg.content
+            }))
+          })),
+          // 不保存当前对话ID，每次都从新对话开始
+          currentConversationId: null
+        };
+      }, // 持久化对话数据（不包含图片）
     }
   )
 ); 
