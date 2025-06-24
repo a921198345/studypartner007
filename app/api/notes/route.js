@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { verifyAuth } from '@/lib/auth-middleware';
+import { checkNotesLimit, logFeatureUsage } from '@/lib/membership-middleware';
 
 // GET /api/notes - 获取用户笔记列表
 export async function GET(request) {
@@ -82,12 +84,36 @@ export async function GET(request) {
 // POST /api/notes - 创建新笔记
 export async function POST(request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, message: '请先登录' },
-        { status: 401 }
-      );
+    // 首先尝试使用新的认证系统
+    const auth_result = await verifyAuth(request);
+    let user_id;
+    
+    if (auth_result.success) {
+      user_id = auth_result.user.user_id;
+    } else {
+      // 如果新认证失败，尝试使用NextAuth session
+      const session = await getServerSession(authOptions);
+      if (!session?.user?.id) {
+        return NextResponse.json(
+          { success: false, message: '请先登录' },
+          { status: 401 }
+        );
+      }
+      user_id = session.user.id;
+    }
+
+    // 检查笔记数量限制
+    const notes_limit = await checkNotesLimit(user_id);
+    if (!notes_limit.canCreate) {
+      return NextResponse.json({
+        success: false,
+        message: `非会员用户最多只能创建${notes_limit.limit}条笔记`,
+        upgradeRequired: true,
+        usage: {
+          count: notes_limit.count,
+          limit: notes_limit.limit
+        }
+      }, { status: 403 });
     }
 
     const body = await request.json();
@@ -112,10 +138,13 @@ export async function POST(request) {
     // 创建笔记
     const [result] = await db.execute(
       `INSERT INTO user_notes (user_id, title, content, category) VALUES (?, ?, ?, ?)`,
-      [session.user.id, title || '无标题笔记', content, category]
+      [user_id, title || '无标题笔记', content, category]
     );
 
     const noteId = result.insertId;
+
+    // 记录使用日志
+    await logFeatureUsage(user_id, 'notes', 'create', noteId.toString());
 
     // 返回新创建的笔记
     const [newNote] = await db.execute(

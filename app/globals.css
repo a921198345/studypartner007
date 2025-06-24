@@ -39,6 +39,57 @@
   -webkit-mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
 }
 
+/* 学习计划统一样式 */
+.study-plan-content {
+  @apply text-sm leading-6;
+}
+
+.study-plan-content h1 {
+  @apply text-lg font-bold mb-3 mt-4 text-gray-900;
+}
+
+.study-plan-content h2 {
+  @apply text-base font-semibold mb-2 mt-3 text-gray-900;
+}
+
+.study-plan-content h3 {
+  @apply text-sm font-medium mb-2 mt-2 text-gray-800;
+}
+
+.study-plan-content p {
+  @apply mb-3 leading-7 text-sm;
+}
+
+.study-plan-content ul,
+.study-plan-content ol {
+  @apply space-y-1 mb-4;
+}
+
+.study-plan-content li {
+  @apply mb-2 leading-6 text-sm;
+}
+
+.study-plan-content strong {
+  @apply font-semibold text-gray-900;
+}
+
+/* 任务列表样式 */
+.task-list-item {
+  @apply flex items-start gap-3 p-3 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors;
+}
+
+.task-list-item.completed {
+  @apply bg-green-50 border-green-200;
+}
+
+.task-list-item .task-content {
+  @apply flex-1 text-sm leading-6;
+}
+
+.task-list-item .task-meta {
+  @apply text-xs text-gray-500 mt-1;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -192,5 +243,98 @@
   
   .sidebar-toggle-button:hover {
     @apply scale-110;
+  }
+
+  /* 学习计划文本格式化 */
+  .study-plan-content {
+    @apply text-sm leading-relaxed text-gray-700;
+  }
+
+  .study-plan-content h1, 
+  .study-plan-content h2, 
+  .study-plan-content h3 {
+    @apply font-semibold mb-3 mt-4 text-gray-900;
+  }
+
+  .study-plan-content h1 {
+    @apply text-lg;
+  }
+
+  .study-plan-content h2 {
+    @apply text-base;
+  }
+
+  .study-plan-content h3 {
+    @apply text-sm;
+  }
+
+  .study-plan-content p {
+    @apply mb-3 leading-relaxed;
+  }
+
+  .study-plan-content ul, 
+  .study-plan-content ol {
+    @apply mb-3 ml-4 space-y-1;
+  }
+
+  .study-plan-content li {
+    @apply leading-relaxed;
+  }
+
+  .study-plan-content strong {
+    @apply font-semibold text-gray-900;
+  }
+
+  .study-plan-content em {
+    @apply italic text-gray-600;
+  }
+
+  /* 任务列表项样式 */
+  .task-list-item {
+    @apply flex items-start gap-3 py-2 px-3 rounded-lg hover:bg-gray-50 transition-colors;
+  }
+
+  .task-list-item input[type="checkbox"] {
+    @apply mt-1;
+  }
+
+  .task-list-item label {
+    @apply text-sm leading-relaxed cursor-pointer flex-1;
+  }
+
+  .task-list-item.completed label {
+    @apply line-through text-gray-500;
+  }
+
+  /* 学习计划卡片样式 */
+  .plan-card {
+    @apply rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow;
+  }
+
+  .plan-card-header {
+    @apply p-4 border-b border-gray-100;
+  }
+
+  .plan-card-content {
+    @apply p-4;
+  }
+
+  /* 响应式文本大小 */
+  @media (max-width: 640px) {
+    .study-plan-content {
+      @apply text-xs;
+    }
+    
+    .study-plan-content h1 {
+      @apply text-base;
+    }
+    
+    .study-plan-content h2 {
+      @apply text-sm;
+    }
+    
+    .study-plan-content h3 {
+      @apply text-xs;
+    }
   }
 }

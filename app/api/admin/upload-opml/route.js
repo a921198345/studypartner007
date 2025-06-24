@@ -1,131 +1,84 @@
 /**
- * 管理员API端点 - OPML文件上传与解析
- * 
- * 该接口允许管理员上传OPML格式的知识导图文件并存储到数据库
- * 支持大于1MB的文件上传
+ * 管理员 API 端点 - OPML 文件上传与解析（基于 Next.js 14 App Router）
+ * POST /api/admin/upload-opml
+ *
+ * 接收 multipart/form-data：
+ *   - opmlFile  : .opml / .xml 文件
+ *   - subjectName : 学科名称
+ *
+ * 不再依赖 multer，直接通过 `req.formData()` 读取文件。
  */
 
 import { NextResponse } from 'next/server';
+import { mkdir, writeFile } from 'fs/promises';
+import path from 'path';
 import { parseOpmlToJsonTree } from '../../../../lib/opml/parser';
 import { saveOPMLFile, saveMindMapToDB } from '../../../../lib/opml/storage';
-import multer from 'multer';
-import fs from 'fs';
-import path from 'path';
-import { promisify } from 'util';
-
-// 将文件读取改为异步Promise版本
-const readFileAsync = promisify(fs.readFile);
-
-// 配置multer存储
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, path.join(process.cwd(), 'public/uploads/opml'));
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-// 创建multer上传实例
-const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024 // 限制为5MB
-  },
-  fileFilter: function (req, file, cb) {
-    // 只接受XML或OPML文件
-    if (file.mimetype === 'application/xml' || 
-        file.mimetype === 'text/xml' || 
-        file.originalname.endsWith('.opml') || 
-        file.originalname.endsWith('.xml')) {
-      cb(null, true);
-    } else {
-      cb(new Error('只接受XML或OPML文件'));
-    }
-  }
-});
-
-// 创建上传处理中间件
-const uploadMiddleware = upload.single('opmlFile');
-
-// 处理multer中间件在Next.js API路由中的使用
-function runMiddleware(req, res, fn) {
-  return new Promise((resolve, reject) => {
-    fn(req, res, (result) => {
-      if (result instanceof Error) {
-        return reject(result);
-      }
-      return resolve(result);
-    });
-  });
-}
 
 /**
  * POST 处理程序
- * 接收OPML文件上传，解析并存储到数据库
  */
 export async function POST(req) {
   try {
-    // 克隆请求及响应对象(为了兼容Express中间件)
-    const res = {};
-    
-    try {
-      // 运行上传中间件
-      await runMiddleware(req, res, uploadMiddleware);
-    } catch (error) {
-      return NextResponse.json({
-        success: false,
-        message: `文件上传失败: ${error.message}`
-      }, { status: 400 });
-    }
-    
-    // 获取表单数据
+    // 解析 multipart/form-data
     const formData = await req.formData();
+
     const subjectName = formData.get('subjectName');
-    const file = req.file; // multer添加的文件信息
-    
-    if (!subjectName) {
-      return NextResponse.json({
-        success: false,
-        message: '缺少学科名称参数'
-      }, { status: 400 });
+    const file = formData.get('opmlFile');
+
+    // 参数校验
+    if (!subjectName || typeof subjectName !== 'string') {
+      return NextResponse.json({ success: false, message: '缺少学科名称参数' }, { status: 400 });
     }
-    
-    if (!file) {
-      return NextResponse.json({
-        success: false,
-        message: '没有上传文件'
-      }, { status: 400 });
+
+    if (!file || typeof file === 'string') {
+      // 当 file 不存在或被解析为普通字段时返回错误
+      return NextResponse.json({ success: false, message: '没有上传文件' }, { status: 400 });
     }
-    
-    // 读取上传的文件内容
-    const filePath = file.path;
-    const opmlContent = await readFileAsync(filePath, 'utf8');
-    
-    // 解析OPML为JSON树结构
+
+    // 检查文件类型
+    const allowedTypes = ['application/xml', 'text/xml', 'text/plain'];
+    const fileName = file.name;
+    const isOpml = fileName.endsWith('.opml') || fileName.endsWith('.xml');
+    if (!isOpml && !allowedTypes.includes(file.type)) {
+      return NextResponse.json({ success: false, message: '只接受 .opml / .xml 文件' }, { status: 400 });
+    }
+
+    // 生成随机文件名，防止冲突
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const ext = path.extname(fileName) || '.opml';
+    const savedFileName = `opmlFile-${uniqueSuffix}${ext}`;
+
+    // 保存文件到 public/uploads/opml
+    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'opml');
+    await mkdir(uploadDir, { recursive: true });
+
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const filePath = path.join(uploadDir, savedFileName);
+    await writeFile(filePath, buffer);
+
+    // 解析 OPML 内容
+    const opmlContent = buffer.toString('utf8');
     const parsedData = await parseOpmlToJsonTree(opmlContent);
-    
-    // 保存文件路径到数据库
-    const savedFilePath = await saveOPMLFile(file.filename, subjectName);
-    
-    // 保存解析后的数据到数据库
+
+    // 保存到数据库（文件信息 + MindMap 数据）
+    await saveOPMLFile(savedFileName, subjectName);
     await saveMindMapToDB(subjectName, parsedData);
-    
-    return NextResponse.json({
-      success: true,
-      message: '知识导图上传并解析成功',
-      data: {
-        subject: subjectName,
-        filePath: savedFilePath
-      }
-    });
-    
+
+    return NextResponse.json(
+      {
+        success: true,
+        message: '知识导图上传并解析成功',
+        data: {
+          subject: subjectName,
+          filePath: `/public/uploads/opml/${savedFileName}`,
+        },
+      },
+      { status: 200 },
+    );
   } catch (error) {
-    console.error('上传处理失败:', error);
-    return NextResponse.json({
-      success: false,
-      message: `处理失败: ${error.message}`
-    }, { status: 500 });
+    console.error('OPML 上传失败:', error);
+    return NextResponse.json({ success: false, message: `处理失败: ${error.message}` }, { status: 500 });
   }
 } 

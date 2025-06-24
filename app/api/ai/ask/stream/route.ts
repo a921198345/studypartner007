@@ -2,6 +2,9 @@ import { NextRequest } from 'next/server';
 import { generateAnswerStream, buildPrompt } from '@/lib/deepseek.js';
 import { getTextEmbedding } from '@/lib/embeddings.js';
 import { searchVectorChunks, searchByKeywords } from '@/lib/vector-search.js';
+import { withAuth } from '@/lib/api-auth.js';
+import { checkAIUsageLimit, incrementAIUsage, logFeatureUsage } from '@/lib/membership-middleware.js';
+import { verifyAuth } from '@/lib/auth-middleware';
 
 // 设置能够流式响应的headers
 export const headers = {
@@ -20,7 +23,7 @@ export async function OPTIONS() {
     headers: {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     },
   });
 }
@@ -61,27 +64,68 @@ function detectSubject(question: string): string {
   return bestMatch.score > 0 ? bestMatch.subject : "民法";
 }
 
-// 接收POST请求，获取问题文本，返回流式响应
-export async function POST(req: NextRequest) {
+// 原始的POST处理函数
+async function handlePost(req: NextRequest) {
   console.log("接收到AI问答请求");
   
   try {
+    // 验证用户身份
+    const auth_result = await verifyAuth(req);
+    if (!auth_result.success) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        message: '请先登录',
+        requireAuth: true
+      }), {
+        status: 401,
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
+    }
+    
+    const user_id = auth_result.user.user_id;
+    
+    // 检查AI使用限制
+    const usage_limit = await checkAIUsageLimit(user_id);
+    console.log('AI使用限制检查:', usage_limit);
+    
+    if (!usage_limit.canUse) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        message: '今日免费提问次数已用完',
+        upgradeRequired: true,
+        usage: {
+          limit: usage_limit.limit,
+          used: usage_limit.used,
+          remainingToday: usage_limit.remainingToday
+        }
+      }), {
+        status: 403,
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
+    }
+    
     // 解析请求体
     const requestData = await req.json();
-    const { question, imageBase64, sessionId } = requestData;
+    const { question, sessionId } = requestData;
     
     console.log("请求参数:", { 
       question: question?.substring(0, 30), 
-      hasImage: !!imageBase64, 
-      sessionId 
+      sessionId,
+      userId: user_id
     });
 
     // 验证请求参数
-    if (!question && !imageBase64) {
+    if (!question) {
       console.log("缺少必要的请求参数");
       return new Response(JSON.stringify({ 
         success: false, 
-        message: '请提供问题文本或图片' 
+        message: '请提供问题文本' 
       }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
@@ -118,19 +162,28 @@ export async function POST(req: NextRequest) {
         };
         
         try {
-          // 立即发送一个初始响应，确保连接建立
-          safeEnqueue(`data: {"type": "init", "content": ""}\n\n`);
+          // 增加AI使用次数
+          await incrementAIUsage(user_id);
+          await logFeatureUsage(user_id, 'ai_chat', 'ask_question', sessionId);
+          
+          // 获取更新后的使用情况
+          const updated_usage = await checkAIUsageLimit(user_id);
+          
+          // 立即发送一个初始响应，包含使用情况信息
+          safeEnqueue(`data: {"type": "init", "content": "", "usage": ${JSON.stringify({
+            limit: updated_usage.limit,
+            used: updated_usage.used,
+            remainingToday: updated_usage.remainingToday
+          })}}\n\n`);
           // 立即开始，不显示多余的状态消息
           console.log('🚀 开始处理用户问题');
           
           // 并行处理：同时进行学科识别和知识库准备
           let contextChunks = [];
-          let subject = "民法"; // 默认学科
           
-          if (question) {
-            // 快速学科识别（不等待，立即处理）
-            subject = detectSubject(question);
-            console.log('🎯 识别学科:', subject);
+          // 快速学科识别（不等待，立即处理）
+          const subject = detectSubject(question);
+          console.log('🎯 识别学科:', subject);
             
             // 异步进行知识库搜索（不阻塞AI调用）
             const searchPromise = (async () => {
@@ -162,7 +215,6 @@ export async function POST(req: NextRequest) {
             } catch {
               contextChunks = [];
             }
-          }
           
           // 5. 构建上下文
           const contextTexts = contextChunks
@@ -170,7 +222,7 @@ export async function POST(req: NextRequest) {
             .map(chunk => chunk.original_text);
           
           // 6. 构建完整的提示词
-          const fullPrompt = buildPrompt(question || '请分析这张图片', contextTexts, imageBase64);
+          const fullPrompt = buildPrompt(question, contextTexts);
           console.log('构建的提示词长度:', fullPrompt.length);
           
           // 7. 调用DeepSeek生成流式回答 (如果没有API密钥则使用模拟回答)
@@ -180,7 +232,7 @@ export async function POST(req: NextRequest) {
             console.log('NODE_ENV:', process.env.NODE_ENV);
             console.log('MOCK_AI_RESPONSE:', process.env.MOCK_AI_RESPONSE);
             
-            const deepseekStream = await generateAnswerStream(fullPrompt, imageBase64);
+            const deepseekStream = await generateAnswerStream(fullPrompt);
             
             if (!deepseekStream) {
               throw new Error('DeepSeek流式响应为空');
@@ -360,7 +412,7 @@ ${contextTexts.slice(0, 2).map((text, index) => `${index + 1}. ${text.substring(
         'Transfer-Encoding': 'chunked',
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       }
     });
     
@@ -375,10 +427,11 @@ ${contextTexts.slice(0, 2).map((text, index) => `${index + 1}. ${text.substring(
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       }
     });
   }
 }
 
- 
+// 导出POST函数，已经内置身份验证和会员限制检查
+export const POST = handlePost;

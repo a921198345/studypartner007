@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>诊断学习计划显示问题</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1000px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+        }
+        .section h2 {
+            margin-top: 0;
+            color: #555;
+            font-size: 18px;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .success {
+            color: #27ae60;
+            font-weight: bold;
+        }
+        .error {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .warning {
+            color: #f39c12;
+            font-weight: bold;
+        }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        button.danger {
+            background: #e74c3c;
+        }
+        button.danger:hover {
+            background: #c0392b;
+        }
+        .fix-section {
+            background: #e8f5e9;
+            border: 1px solid #4caf50;
+            padding: 20px;
+            border-radius: 6px;
+            margin-top: 20px;
+        }
+        .code-block {
+            background: #263238;
+            color: #aed581;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>学习计划显示问题诊断</h1>
+        
+        <div class="section">
+            <h2>1. localStorage 数据检查</h2>
+            <div id="localStorage-check"></div>
+        </div>
+
+        <div class="section">
+            <h2>2. 计划数据结构分析</h2>
+            <div id="plan-structure"></div>
+        </div>
+
+        <div class="section">
+            <h2>3. 问题诊断</h2>
+            <div id="diagnosis"></div>
+        </div>
+
+        <div class="section">
+            <h2>4. 操作工具</h2>
+            <button onclick="viewRawData()">查看原始数据</button>
+            <button onclick="fixPlanStructure()">修复计划结构</button>
+            <button onclick="clearPlan()" class="danger">清除计划数据</button>
+            <button onclick="createTestPlan()">创建测试计划</button>
+        </div>
+
+        <div id="fix-result" style="display: none;" class="fix-section">
+            <h2>修复结果</h2>
+            <div id="fix-content"></div>
+        </div>
+    </div>
+
+    <script>
+        // 诊断函数
+        function diagnose() {
+            const localStorageDiv = document.getElementById('localStorage-check');
+            const structureDiv = document.getElementById('plan-structure');
+            const diagnosisDiv = document.getElementById('diagnosis');
+            
+            // 1. 检查localStorage
+            const savedPlan = localStorage.getItem('current-study-plan');
+            
+            if (savedPlan) {
+                localStorageDiv.innerHTML = '<p class="success">✓ 找到保存的学习计划</p>';
+                
+                try {
+                    const plan = JSON.parse(savedPlan);
+                    
+                    // 2. 分析数据结构
+                    let structureHTML = '<pre>' + JSON.stringify(plan, null, 2) + '</pre>';
+                    structureDiv.innerHTML = structureHTML;
+                    
+                    // 3. 诊断问题
+                    let issues = [];
+                    
+                    if (!plan.generatedContent) {
+                        issues.push('<p class="error">❌ 缺少 generatedContent 字段</p>');
+                    } else {
+                        if (!plan.generatedContent.dailyPlan) {
+                            issues.push('<p class="error">❌ 缺少 dailyPlan 内容</p>');
+                        }
+                        if (!plan.generatedContent.weeklyPlan) {
+                            issues.push('<p class="error">❌ 缺少 weeklyPlan 内容</p>');
+                        }
+                        if (!plan.generatedContent.overallStrategy) {
+                            issues.push('<p class="error">❌ 缺少 overallStrategy 内容</p>');
+                        }
+                        
+                        if (issues.length === 0) {
+                            issues.push('<p class="success">✓ 计划数据结构完整</p>');
+                            
+                            // 检查内容是否为空
+                            if (!plan.generatedContent.dailyPlan.trim() || 
+                                !plan.generatedContent.weeklyPlan.trim() || 
+                                !plan.generatedContent.overallStrategy.trim()) {
+                                issues.push('<p class="warning">⚠️ 某些计划内容为空</p>');
+                            }
+                        }
+                    }
+                    
+                    // 检查其他必要字段
+                    if (!plan.id) issues.push('<p class="error">❌ 缺少 id 字段</p>');
+                    if (!plan.subjects || plan.subjects.length === 0) {
+                        issues.push('<p class="warning">⚠️ 没有选择学习科目</p>');
+                    }
+                    
+                    diagnosisDiv.innerHTML = issues.join('');
+                    
+                    // 根据诊断结果显示修复建议
+                    if (issues.some(issue => issue.includes('error'))) {
+                        diagnosisDiv.innerHTML += '<hr><p><strong>建议：</strong>计划数据结构不完整，建议点击"修复计划结构"按钮尝试修复，或重新创建学习计划。</p>';
+                    }
+                    
+                } catch (e) {
+                    localStorageDiv.innerHTML = '<p class="error">❌ JSON 解析错误</p>';
+                    structureDiv.innerHTML = '<pre class="error">' + e.message + '</pre>';
+                }
+            } else {
+                localStorageDiv.innerHTML = '<p class="error">❌ 没有找到保存的学习计划</p>';
+                diagnosisDiv.innerHTML = '<p>请在应用中创建一个新的学习计划。</p>';
+            }
+            
+            // 检查其他相关数据
+            const otherData = [
+                'daily-tasks',
+                'weekly-tasks', 
+                'completed-study-tasks'
+            ];
+            
+            let otherDataHTML = '<h3>其他相关数据:</h3><ul>';
+            otherData.forEach(key => {
+                const value = localStorage.getItem(key);
+                if (value) {
+                    otherDataHTML += `<li><strong>${key}:</strong> ${value.substring(0, 100)}...</li>`;
+                }
+            });
+            otherDataHTML += '</ul>';
+            localStorageDiv.innerHTML += otherDataHTML;
+        }
+
+        // 查看原始数据
+        function viewRawData() {
+            const savedPlan = localStorage.getItem('current-study-plan');
+            if (savedPlan) {
+                console.log('原始计划数据:', savedPlan);
+                alert('原始数据已输出到控制台，请打开开发者工具查看。');
+            } else {
+                alert('没有找到保存的计划数据。');
+            }
+        }
+
+        // 修复计划结构
+        function fixPlanStructure() {
+            const savedPlan = localStorage.getItem('current-study-plan');
+            if (!savedPlan) {
+                alert('没有找到需要修复的计划数据。');
+                return;
+            }
+            
+            try {
+                const plan = JSON.parse(savedPlan);
+                
+                // 修复 generatedContent
+                if (!plan.generatedContent) {
+                    plan.generatedContent = {
+                        dailyPlan: plan.dailyPlan || '',
+                        weeklyPlan: plan.weeklyPlan || '',
+                        overallStrategy: plan.overallStrategy || '',
+                        generatedAt: new Date().toISOString(),
+                        settings: {
+                            dailyHours: 2,
+                            weeklyDays: 5,
+                            subjects: plan.subjects || []
+                        }
+                    };
+                }
+                
+                // 确保必要字段存在
+                if (!plan.id) plan.id = Date.now().toString();
+                if (!plan.title) plan.title = "我的学习计划";
+                if (!plan.description) plan.description = "AI智能生成的个性化学习计划";
+                if (!plan.subjects) plan.subjects = [];
+                if (!plan.createdAt) plan.createdAt = new Date().toISOString();
+                if (!plan.lastUpdated) plan.lastUpdated = new Date().toISOString();
+                
+                // 保存修复后的数据
+                localStorage.setItem('current-study-plan', JSON.stringify(plan));
+                
+                document.getElementById('fix-result').style.display = 'block';
+                document.getElementById('fix-content').innerHTML = 
+                    '<p class="success">✓ 计划结构已修复！</p>' +
+                    '<p>请刷新学习计划页面查看效果。</p>' +
+                    '<pre>' + JSON.stringify(plan, null, 2) + '</pre>';
+                
+                // 重新诊断
+                setTimeout(diagnose, 500);
+                
+            } catch (e) {
+                alert('修复失败：' + e.message);
+            }
+        }
+
+        // 清除计划数据
+        function clearPlan() {
+            if (confirm('确定要清除所有学习计划数据吗？此操作不可恢复。')) {
+                localStorage.removeItem('current-study-plan');
+                localStorage.removeItem('daily-tasks');
+                localStorage.removeItem('weekly-tasks');
+                localStorage.removeItem('completed-study-tasks');
+                alert('学习计划数据已清除。');
+                diagnose();
+            }
+        }
+
+        // 创建测试计划
+        function createTestPlan() {
+            const testPlan = {
+                id: Date.now().toString(),
+                title: "测试学习计划",
+                description: "用于测试的学习计划",
+                subjects: ["民法", "刑法"],
+                totalWeeks: 12,
+                currentWeek: 1,
+                progressPercentage: 0,
+                generatedContent: {
+                    overallStrategy: "## 总体学习策略\n\n### 第一阶段：基础知识学习（1-4周）\n- 重点学习民法和刑法的基础概念\n- 每天学习2小时，每周学习5天\n\n### 第二阶段：深入理解（5-8周）\n- 深入理解重点法条\n- 开始做练习题\n\n### 第三阶段：冲刺复习（9-12周）\n- 大量做题\n- 查漏补缺",
+                    dailyPlan: "## 今日学习任务\n\n□ 任务1：学习民法总则第一章（1小时）\n□ 任务2：复习刑法总则基本原则（30分钟）\n□ 任务3：完成民法练习题10道（30分钟）",
+                    weeklyPlan: "## 本周学习计划\n\n### 周一至周三\n□ 完成民法总则前三章学习\n□ 刑法总则复习\n\n### 周四至周五\n□ 民法练习题50道\n□ 刑法案例分析3个\n\n### 周末\n□ 本周知识点总结\n□ 错题复习",
+                    generatedAt: new Date().toISOString(),
+                    settings: {
+                        dailyHours: 2,
+                        weeklyDays: 5,
+                        subjects: ["民法", "刑法"]
+                    }
+                },
+                createdAt: new Date().toISOString(),
+                lastUpdated: new Date().toISOString()
+            };
+            
+            localStorage.setItem('current-study-plan', JSON.stringify(testPlan));
+            
+            document.getElementById('fix-result').style.display = 'block';
+            document.getElementById('fix-content').innerHTML = 
+                '<p class="success">✓ 测试计划已创建！</p>' +
+                '<p>请刷新学习计划页面查看效果。</p>';
+            
+            setTimeout(diagnose, 500);
+        }
+
+        // 页面加载时自动诊断
+        window.onload = diagnose;
+    </script>
+</body>
+</html>

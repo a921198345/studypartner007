@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>学习计划功能流程图 V4 - 含用户偏好记忆</title>
+  <!-- Mermaid.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({ 
+      startOnLoad: true,
+      theme: 'default',
+      flowchart: {
+        useMaxWidth: true,
+        htmlLabels: true,
+        curve: 'basis'
+      }
+    });
+  </script>
+  <style>
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
+      margin: 2rem; 
+      line-height: 1.6;
+    }
+    .mermaid {
+      text-align: center;
+      margin: 2rem 0;
+    }
+    h2 {
+      color: #333;
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .description {
+      background: #f8f9fa;
+      padding: 1rem;
+      border-radius: 8px;
+      margin: 2rem 0;
+    }
+    .highlight {
+      background: #fff3cd;
+      padding: 0.5rem;
+      border-radius: 4px;
+      border-left: 4px solid #ffc107;
+    }
+  </style>
+</head>
+<body>
+  <h2>法考学习计划功能流程图 V4</h2>
+  
+  <div class="description">
+    <h3>🎯 V4 核心升级</h3>
+    <ul>
+      <li><strong>三级计划结构</strong>：总体规划思路 + 日计划 + 周计划</li>
+      <li><strong>用户偏好记忆</strong>：自动保存学习习惯，确保一致性</li>
+      <li><strong>冲突检测机制</strong>：基于历史计划避免内容冲突</li>
+      <li><strong>智能优化</strong>：根据完成率动态调整计划难度</li>
+    </ul>
+  </div>
+
+  <div class="mermaid">
+  graph TD
+      A[🏠 学习计划页面] --> A1{🔍 检查用户历史}
+      A1 --> A2[📊 加载用户偏好<br/>learning_preferences]
+      A2 --> B[📝 重新制定计划按钮]
+      
+      B --> C[📋 步骤1: 选择学习进度]
+      C --> C0[💾 自动填充上次选择<br/>如有历史记录]
+      
+      C0 --> D{每个科目选择状态}
+      D --> D1[✅ 已完成]
+      D --> D2[❌ 未开始] 
+      D --> D3[🟡 进行中]
+      
+      D3 --> E[📊 步骤1.1: 滑块选择具体进度]
+      E --> F[显示该科目章节列表<br/>垂直滑动进度条]
+      F --> G[自动计算完成百分比<br/>💾 保存进度偏好]
+      
+      D1 --> H[📑 步骤2: 科目学习顺序]
+      D2 --> H
+      G --> H
+      
+      H --> H0[🔄 应用历史排序偏好<br/>order_method: ai/manual]
+      H0 --> I{选择排序方式}
+      I --> I1[👆 手动拖拽排序]
+      I --> I2[🤖 AI智能排序]
+      
+      I2 --> J[基于进度+重要程度+<br/>难易程度+关联性+<br/>🆕 用户历史表现排序]
+      
+      I1 --> K[⏰ 步骤3: 设置学习时间]
+      J --> K
+      
+      K --> K0[🔄 自动填充历史时间偏好<br/>daily_hours, weekly_days]
+      K0 --> L[每日学习时长: 1-5h+<br/>每周学习天数: 3-7天]
+      L --> M[📝 步骤4: 自定义说明可选]
+      
+      M --> N[💭 引导词提示:<br/>薄弱环节/重点加强等<br/>🔄 显示历史常用描述]
+      N --> O[🚀 步骤5: 生成计划]
+      
+      O --> O1[🔍 冲突检测预处理]
+      O1 --> O2{检查历史计划冲突}
+      O2 -->|有冲突| O3[⚠️ 显示冲突警告<br/>建议调整]
+      O2 -->|无冲突| P[⏳ 显示加载动画<br/>调用AI生成计划]
+      O3 --> P
+      
+      P --> Q[POST /api/study-plan/generate<br/>🆕 包含用户偏好数据]
+      
+      Q --> R[📋 计划预览页面]
+      R --> S[🆕 显示三级计划结构:<br/>1️⃣总体规划思路<br/>2️⃣今日学习计划<br/>3️⃣本周学习计划]
+      
+      S --> T{用户是否满意?}
+      T -->|😊 满意| U[✅ 确认计划按钮]
+      T -->|😐 不满意| V[💬 反馈并重新生成]
+      
+      V --> W[弹出反馈输入框<br/>用户输入修改意见]
+      W --> X[保留原设置+反馈<br/>🆕 更新用户偏好<br/>基于反馈重新生成]
+      X --> Q
+      
+      U --> Y[POST /api/study-plan/save]
+      Y --> Y1[💾 保存用户偏好数据<br/>更新learning_preferences]
+      Y1 --> Y2[💾 计划写入数据库<br/>标记为historical_performance]
+      Y2 --> Z[🎉 返回学习计划页面<br/>显示新计划]
+      
+      style A fill:#e1f5fe
+      style A1 fill:#f3e5f5
+      style B fill:#f3e5f5
+      style C fill:#fff3e0
+      style O1 fill:#ffebee
+      style O2 fill:#ffebee
+      style S fill:#e8f5e8
+      style U fill:#e8f5e8
+      style V fill:#ffebee
+      style Y1 fill:#f3e5f5
+      style Z fill:#e1f5fe
+  </div>
+
+  <div class="description">
+    <h3>🆕 新增功能特性</h3>
+    <div class="highlight">
+      <h4>1. 用户偏好记忆系统</h4>
+      <ul>
+        <li><strong>自动填充</strong>：基于历史选择预填问卷</li>
+        <li><strong>学习习惯跟踪</strong>：记录时间偏好、科目偏好、排序方式</li>
+        <li><strong>表现分析</strong>：根据完成率调整后续计划难度</li>
+      </ul>
+    </div>
+    
+    <div class="highlight">
+      <h4>2. 三级计划结构输出</h4>
+      <ul>
+        <li><strong>总体规划思路</strong>：学习策略 + 目标设定 + 方法论</li>
+        <li><strong>今日学习计划</strong>：具体时间安排 + 学习内容 + 功能使用建议</li>
+        <li><strong>本周学习计划</strong>：章节组合 + 里程碑 + 复习安排</li>
+      </ul>
+    </div>
+    
+    <div class="highlight">
+      <h4>3. 冲突检测与一致性保证</h4>
+      <ul>
+        <li><strong>进度冲突检测</strong>：确保新计划基于最新学习进度</li>
+        <li><strong>时间合理性检查</strong>：避免超出用户历史承受能力</li>
+        <li><strong>内容衔接验证</strong>：保证知识点学习的连贯性</li>
+        <li><strong>难度适配调整</strong>：根据历史完成情况动态调整</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="description">
+    <h3>🔧 技术实现要点</h3>
+    <ul>
+      <li><strong>数据存储</strong>：用户偏好表 + 历史计划表 + 表现分析表</li>
+      <li><strong>AI优化</strong>：基于用户数据的个性化Prompt生成</li>
+      <li><strong>冲突算法</strong>：多维度检测机制确保计划一致性</li>
+      <li><strong>前端状态</strong>：智能缓存用户选择，支持无缝体验</li>
+      <li><strong>API设计</strong>：支持偏好数据传递和冲突预警</li>
+    </ul>
+  </div>
+
+  <div class="description">
+    <h3>📊 数据流转</h3>
+    <p><strong>输入</strong>：用户选择 + 历史偏好 + 学习进度</p>
+    <p><strong>处理</strong>：冲突检测 + AI智能生成 + 个性化优化</p>
+    <p><strong>输出</strong>：三级计划结构 + 更新的用户偏好</p>
+    <p><strong>存储</strong>：计划数据 + 偏好更新 + 表现记录</p>
+  </div>
+</body>
+</html>

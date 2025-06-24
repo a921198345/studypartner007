@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>测试知识导图搜索功能</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .test-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        .test-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        input, select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        input[type="text"] {
+            flex: 1;
+        }
+        
+        button {
+            padding: 8px 16px;
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        button:hover {
+            background-color: #2563eb;
+        }
+        
+        .results {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            min-height: 200px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            font-size: 13px;
+        }
+        
+        .question-item {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .question-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .question-text {
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
+        
+        .highlight {
+            background-color: #fff3cd;
+            padding: 2px 4px;
+            border-radius: 2px;
+        }
+        
+        .status {
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        
+        .status.success {
+            background-color: #d1fae5;
+            color: #059669;
+        }
+        
+        .status.error {
+            background-color: #fee2e2;
+            color: #dc2626;
+        }
+        
+        .test-cases {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .test-case {
+            padding: 10px;
+            background: #f0f4f8;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .test-case:hover {
+            background: #e2e8f0;
+        }
+    </style>
+</head>
+<body>
+    <h1>知识导图搜索功能测试</h1>
+    
+    <div class="test-section">
+        <h2>测试用例</h2>
+        <div class="test-cases">
+            <div class="test-case" onclick="runTest('30婚姻家庭', '民法')">
+                30婚姻家庭 (民法)
+            </div>
+            <div class="test-case" onclick="runTest('婚姻家庭', '民法')">
+                婚姻家庭 (民法)
+            </div>
+            <div class="test-case" onclick="runTest('合同的保全', '民法')">
+                合同的保全 (民法)
+            </div>
+            <div class="test-case" onclick="runTest('1财产继承', '民法')">
+                1财产继承 (民法)
+            </div>
+            <div class="test-case" onclick="runTest('15物权法', '民法')">
+                15物权法 (民法)
+            </div>
+            <div class="test-case" onclick="runTest('故意杀人', '刑法')">
+                故意杀人 (刑法)
+            </div>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>自定义测试</h2>
+        <div class="test-controls">
+            <input type="text" id="keyword" placeholder="输入关键词，如: 30婚姻家庭" value="30婚姻家庭">
+            <select id="subject">
+                <option value="">全部科目</option>
+                <option value="民法" selected>民法</option>
+                <option value="刑法">刑法</option>
+                <option value="刑事诉讼法">刑事诉讼法</option>
+                <option value="民事诉讼法">民事诉讼法</option>
+                <option value="行政法">行政法</option>
+            </select>
+            <button onclick="searchQuestions()">搜索题目</button>
+            <button onclick="simulateKnowledgeMapNavigation()">模拟知识导图跳转</button>
+        </div>
+        
+        <div id="searchStatus"></div>
+        
+        <h3>搜索日志</h3>
+        <div class="results" id="searchLog"></div>
+        
+        <h3>搜索结果 (<span id="resultCount">0</span>条)</h3>
+        <div id="searchResults"></div>
+    </div>
+    
+    <script>
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('searchLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+            logDiv.innerHTML += `[${timestamp}] ${prefix} ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function updateStatus(message, isError = false) {
+            const statusDiv = document.getElementById('searchStatus');
+            statusDiv.innerHTML = `<span class="status ${isError ? 'error' : 'success'}">${message}</span>`;
+        }
+        
+        function runTest(keyword, subject) {
+            document.getElementById('keyword').value = keyword;
+            document.getElementById('subject').value = subject;
+            searchQuestions();
+        }
+        
+        async function searchQuestions() {
+            const keyword = document.getElementById('keyword').value.trim();
+            const subject = document.getElementById('subject').value;
+            
+            if (!keyword) {
+                updateStatus('请输入搜索关键词', true);
+                return;
+            }
+            
+            log(`开始搜索: "${keyword}", 科目: ${subject || '全部'}`);
+            updateStatus('搜索中...');
+            
+            try {
+                const response = await fetch('/api/exams/questions/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        keywords: [keyword],
+                        subject: subject || undefined,
+                        page: 1,
+                        limit: 20
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    const total = data.data?.pagination?.total || 0;
+                    log(`搜索成功: 找到 ${total} 条题目`, 'success');
+                    updateStatus(`搜索完成: 找到 ${total} 条题目`);
+                    displayResults(data.data.questions, keyword);
+                    
+                    // 显示调试信息
+                    if (data.data.debug) {
+                        log(`调试信息: 去重前 ${data.data.debug.total_before_dedup} 条, 去重后 ${data.data.debug.total_after_dedup} 条`);
+                    }
+                } else {
+                    log(`搜索失败: ${data.message}`, 'error');
+                    updateStatus(data.message || '搜索失败', true);
+                    displayResults([], keyword);
+                }
+            } catch (error) {
+                log(`请求错误: ${error.message}`, 'error');
+                updateStatus('网络错误，请稍后重试', true);
+                displayResults([], keyword);
+            }
+        }
+        
+        function displayResults(questions, keyword) {
+            const resultsDiv = document.getElementById('searchResults');
+            const countSpan = document.getElementById('resultCount');
+            
+            countSpan.textContent = questions.length;
+            
+            if (questions.length === 0) {
+                resultsDiv.innerHTML = '<div class="results">未找到相关题目</div>';
+                return;
+            }
+            
+            resultsDiv.innerHTML = questions.map((q, index) => {
+                // 高亮关键词
+                const highlightText = (text) => {
+                    if (!text) return '';
+                    const regex = new RegExp(`(${keyword})`, 'gi');
+                    return text.replace(regex, '<span class="highlight">$1</span>');
+                };
+                
+                return `
+                    <div class="question-item">
+                        <div class="question-header">
+                            <span>📋 ${q.question_code} | ${q.subject} | ${q.year}年</span>
+                            <span>${q.question_type}</span>
+                        </div>
+                        <div class="question-text">
+                            ${highlightText(q.question_text)}
+                        </div>
+                        ${q.matched_keyword ? `<div style="font-size: 12px; color: #666;">匹配关键词: ${q.matched_keyword}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function simulateKnowledgeMapNavigation() {
+            const keyword = document.getElementById('keyword').value.trim();
+            const subject = document.getElementById('subject').value;
+            
+            if (!keyword) {
+                updateStatus('请输入关键词', true);
+                return;
+            }
+            
+            // 构建跳转URL，模拟从知识导图跳转的场景
+            const params = new URLSearchParams({
+                source: 'knowledge-map',
+                keywords: keyword,
+                knowledgePoint: keyword
+            });
+            
+            if (subject) {
+                params.append('subject', subject);
+                params.append('from', subject);
+            }
+            
+            const url = `/question-bank?${params.toString()}`;
+            
+            log(`模拟跳转URL: ${url}`);
+            log('在实际应用中，这将导航到题库页面并自动执行搜索');
+            
+            // 也执行一次搜索以显示效果
+            searchQuestions();
+        }
+        
+        // 页面加载时自动执行一次搜索
+        window.onload = () => {
+            log('测试页面已加载');
+            log('点击测试用例或输入自定义关键词进行测试');
+        };
+    </script>
+</body>
+</html>

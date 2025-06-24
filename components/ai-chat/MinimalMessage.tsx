@@ -10,14 +10,12 @@ interface MinimalMessageProps {
   content: string;
   role: 'user' | 'assistant';
   isStreaming?: boolean;
-  imageBase64?: string;
 }
 
 export function MinimalMessage({
   content,
   role,
-  isStreaming = false,
-  imageBase64
+  isStreaming = false
 }: MinimalMessageProps) {
   return (
     <div className={cn(
@@ -40,17 +38,6 @@ export function MinimalMessage({
         
         {/* 内容区 */}
         <div className="flex-1 space-y-2">
-          {/* 用户上传的图片 */}
-          {imageBase64 && role === 'user' && (
-            <div className="mb-3">
-              <img 
-                src={imageBase64} 
-                alt="上传的图片" 
-                className="max-w-md rounded-lg border border-gray-200"
-              />
-            </div>
-          )}
-          
           {/* 消息内容 */}
           <div className={cn(
             "prose prose-gray max-w-none",

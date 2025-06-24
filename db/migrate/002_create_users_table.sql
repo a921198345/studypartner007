@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `nickname` VARCHAR(50) DEFAULT NULL COMMENT '用户昵称',
   `avatar_url` VARCHAR(255) DEFAULT NULL COMMENT '用户头像URL',
   `wechat_openid` VARCHAR(50) DEFAULT NULL COMMENT '微信OpenID',
-  `membership_type` ENUM('free_user', 'paid_user') DEFAULT 'free_user' COMMENT '会员类型',
+  `membership_type` ENUM('free', 'paid') DEFAULT 'free' COMMENT '会员类型',
   `membership_expires_at` DATETIME DEFAULT NULL COMMENT '会员过期时间',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `last_login` TIMESTAMP NULL COMMENT '最后登录时间',

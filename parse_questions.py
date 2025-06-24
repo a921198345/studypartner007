@@ -8,41 +8,49 @@ from datetime import datetime
 from docx import Document
 
 def validate_question_format(text):
-    """验证题目格式并返回问题列表"""
+    """验证题目格式并返回问题列表 - 使用与解析逻辑一致的验证"""
     issues = []
     
-    # 检查题号格式
-    if not re.search(r'【\d{8}】', text):
-        issues.append("题号格式不正确，应为【8位数字】")
+    # 检查题号格式 (宽松检查)
+    if not re.search(r'【\d+】', text):
+        issues.append("题号格式不正确")
     
-    # 检查选项数量
-    options = re.findall(r'[A-D]\.', text)
-    if len(options) != 4:
-        issues.append(f"选项数量不正确，应有4个选项(A-D)，实际有{len(options)}个")
+    # 检查选项存在性 - 使用与parse_question相同的逻辑
+    has_options = False
     
-    # 检查选项格式统一性
-    if not all(option in text for option in ["A.", "B.", "C.", "D."]):
-        issues.append("选项标识不完整或格式不统一")
+    # 查找各种格式的选项标记
+    option_patterns = [
+        r'[A-D]\s*\.',      # A.
+        r'[A-D]\s*\uff0e',  # A．(全角点)
+        r'[A-D]\s*\u3001',  # A、
+    ]
     
-    # 检查解析标记
-    if "【解析】" not in text:
-        issues.append("缺少【解析】标记")
+    for pattern in option_patterns:
+        if len(re.findall(pattern, text)) >= 1:
+            has_options = True
+            break
     
-    # 检查是否有答案标识
-    has_answer = any(pattern in text for pattern in [
-        "答案：", "正确答案", "故选", "本题答案", "【答案】"
-    ])
-    if not has_answer:
-        issues.append("解析中缺少明确的答案标识")
+    # 如果还没找到，尝试其他检查
+    if not has_options:
+        # 检查是否有明显的选项行
+        lines = text.split('\n')
+        for line in lines:
+            line = line.strip()
+            if re.match(r'^[A-D][\s\.\uff0e\u3001]', line) and len(line) > 3:
+                has_options = True
+                break
     
-    # 检查多余空行
-    if "\n\n\n" in text:
-        issues.append("存在多余空行")
+    if not has_options:
+        issues.append(f"选项过少，至少需要1个选项，实际有0个")
+    
+    # 检查解析标记 (更宽松检查 - 只要有解析相关内容即可)
+    if not any(keyword in text for keyword in ["【解析】", "解析", "答案", "解答"]):
+        issues.append("缺少解析内容")
     
     return issues
    
 def parse_question(text):
-    """解析单个题目文本，提取题号、题干、选项、答案和解析"""
+    """解析单个题目文本，提取题号、题干、选项、答案和解析 - 优化版本"""
     # 正则表达式匹配题号
     question_id_match = re.search(r'【(\d+)】', text)
     if not question_id_match:
@@ -53,71 +61,193 @@ def parse_question(text):
     # 提取年份
     year = int(question_id[:4])
     
-    # 分离题干、选项和解析
-    parts = text.split('【解析】')
-    if len(parts) != 2:
-        return None
+    # 更灵活地分离题干、选项和解析
+    # 优先按【解析】分割，如果没有则尝试其他标记
+    analysis = ""
+    question_part = text
     
-    question_part = parts[0]
-    analysis = parts[1].strip()
+    # 多种解析标记的分割方式
+    split_patterns = [
+        r'【解析】',
+        r'解析：',
+        r'解析:',
+        r'【答案及解析】',
+        r'【分析】'
+    ]
     
-    # 提取选项
-    options_pattern = r'([A-D]\..*?)(?=[A-D]\.|【解析】|$)'
-    options_matches = re.findall(options_pattern, question_part, re.DOTALL)
+    for pattern in split_patterns:
+        parts = re.split(pattern, text, maxsplit=1)
+        if len(parts) == 2:
+            question_part = parts[0]
+            analysis = parts[1].strip()
+            break
+    
+    # 如果没有找到解析标记，尝试从文本末尾推断解析部分
+    if not analysis:
+        # 查找最后一个选项后的内容作为解析
+        last_option_match = re.search(r'([A-D]\..*?)(\n|$)', question_part, re.DOTALL)
+        if last_option_match:
+            # 从最后一个选项后开始的内容可能是解析
+            remaining_text = text[last_option_match.end():]
+            if remaining_text.strip():
+                analysis = remaining_text.strip()
+                question_part = text[:last_option_match.end()]
+    
+    # 更简化有效的选项提取逻辑
+    options_matches = []
+    
+    # 方法1: 先找到所有A、B、C、D的位置，然后智能分割
+    option_markers = []
+    for letter in ['A', 'B', 'C', 'D']:
+        # 查找各种格式的选项标记
+        patterns = [
+            rf'\b{letter}\s*\.',      # A.
+            rf'\b{letter}\s*\uff0e',  # A．(全角点)
+            rf'\b{letter}\s*\u3001',  # A、
+        ]
+        for pattern in patterns:
+            for match in re.finditer(pattern, question_part):
+                option_markers.append({
+                    'letter': letter,
+                    'start': match.start(),
+                    'end': match.end(),
+                    'pattern': pattern
+                })
+    
+    # 按位置排序
+    option_markers.sort(key=lambda x: x['start'])
+    
+    # 如果找到了足够的选项标记，提取内容
+    if len(option_markers) >= 2:
+        for i, marker in enumerate(option_markers):
+            start = marker['end']
+            
+            # 确定内容结束位置
+            if i + 1 < len(option_markers):
+                # 下一个选项标记的开始
+                end = option_markers[i + 1]['start']
+            else:
+                # 最后一个选项，到解析标记或文本结束
+                analysis_pos = question_part.find('【解析】', start)
+                if analysis_pos != -1:
+                    end = analysis_pos
+                else:
+                    end = len(question_part)
+            
+            # 提取并清理内容
+            content = question_part[start:end].strip()
+            # 移除可能混入的其他选项标记
+            content = re.sub(r'\s*[A-D]\s*[．.\u3001].*$', '', content).strip()
+            
+            if content and len(content) > 1:
+                options_matches.append(f"{marker['letter']}.{content}")
+    
+    # 方法2: 如果上面失败，尝试标准的正则匹配
+    if not options_matches:
+        patterns = [
+            r'([A-D]\..*?)(?=\s*[A-D]\.|【解析】|$)',      # A.内容
+            r'([A-D]\s*\uff0e.*?)(?=\s*[A-D]\s*\uff0e|【解析】|$)',  # A．内容
+            r'([A-D]\s*\u3001.*?)(?=\s*[A-D]\s*\u3001|【解析】|$)',   # A、内容
+        ]
+        
+        for pattern in patterns:
+            matches = re.findall(pattern, question_part, re.DOTALL)
+            if len(matches) >= 2:
+                options_matches = matches
+                break
+    
+    # 方法3: 按行处理
+    if not options_matches:
+        lines = question_part.split('\n')
+        for line in lines:
+            line = line.strip()
+            # 检查是否是选项行
+            if re.match(r'^[A-D][\s\.\uff0e\u3001]', line) and len(line) > 3:
+                options_matches.append(line)
+    
+    # 方法4: 最后尝试 - 查找所有可能的选项文本
+    if not options_matches:
+        all_options = re.findall(r'[A-D][\s\.\uff0e\u3001][^\n]*', question_part)
+        if len(all_options) >= 2:
+            options_matches = all_options
     
     if not options_matches:
-        return None
+        return None  # 如果完全没有选项，返回None
     
     # 提取题干（题号之后到第一个选项之前的文本）
     question_text_match = re.search(r'】(.*?)(?=[A-D]\.)', question_part, re.DOTALL)
+    if not question_text_match:
+        # 如果标准匹配失败，尝试更灵活的匹配（处理 A ． 格式）
+        question_text_match = re.search(r'】(.*?)(?=[A-D]\s*[．.])', question_part, re.DOTALL)
+    if not question_text_match:
+        # 最后尝试：直接从题号后到第一个选项标记
+        question_text_match = re.search(r'】(.+?)(?=A\s*[．.、])', text, re.DOTALL)
+    
     if not question_text_match:
         return None
     
     question_text = question_text_match.group(1).strip()
     
-    # 格式化选项为JSON
+    # 格式化选项为字典
     options_dict = {}
     for option in options_matches:
         option = option.strip()
-        if option:
+        if option and len(option) > 2:
             key = option[0]  # 选项字母A、B、C、D
-            value = option[2:].strip()  # 选项内容
-            options_dict[key] = value
+            value = option[2:].strip()  # 选项内容，去掉前面的"A."等
+            if value:  # 确保选项内容不为空
+                options_dict[key] = value
                
     # 初始化 correct_answer 变量
     correct_answer = ""
                    
-    # 查找答案 - 最直接的方法：找最明确的【答案】标记
-    answer_explicit = re.search(r'【答案】\s*([A-D]+)', text)
-    if answer_explicit:
-        correct_answer = answer_explicit.group(1).strip()
-    else:
-        # 尝试其他格式
-        answer_patterns = [
-            r'答案[：:]\s*([A-D]+)',           # "答案：B" 或 "答案:B"
-            r'正确答案[是为：:]\s*([A-D]+)',    # "正确答案是B"
-            r'故\s*(?:选择|选)?\s*([A-D]+)[。，,\.]', # "故选B。"
-            r'本题(?:答案)?(?:是|为|选)\s*([A-D]+)', # "本题为B"
-            r'综上所述\s*[，,]?\s*本题的?正确答案[为是:：]?\s*([A-D]+)', # "综上所述，本题正确答案为B"
-            r'[，,\s]([A-D])\s*[选]?项?正确[。，,\s]',  # "，B项正确，"
-        ]
-        
+    # 扩展的答案提取逻辑 - 更多模式匹配
+    answer_patterns = [
+        r'【答案】\s*([A-D]+)',                    # "【答案】B"
+        r'答案[：:]\s*([A-D]+)',                   # "答案：B" 或 "答案:B"
+        r'正确答案[是为：:]\s*([A-D]+)',            # "正确答案是B"
+        r'故\s*(?:选择|选)?\s*([A-D]+)[。，,\.\s]', # "故选B。"
+        r'本题(?:答案)?(?:是|为|选)\s*([A-D]+)',     # "本题为B" 
+        r'综上所述\s*[，,]?\s*本题的?正确答案[为是:：]?\s*([A-D]+)', # "综合所述，本题正确答案为B"
+        r'[，,\s]([A-D])\s*[选]?项?正确[。，,\s]',     # "，B项正确，"
+        r'选择\s*([A-D]+)[。，,\.]',                # "选择B。"
+        r'应当选择\s*([A-D]+)',                     # "应当选择B"
+        r'应该选择\s*([A-D]+)',                     # "应该选择B"
+        r'([A-D]+)\s*是正确的',                     # "B是正确的"
+        r'([A-D]+)\s*正确',                        # "B正确"
+        r'选择\s*([A-D]+)\s*选项',                 # "选择B选项"
+    ]
+    
+    # 首先在解析部分查找答案
+    search_text = analysis if analysis else text
+    for pattern in answer_patterns:
+        answer_match = re.search(pattern, search_text, re.IGNORECASE)
+        if answer_match:
+            correct_answer = answer_match.group(1).strip().upper()
+            break
+
+    # 如果在解析中没找到，在整个文本中查找
+    if not correct_answer:
         for pattern in answer_patterns:
-            answer_match = re.search(pattern, analysis, re.IGNORECASE)
+            answer_match = re.search(pattern, text, re.IGNORECASE)
             if answer_match:
-                correct_answer = answer_match.group(1).strip()
+                correct_answer = answer_match.group(1).strip().upper()
                 break
 
-    # 如果使用上面的方法仍然没找到答案，尝试最后一段文本
-    if not correct_answer:
-        # 获取解析的最后一段
-        last_paragraph = analysis.split('\n')[-1].strip()
-        # 查找单个字母形式的答案（通常在最后一段）
-        answer_match = re.search(r'[^A-D]([A-D])[^A-D]', last_paragraph)
-        if answer_match:
-            correct_answer = answer_match.group(1)
+    # 最后尝试：查找解析末尾的单个字母
+    if not correct_answer and analysis:
+        # 获取解析的最后几行
+        analysis_lines = analysis.split('\n')
+        for line in reversed(analysis_lines[-3:]):  # 查看最后3行
+            line = line.strip()
+            if line:
+                # 查找行中的单个字母答案
+                single_letter_match = re.search(r'\b([A-D])\b', line)
+                if single_letter_match:
+                    correct_answer = single_letter_match.group(1)
+                    break
 
-    # 根据答案长度判断题型 (现在 correct_answer 一定有值)
+    # 根据答案长度判断题型
     if correct_answer and len(correct_answer) > 1:
         question_type = 2  # 多选
     else:
@@ -127,7 +257,7 @@ def parse_question(text):
         'question_id': question_id,
         'year': year,
         'question_text': question_text,
-        'options': json.dumps(options_dict, ensure_ascii=False),
+        'options': options_dict,  # 直接返回字典
         'correct_answer': correct_answer,
         'analysis': analysis,
         'question_type': question_type
@@ -173,41 +303,58 @@ def save_to_database(questions, db_config):
     """将解析后的题目保存到数据库"""
     conn = mysql.connector.connect(**db_config)
     cursor = conn.cursor()
+    
+    new_questions = 0
+    updated_questions = 0
            
-    for question in questions:
-        # 检查是否已存在该题目
-        cursor.execute(
-            "SELECT id FROM questions WHERE question_code = %s",
-            (question['question_id'],)
-        )
+    try:
+        for question in questions:
+            # 将选项字典转换为JSON字符串
+            options_json = json.dumps(question['options'], ensure_ascii=False)
+            
+            # 检查是否已存在该题目
+            cursor.execute(
+                "SELECT id FROM questions WHERE question_code = %s",
+                (question['question_id'],)
+            )
+            
+            if cursor.fetchone():
+                # 更新现有题目
+                cursor.execute("""
+                    UPDATE questions
+                    SET subject = %s, year = %s, question_text = %s, options_json = %s,
+                        correct_answer = %s, explanation_text = %s, question_type = %s,
+                        updated_at = NOW()
+                    WHERE question_code = %s
+                """, (
+                    question['subject'], question['year'], question['question_text'],
+                    options_json, question['correct_answer'], question['analysis'],
+                    question['question_type'], question['question_id']
+                ))
+                updated_questions += 1
+            else:
+                # 插入新题目
+                cursor.execute("""
+                    INSERT INTO questions
+                    (question_code, subject, year, question_text, options_json, correct_answer, explanation_text, question_type)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    question['question_id'], question['subject'], question['year'],
+                    question['question_text'], options_json, question['correct_answer'],
+                    question['analysis'], question['question_type']
+                ))
+                new_questions += 1
+           
+        conn.commit()
+        print(f"数据库保存成功：新增 {new_questions} 题，更新 {updated_questions} 题")
         
-        if cursor.fetchone():
-            # 更新现有题目
-            cursor.execute("""
-                UPDATE questions
-                SET subject = %s, year = %s, question_text = %s, options_json = %s,
-                    correct_answer = %s, explanation_text = %s, question_type = %s
-                WHERE question_code = %s
-            """, (
-                question['subject'], question['year'], question['question_text'],
-                question['options'], question['correct_answer'], question['analysis'],
-                question['question_type'], question['question_id']
-            ))
-        else:
-            # 插入新题目
-            cursor.execute("""
-                INSERT INTO questions
-                (question_code, subject, year, question_text, options_json, correct_answer, explanation_text, question_type)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                question['question_id'], question['subject'], question['year'],
-                question['question_text'], question['options'], question['correct_answer'],
-                question['analysis'], question['question_type']
-            ))
-           
-    conn.commit()
-    cursor.close()
-    conn.close()
+    except Exception as e:
+        conn.rollback()
+        print(f"数据库保存失败：{e}")
+        raise
+    finally:
+        cursor.close()
+        conn.close()
    
     missing_answers = 0
     for question in questions:
@@ -263,9 +410,29 @@ def main():
     }
     
     try:
-        print(f"正在解析文件: {file_path}...")
+        # 只在非JSON模式下输出调试信息
+        if not output_json:
+            print(f"正在解析文件: {file_path}...")
+        
         questions, format_issues = extract_questions_from_doc(file_path, subject, validate)
         questions = apply_manual_answers(questions)  # 应用手动规则
+        
+        # 保存到数据库 - 仅在非JSON模式下执行
+        if questions and not output_json:
+            print(f"准备保存 {len(questions)} 个题目到数据库...")
+            save_to_database(questions, db_config)
+            
+            # 统计数据库中的总题目数
+            try:
+                conn = mysql.connector.connect(**db_config)
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM questions")
+                total_count = cursor.fetchone()[0]
+                cursor.close()
+                conn.close()
+                print(f"数据库中现有题目总数: {total_count}")
+            except:
+                pass
         
         # 准备输出信息
         result = {
@@ -273,14 +440,16 @@ def main():
             "message": f"成功解析 {len(questions)} 个题目" + (f"，但有 {len(format_issues)} 个题目存在格式问题" if format_issues else ""),
             "total_questions": len(questions) + len(format_issues),
             "parsed_questions": len(questions),
+            "questions": questions if output_json else [
+                {
+                    "question_id": q["question_id"],
+                    "question_text": q["question_text"][:100] + "..." if len(q["question_text"]) > 100 else q["question_text"],
+                    "correct_answer": q["correct_answer"],
+                    "has_answer": bool(q["correct_answer"])
+                } for q in questions
+            ],  # JSON模式下输出完整题目数据
             "format_issues": format_issues if validate else {}
         }
-        
-        # 总是保存成功解析的题目到数据库，无论是否有格式问题
-        if len(questions) > 0:
-            print(f"正在将 {len(questions)} 个成功解析的题目保存到数据库...")
-            save_to_database(questions, db_config)
-            print(f"成功保存 {len(questions)} 个题目到数据库")
         
         # 输出结果
         if output_json:
@@ -291,6 +460,11 @@ def main():
                 print(f"发现 {len(format_issues)} 个题目存在格式问题")
                 for q_id, issue in format_issues.items():
                     print(f"题目 {q_id}: {', '.join(issue['issues'])}")
+            
+            # 统计答案情况
+            missing_answers = sum(1 for q in questions if not q['correct_answer'])
+            if missing_answers > 0:
+                print(f"\n注意: 共有 {missing_answers} 个题目没有找到答案")
     
     except Exception as e:
         error_msg = f"程序出错: {e}"

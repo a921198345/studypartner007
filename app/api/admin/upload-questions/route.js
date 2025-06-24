@@ -51,28 +51,21 @@ export async function POST(request) {
     const savedFileStats = await execAsync(`file "${tempFilePath}"`);
     console.log('保存后的文件类型:', savedFileStats.stdout);
     
-    // 使用终极版解析脚本
-    const pythonPath = join(process.cwd(), 'venv_flask_api/bin/python');
-    const scriptPath = join(process.cwd(), 'parse_questions_ultimate.py');  // 使用终极版解析脚本
-    
-    // 验证Python脚本是否存在
-    try {
-      await execAsync(`test -f "${scriptPath}"`);
-    } catch (e) {
-      console.error('Python脚本不存在:', scriptPath);
-      throw new Error('解析脚本不存在');
-    }
+    // 构造解析脚本的绝对路径，防止找不到脚本
+    const scriptPath = join(process.cwd(), 'parse_questions.py');
+    // 执行Python脚本解析文件
+    const pythonCommand = `python "${scriptPath}" "${tempFilePath}" "${subject}" --validate --output-json`;
     
     // 验证上传的文件
     console.log('验证上传的文件:', tempFilePath);
     const fileStats = await execAsync(`ls -la "${tempFilePath}"`);
     console.log('文件信息:', fileStats.stdout);
     
-    console.log('执行解析脚本:', `${pythonPath} ${scriptPath} "${tempFilePath}" "${subject}" --output-json`);
+    console.log('执行解析脚本:', pythonCommand);
     
     // 执行Python脚本解析文件
     const { stdout, stderr } = await execAsync(
-      `${pythonPath} ${scriptPath} "${tempFilePath}" "${subject}" --output-json`,
+      pythonCommand,
       { 
         timeout: 60000, // 增加到60秒超时
         maxBuffer: 10 * 1024 * 1024 // 增加输出缓冲区大小到10MB

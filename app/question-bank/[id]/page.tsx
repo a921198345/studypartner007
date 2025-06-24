@@ -15,6 +15,7 @@ import { questionApi, addToWrongQuestions, isQuestionFavorited } from "@/lib/api
 import { CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { updateCurrentSession, endCurrentSession, getCurrentSession } from "@/lib/answer-sessions"
+import { useFirstUseAuth } from '@/components/auth/first-use-auth-guard'
 
 // 获取当前页面模式（普通、错题、收藏）
 const getCurrentPageMode = (searchParams: URLSearchParams | null): string => {
@@ -103,6 +104,7 @@ const clearModeAnswerState = (mode, questionId = null) => {
 export default function QuestionPage() {
   const params = useParams()
   const router = useRouter()
+  const { checkAuthOnAction } = useFirstUseAuth('question-bank-detail')
   const questionId = params.id as string
   const [question, setQuestion] = useState<any>(null)
   const [selectedAnswer, setSelectedAnswer] = useState<string | string[]>("")
@@ -947,6 +949,9 @@ export default function QuestionPage() {
     if (!selectedAnswer || (Array.isArray(selectedAnswer) && selectedAnswer.length === 0)) {
       return;
     }
+
+    // 首次使用时触发登录提醒
+    checkAuthOnAction();
 
     setSubmitting(true);
     try {
@@ -1951,6 +1956,35 @@ export default function QuestionPage() {
     );
   }
 
+  // 检查是否从知识导图跳转过来
+  const isFromKnowledgeMap = searchParams.get('source') === 'knowledge-map';
+  const fromSubject = searchParams.get('from'); // 知识导图的学科
+  const knowledgePoint = searchParams.get('knowledgePoint'); // 选中的知识点
+  
+  // 构建返回URL
+  const getBackUrl = () => {
+    if (isFromKnowledgeMap && fromSubject) {
+      // 构建返回知识导图的URL，带上恢复状态的参数
+      const params = new URLSearchParams({
+        subject: fromSubject,
+        restoreState: 'true'
+      });
+      
+      // 如果有知识点，添加到参数中
+      if (knowledgePoint) {
+        params.append('selectedKnowledge', knowledgePoint);
+      }
+      
+      return `/knowledge-map?${params.toString()}`;
+    }
+    
+    // 默认返回题库
+    return '/question-bank';
+  };
+  
+  const backUrl = getBackUrl();
+  const backText = isFromKnowledgeMap ? '返回知识导图' : '返回题库';
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -1961,9 +1995,9 @@ export default function QuestionPage() {
       <main className="flex-1">
         <div className="container mx-auto py-6">
           <div className="flex items-center justify-between mb-6">
-            <Link href="/question-bank" className="flex items-center text-primary">
+            <Link href={backUrl} className="flex items-center text-primary">
               <ChevronLeft className="h-4 w-4 mr-1" />
-              返回题库
+              {backText}
             </Link>
             
             {question && (

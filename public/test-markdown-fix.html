@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学习计划Markdown渲染测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin-bottom: 40px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+        }
+        .before {
+            background-color: #fee;
+        }
+        .after {
+            background-color: #efe;
+        }
+        .label {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #666;
+        }
+        .content {
+            white-space: pre-wrap;
+            font-family: monospace;
+            line-height: 1.6;
+        }
+        .success {
+            color: #4caf50;
+            font-weight: bold;
+        }
+        .error {
+            color: #f44336;
+            font-weight: bold;
+        }
+        .note {
+            background-color: #e3f2fd;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>学习计划Markdown渲染修复测试</h1>
+        
+        <div class="test-section before">
+            <div class="label">修复前（问题）:</div>
+            <div class="content">
+#### 📚 具体任务（1.6小时客观题 + 0.4小时主观题）
+
+□ 掌握要约与承诺的生效要件（《民法典》第471-478条）+ 完成10道真题（客观题）
+□ 理解格式条款的无效情形（《民法典》第496-498条）+ 制作知识导图（客观题）
+□ 分析合同成立的特殊情形（交叉要约、事实合同）（客观题）
+□ 任务4（主观题考点）：总结合同订立在主观题中的考查逻辑（如：要约邀请vs要约的区分标准）
+
+#### AI问答建议
+
+□ "要约撤回与撤销的区别是什么？《民法典》第475条如何适用？"
+□ "格式条款无效的'不合理免除己方责任'具体如何认定？"
+□ "网购合同成立时间以发货为准还是付款成功为准？法律依据是什么？"
+            </div>
+        </div>
+        
+        <div class="test-section after">
+            <div class="label">修复后（期望效果）:</div>
+            <div class="content">
+<h4>📚 具体任务（1.6小时客观题 + 0.4小时主观题）</h4>
+
+□ 掌握要约与承诺的生效要件（《民法典》第471-478条）+ 完成10道真题（客观题）
+□ 理解格式条款的无效情形（《民法典》第496-498条）+ 制作知识导图（客观题）
+□ 分析合同成立的特殊情形（交叉要约、事实合同）（客观题）
+□ 任务4（主观题考点）：总结合同订立在主观题中的考查逻辑（如：要约邀请vs要约的区分标准）
+
+<h4>AI问答建议</h4>
+
+□ "要约撤回与撤销的区别是什么？《民法典》第475条如何适用？"
+□ "格式条款无效的'不合理免除己方责任'具体如何认定？"
+□ "网购合同成立时间以发货为准还是付款成功为准？法律依据是什么？"
+            </div>
+        </div>
+        
+        <div class="note">
+            <p><strong>修复说明：</strong></p>
+            <ul>
+                <li>✅ 使用ReactMarkdown库解析Markdown语法</li>
+                <li>✅ 正确渲染 #### 为 h4 标题</li>
+                <li>✅ 正确渲染 ** 为加粗文本</li>
+                <li>✅ 保持任务复选框功能</li>
+                <li>✅ 统一样式和布局</li>
+            </ul>
+        </div>
+        
+        <script>
+            console.log('Markdown渲染修复测试页面已加载');
+            console.log('修复内容：');
+            console.log('1. 添加ReactMarkdown和remarkGfm库');
+            console.log('2. 重构renderPlanWithCheckboxes函数');
+            console.log('3. 为总体规划思路添加Markdown渲染');
+            console.log('4. 自定义组件样式以匹配设计');
+        </script>
+    </div>
+</body>
+</html>

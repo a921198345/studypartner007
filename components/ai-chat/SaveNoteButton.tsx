@@ -26,6 +26,8 @@ interface SaveNoteButtonProps {
   question: string
   answer: string
   chatId?: string
+  defaultCategory?: string
+  preserveHtml?: boolean
 }
 
 interface Note {
@@ -39,16 +41,17 @@ interface Note {
   is_deleted?: boolean
 }
 
-export function SaveNoteButton({ question, answer, chatId }: SaveNoteButtonProps) {
+export function SaveNoteButton({ question, answer, chatId, defaultCategory = "AI问答", preserveHtml = false }: SaveNoteButtonProps) {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [title, setTitle] = useState("")
-  const [category, setCategory] = useState("AI问答")
+  const [category, setCategory] = useState(defaultCategory)
   const { toast } = useToast()
 
   // 预定义的学科分类
   const categories = [
     "AI问答",
+    "知识点详解",
     "民法",
     "刑法",
     "行政法",
@@ -79,6 +82,65 @@ export function SaveNoteButton({ question, answer, chatId }: SaveNoteButtonProps
     return maxId + 1
   }
 
+  // 简单的Markdown转HTML转换器
+  const markdownToHtml = (markdown: string): string => {
+    if (!preserveHtml) {
+      // 如果不需要保持HTML格式，直接返回纯文本并去除HTML标签
+      return markdown.replace(/<[^>]*>/g, '').replace(/\n/g, '<br>')
+    }
+
+    let html = markdown
+
+    try {
+      // 转换标题
+      html = html.replace(/^### (.*$)/gim, '<h3 style="font-size: 1.1em; font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; color: #333;">$1</h3>')
+      html = html.replace(/^## (.*$)/gim, '<h2 style="font-size: 1.3em; font-weight: bold; margin-top: 1.2em; margin-bottom: 0.6em; color: #333;">$1</h2>')
+      html = html.replace(/^# (.*$)/gim, '<h1 style="font-size: 1.5em; font-weight: bold; margin-top: 1.2em; margin-bottom: 0.6em; color: #333;">$1</h1>')
+
+      // 转换粗体和斜体
+      html = html.replace(/\*\*(.*?)\*\*/g, '<strong style="font-weight: bold;">$1</strong>')
+      html = html.replace(/\*(.*?)\*/g, '<em style="font-style: italic;">$1</em>')
+
+      // 转换行内代码
+      html = html.replace(/`([^`]+)`/g, '<code style="background-color: #f5f5f5; padding: 2px 4px; border-radius: 3px; font-size: 0.9em; font-family: monospace;">$1</code>')
+
+      // 转换列表项（简单处理）
+      html = html.replace(/^[\s]*[-*+]\s+(.*)$/gim, '<li style="margin-bottom: 0.3em; list-style-type: disc;">$1</li>')
+      
+      // 包装连续的列表项
+      html = html.replace(/(<li[^>]*>.*?<\/li>)(\n<li[^>]*>.*?<\/li>)*/gs, (match) => {
+        return '<ul style="list-style-type: disc; padding-left: 1.5em; margin-bottom: 0.8em;">' + match.replace(/\n/g, '') + '</ul>'
+      })
+
+      // 转换数字列表
+      html = html.replace(/^[\s]*\d+\.\s+(.*)$/gim, '<li style="margin-bottom: 0.3em; list-style-type: decimal;">$1</li>')
+      
+      // 包装连续的数字列表项
+      html = html.replace(/(<li[^>]*style="[^"]*list-style-type: decimal[^"]*"[^>]*>.*?<\/li>)(\n<li[^>]*style="[^"]*list-style-type: decimal[^"]*"[^>]*>.*?<\/li>)*/gs, (match) => {
+        return '<ol style="list-style-type: decimal; padding-left: 1.5em; margin-bottom: 0.8em;">' + match.replace(/\n/g, '') + '</ol>'
+      })
+
+      // 转换引用块
+      html = html.replace(/^>\s+(.*)$/gim, '<blockquote style="border-left: 4px solid #ddd; padding-left: 1em; margin: 1em 0; color: #666; font-style: italic;">$1</blockquote>')
+
+      // 转换段落（将双换行符转换为段落）
+      html = html.replace(/\n\n/g, '</p><p style="margin-bottom: 0.8em; line-height: 1.6;">')
+      html = '<p style="margin-bottom: 0.8em; line-height: 1.6;">' + html + '</p>'
+
+      // 转换单个换行符为<br>
+      html = html.replace(/(?<!<\/p>)\n(?!<p)/g, '<br>')
+
+      // 清理空段落
+      html = html.replace(/<p[^>]*><\/p>/g, '')
+
+      return html
+    } catch (error) {
+      console.error('Markdown转HTML失败:', error)
+      // 转换失败时，返回原始内容并转换换行符
+      return markdown.replace(/\n/g, '<br>')
+    }
+  }
+
   const handleSave = () => {
     setSaving(true)
     
@@ -87,21 +149,24 @@ export function SaveNoteButton({ question, answer, chatId }: SaveNoteButtonProps
         const notes = getLocalNotes()
         const now = new Date().toISOString()
         
-        // 构建笔记内容（HTML格式）
+        // 处理回答内容 - 转换Markdown为HTML
+        const processedAnswer = markdownToHtml(answer)
+        
+        // 构建笔记内容
         const noteContent = `
-          <div class="ai-note">
-            <div class="question">
-              <h3>问题：</h3>
-              <p>${question}</p>
+          <div class="ai-note" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6;">
+            <div class="question" style="margin-bottom: 1em;">
+              <h3 style="font-size: 1.1em; font-weight: bold; margin-bottom: 0.5em; color: #333;">问题：</h3>
+              <p style="margin-bottom: 0.8em; background-color: #f8f9fa; padding: 0.8em; border-radius: 5px; border-left: 4px solid #007acc;">${question}</p>
             </div>
-            <hr />
-            <div class="answer">
-              <h3>AI回答：</h3>
-              <div>${answer}</div>
+            <hr style="border: none; border-top: 1px solid #e1e5e9; margin: 1.5em 0;" />
+            <div class="answer" style="margin-bottom: 1em;">
+              <h3 style="font-size: 1.1em; font-weight: bold; margin-bottom: 0.5em; color: #333;">${category === "知识点详解" ? "知识点详解：" : "AI回答："}</h3>
+              <div style="color: #444;">${processedAnswer}</div>
             </div>
-            <hr />
-            <div class="note-meta">
-              <small>保存自AI问答 - ${new Date().toLocaleString('zh-CN')}</small>
+            <hr style="border: none; border-top: 1px solid #e1e5e9; margin: 1.5em 0;" />
+            <div class="note-meta" style="text-align: right; color: #666; font-size: 0.9em;">
+              <small>保存自${category} - ${new Date().toLocaleString('zh-CN')}</small>
             </div>
           </div>
         `
@@ -123,7 +188,7 @@ export function SaveNoteButton({ question, answer, chatId }: SaveNoteButtonProps
         
         toast({
           title: "保存成功",
-          description: "AI回答已保存为笔记",
+          description: `${category === "知识点详解" ? "知识点详解" : "AI回答"}已保存为笔记`,
         })
         
         setOpen(false)

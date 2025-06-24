@@ -1,1 +1,0 @@
-const test = () => { let year: string | number | undefined = "2023"; const result: number | undefined = typeof year === "string" ? (isNaN(Number(year)) ? undefined : Number(year)) : (typeof year === "number" ? year : undefined); console.log(result); }; test();
