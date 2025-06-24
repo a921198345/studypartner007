@@ -8,9 +8,11 @@ import { usePathname } from "next/navigation"
 import { BookOpen, Brain, FileText, MessageCircle, User, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { BookBuddyLogo5 } from "@/components/BookBuddyLogo5"
+import { useAuth } from "@/hooks/useAuth"
 
 export function MainNav({ className, ...props }: React.HTMLAttributes<HTMLElement>) {
   const pathname = usePathname()
+  const { isAuthenticated, user, logout } = useAuth()
 
   const routes = [
     {
@@ -71,10 +73,28 @@ export function MainNav({ className, ...props }: React.HTMLAttributes<HTMLElemen
             <span>{route.label}</span>
           </Link>
         ))}
-        {/* 修改登录按钮的样式，确保文字为白色 */}
-        <Button asChild className="ml-6 text-white">
-          <Link href="/login">登录</Link>
-        </Button>
+        {/* 根据登录状态显示不同按钮 */}
+        {isAuthenticated ? (
+          <div className="ml-6 flex items-center space-x-2">
+            <span className="text-sm text-muted-foreground">
+              {user?.nickname || user?.phone_number}
+            </span>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                logout()
+                window.location.href = '/login'
+              }}
+            >
+              退出登录
+            </Button>
+          </div>
+        ) : (
+          <Button asChild className="ml-6 text-white">
+            <Link href="/login">登录</Link>
+          </Button>
+        )}
       </nav>
     </div>
   )

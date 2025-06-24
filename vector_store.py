@@ -22,6 +22,25 @@ import pickle
 import base64
 import math
 
+# 导入统一的 Embedding 服务
+try:
+    from embedding_service import EmbeddingService
+    EMBEDDING_SERVICE_AVAILABLE = True
+except ImportError:
+    EMBEDDING_SERVICE_AVAILABLE = False
+    print("Embedding 服务模块未找到，将使用原有方案")
+
+# 导入 Jina
+try:
+    from jina_embedding import JinaEmbedding
+    JINA_AVAILABLE = True
+except ImportError:
+    JINA_AVAILABLE = False
+
+# 加载环境变量
+from dotenv import load_dotenv
+load_dotenv('.env.local')
+
 # 可选：如果安装了faiss，则导入用于高效向量检索
 try:
     import faiss
@@ -56,7 +75,8 @@ class VectorStore:
         mysql_config: Dict[str, Any] = None,
         sqlite_path: str = "data/vector_store.db",
         api_key: str = None,
-        embedding_model: str = "text-embedding-ada-002"
+        embedding_model: str = "text-embedding-ada-002",
+        db_config: Dict[str, Any] = None  # 添加db_config参数
     ):
         """
         初始化向量存储
@@ -67,9 +87,11 @@ class VectorStore:
             sqlite_path: SQLite数据库文件路径
             api_key: DeepSeek API密钥，如果为None则尝试从环境变量DEEPSEEK_API_KEY获取
             embedding_model: 使用的向量嵌入模型
+            db_config: 数据库配置，与mysql_config兼容，优先使用
         """
         self.database_type = database_type
-        self.mysql_config = mysql_config
+        # 优先使用db_config，如果提供了的话
+        self.mysql_config = db_config if db_config is not None else mysql_config
         self.sqlite_path = sqlite_path
         
         # 优先使用传入的API密钥，否则尝试从环境变量获取
@@ -89,6 +111,22 @@ class VectorStore:
         if self.database_type == 'sqlite':
             os.makedirs(os.path.dirname(sqlite_path), exist_ok=True)
     
+    def check_table_columns(self):
+        """检查表的字段结构，返回可用字段列表"""
+        available_columns = []
+        if self.database_type == 'mysql' and MYSQL_AVAILABLE:
+            try:
+                conn = mysql.connector.connect(**self.mysql_config)
+                cursor = conn.cursor()
+                cursor.execute("DESCRIBE vector_chunks")
+                columns = cursor.fetchall()
+                available_columns = [col[0] for col in columns]
+                cursor.close()
+                conn.close()
+            except Exception as e:
+                logger.error(f"检查表结构失败: {str(e)}")
+        return available_columns
+
     def init_database(self):
         """初始化数据库表结构"""
         if self.database_type == 'mysql' and MYSQL_AVAILABLE:
@@ -101,6 +139,7 @@ class VectorStore:
                 CREATE TABLE IF NOT EXISTS vector_chunks (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     doc_id VARCHAR(50) NOT NULL,
+                    subject_area VARCHAR(30),
                     chunk_index INT NOT NULL,
                     original_text TEXT NOT NULL,
                     vector_embedding LONGBLOB NOT NULL,
@@ -120,6 +159,14 @@ class VectorStore:
                     INDEX (article)
                 ) DEFAULT CHARSET=utf8mb4
                 ''')
+                
+                # 尝试添加 subject_area 列（兼容已存在旧表）
+                try:
+                    cursor.execute("ALTER TABLE vector_chunks ADD COLUMN subject_area VARCHAR(30)")
+                    conn.commit()
+                    logger.info("成功添加subject_area字段")
+                except Exception as e:
+                    logger.warning(f"无法添加subject_area字段: {str(e)}")
                 
                 conn.commit()
                 cursor.close()
@@ -143,6 +190,7 @@ class VectorStore:
                 CREATE TABLE IF NOT EXISTS vector_chunks (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     doc_id TEXT NOT NULL,
+                    subject_area TEXT,
                     chunk_index INTEGER NOT NULL,
                     original_text TEXT NOT NULL,
                     vector_embedding BLOB NOT NULL,
@@ -164,6 +212,13 @@ class VectorStore:
                 cursor.execute('CREATE INDEX IF NOT EXISTS idx_law ON vector_chunks(law_name)')
                 cursor.execute('CREATE INDEX IF NOT EXISTS idx_article ON vector_chunks(article)')
                 
+                # 尝试添加 subject_area 列，兼容旧表
+                try:
+                    cursor.execute("ALTER TABLE vector_chunks ADD COLUMN subject_area TEXT")
+                    conn.commit()
+                except Exception:
+                    pass
+                
                 conn.commit()
                 cursor.close()
                 conn.close()
@@ -174,7 +229,7 @@ class VectorStore:
     
     def get_embedding_from_deepseek(self, text: str) -> List[float]:
         """
-        调用DeepSeek API获取文本的向量嵌入
+        获取文本的向量嵌入（优先使用Jina，否则降级到其他方案）
         
         Args:
             text: 要转换为向量的文本
@@ -182,62 +237,103 @@ class VectorStore:
         Returns:
             向量嵌入列表
         """
+        # 优先使用 Jina
+        if JINA_AVAILABLE and os.getenv('JINA_API_KEY'):
+            try:
+                if not hasattr(self, 'jina_client'):
+                    self.jina_client = JinaEmbedding()
+                embeddings = self.jina_client.get_embeddings([text])
+                # 更新向量维度为Jina的维度
+                self.vector_dim = len(embeddings[0])
+                return embeddings[0]
+            except Exception as e:
+                logger.warning(f"Jina API调用失败: {e}，降级到伪向量")
+        
+        # 原有的伪向量方案作为降级
         if not self.api_key:
-            raise ValueError("未设置DeepSeek API密钥，无法生成向量嵌入")
+            logger.warning("未设置任何API密钥，使用伪向量")
         
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}"
-        }
+        # 生成一个基于文本内容的伪向量
+        import hashlib
         
-        # DeepSeek API URL - 使用正确的API端点
-        url = "https://api.deepseek.com/v1/embeddings"
+        # 使用SHA-256哈希
+        text_hash = hashlib.sha256(text.encode('utf-8')).digest()
         
-        # 请求参数 - 使用正确的模型名称
-        payload = {
-            "input": text,
-            "model": "text-embedding-ada-002"  # 使用DeepSeek支持的嵌入模型
-        }
-        
-        try:
-            # 禁用SSL证书验证以解决证书问题
-            response = requests.post(url, headers=headers, json=payload, verify=False)
-            response.raise_for_status()
+        # 将哈希值转换为768维的向量（Jina的标准维度）
+        self.vector_dim = 768  # 使用Jina的标准维度
+        embedding = []
+        for i in range(self.vector_dim):
+            # 使用哈希值的不同部分生成浮点数
+            byte_index = i % len(text_hash)
+            value = text_hash[byte_index] / 255.0  # 归一化到0-1之间
             
-            result = response.json()
-            embedding = result['data'][0]['embedding']
-            return embedding
+            # 添加一些变化以增加向量的多样性
+            if i % 2 == 0:
+                value = value * 2 - 1  # 转换到-1到1之间
             
-        except requests.exceptions.RequestException as e:
-            logger.error(f"DeepSeek API请求失败: {str(e)}")
-            if response := getattr(e, "response", None):
-                logger.error(f"API响应: {response.status_code} - {response.text}")
-            # 打印更详细的错误信息
-            logger.error(f"详细错误信息: {str(e)}")
-            raise
+            embedding.append(value)
+        
+        return embedding
     
-    def batch_get_embeddings(self, texts: List[str], batch_size: int = 10) -> List[List[float]]:
+    def batch_get_embeddings(self, texts: List[str], batch_size: int = 96) -> List[List[float]]:
         """
         批量获取多个文本的向量嵌入
         
         Args:
             texts: 文本列表
-            batch_size: 批处理大小，避免API请求过于频繁
+            batch_size: 批处理大小（Jina支持最多96个文本）
             
         Returns:
             向量嵌入列表的列表
         """
+        # 如果使用Jina，直接批量处理
+        if JINA_AVAILABLE and os.getenv('JINA_API_KEY'):
+            try:
+                if not hasattr(self, 'jina_client'):
+                    self.jina_client = JinaEmbedding()
+                
+                logger.info(f"使用Jina批量处理 {len(texts)} 个文本")
+                start_time = time.time()
+                
+                # Jina支持批量处理，直接调用
+                all_embeddings = []
+                for i in range(0, len(texts), batch_size):
+                    batch = texts[i:i + batch_size]
+                    batch_num = i//batch_size + 1
+                    total_batches = (len(texts) + batch_size - 1) // batch_size
+                    
+                    logger.info(f"Jina处理批次 {batch_num}/{total_batches}")
+                    embeddings = self.jina_client.get_embeddings(batch)
+                    all_embeddings.extend(embeddings)
+                    
+                    # 显示进度
+                    if len(texts) > 50:
+                        elapsed = time.time() - start_time
+                        progress = len(all_embeddings) / len(texts)
+                        logger.info(f"进度: {progress*100:.1f}%, 已处理: {len(all_embeddings)}/{len(texts)}")
+                
+                # 更新向量维度
+                if all_embeddings:
+                    self.vector_dim = len(all_embeddings[0])
+                
+                elapsed = time.time() - start_time
+                logger.info(f"✓ Jina向量化完成，用时: {elapsed:.1f}秒")
+                return all_embeddings
+            except Exception as e:
+                logger.error(f"Jina批量处理失败: {e}，降级到逐个处理")
+        
+        # 降级到原有方案
         embeddings = []
-        total_batches = (len(texts) + batch_size - 1) // batch_size
+        total_batches = (len(texts) + 10 - 1) // 10  # 降级时使用小批次
         
         # 如果文本量很大，记录开始时间并输出信息
         start_time = time.time()
         if len(texts) > 50:
             logger.info(f"开始处理大量文本嵌入: {len(texts)}个文本，分{total_batches}个批次")
         
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i:i + batch_size]
-            batch_num = i//batch_size + 1
+        for i in range(0, len(texts), 10):
+            batch = texts[i:i + 10]
+            batch_num = i//10 + 1
             logger.info(f"处理批次 {batch_num}/{total_batches}，包含{len(batch)}个文本")
             
             # 计算已处理百分比和预计剩余时间
@@ -249,20 +345,15 @@ class VectorStore:
                 logger.info(f"进度: {progress*100:.1f}%, 已用时: {elapsed:.1f}秒, 预计剩余: {remaining:.1f}秒")
             
             try:
-                # 尝试批量API调用 (如果API支持)
-                if False:  # 替换为实际的批量API支持检查
-                    # 批量API调用代码
-                    pass
-                else:
-                    # 逐个处理批次中的文本
-                    for text in batch:
-                        try:
-                            embedding = self.get_embedding_from_deepseek(text)
-                            embeddings.append(embedding)
-                        except Exception as e:
-                            logger.error(f"获取文本嵌入失败: {str(e)}")
-                            # 添加一个零向量作为占位符
-                            embeddings.append([0.0] * self.vector_dim)
+                # 逐个处理批次中的文本
+                for text in batch:
+                    try:
+                        embedding = self.get_embedding_from_deepseek(text)
+                        embeddings.append(embedding)
+                    except Exception as e:
+                        logger.error(f"获取文本嵌入失败: {str(e)}")
+                        # 添加一个零向量作为占位符
+                        embeddings.append([0.0] * self.vector_dim)
                 
                 # 批次间添加小延迟，避免API速率限制
                 if batch_num < total_batches:
@@ -292,7 +383,8 @@ class VectorStore:
         doc_id: str, 
         texts: List[str], 
         metadata_list: List[Dict[str, Any]],
-        source_document_name: str
+        source_document_name: str,
+        subject_area: str = "其他"  # 新增参数
     ) -> bool:
         """
         将文本块及其向量嵌入存储到数据库
@@ -302,6 +394,7 @@ class VectorStore:
             texts: 文本块列表
             metadata_list: 元数据列表，每个文本块一个元数据字典
             source_document_name: 源文档名称
+            subject_area: 文档的学科领域，将直接用作 law_name
             
         Returns:
             存储是否成功
@@ -313,11 +406,10 @@ class VectorStore:
             # 检查文本数量和元数据数量是否匹配
             if len(texts) != len(metadata_list):
                 raise ValueError(f"文本数量({len(texts)})与元数据数量({len(metadata_list)})不匹配")
-                
+            
             # 获取文本的向量嵌入
             start_time = time.time()
             
-            # 是否为大批量处理（超过50个文本）
             is_large_batch = len(texts) > 50
             
             if is_large_batch:
@@ -332,52 +424,74 @@ class VectorStore:
             # 准备批量插入数据
             insert_data = []
             for i, (text, embedding, metadata) in enumerate(zip(texts, embeddings, metadata_list)):
-                # 编码向量为二进制数据
                 vector_binary = self.vector_to_binary(embedding)
                 
-                # 从元数据中提取特定字段
-                law_name = metadata.get('law_name', '')
+                # 直接使用传入的 subject_area 作为 law_name
+                law_name = subject_area
+                
                 book = metadata.get('book', '')
                 chapter = metadata.get('chapter', '')
                 section = metadata.get('section', '')
                 article = metadata.get('article', '')
                 token_count = metadata.get('token_count', len(text))
                 
-                # 生成块ID
+                # 确定 subject_area (这里的字段也叫 subject_area，保持一致)
+                db_subject_area = subject_area
+                
                 chunk_id = f"{doc_id}_{i}"
                 
-                # 添加到插入数据列表
                 insert_data.append((
                     doc_id, i, text, vector_binary, 
                     source_document_name, chunk_id, law_name,
-                    book, chapter, section, article, token_count
+                    book, chapter, section, article, token_count, db_subject_area
                 ))
             
             # 向数据库批量插入数据
-            batch_size = 100  # 每次插入100条记录
+            batch_size = 100
             total_batches = (len(insert_data) + batch_size - 1) // batch_size
             
             if self.database_type == 'mysql' and MYSQL_AVAILABLE:
                 conn = mysql.connector.connect(**self.mysql_config)
                 cursor = conn.cursor()
                 
+                # 检查表结构，决定是否包含subject_area字段
+                available_columns = self.check_table_columns()
+                has_subject_area = 'subject_area' in available_columns
+                
                 # 开始事务
                 cursor.execute("START TRANSACTION")
                 
-                # 插入查询
-                insert_query = """
-                INSERT INTO vector_chunks (
-                    doc_id, chunk_index, original_text, vector_embedding, 
-                    source_document_name, chunk_id_in_document, law_name,
-                    book, chapter, section, article, token_count
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """
+                # 根据表结构动态构建插入查询
+                if has_subject_area:
+                    insert_query = """
+                    INSERT INTO vector_chunks (
+                        doc_id, chunk_index, original_text, vector_embedding, 
+                        source_document_name, chunk_id_in_document, law_name,
+                        book, chapter, section, article, token_count, subject_area
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """
+                    # 保持原有数据结构
+                    final_insert_data = insert_data
+                else:
+                    insert_query = """
+                    INSERT INTO vector_chunks (
+                        doc_id, chunk_index, original_text, vector_embedding, 
+                        source_document_name, chunk_id_in_document, law_name,
+                        book, chapter, section, article, token_count
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """
+                    # 移除subject_area字段数据
+                    final_insert_data = []
+                    for item in insert_data:
+                        final_insert_data.append(item[:-1])  # 移除最后一个subject_area字段
+                    
+                logger.info(f"使用{'有' if has_subject_area else '无'}subject_area字段的表结构")
                 
                 # 分批执行插入
                 for batch_idx in range(total_batches):
                     start_idx = batch_idx * batch_size
-                    end_idx = min(start_idx + batch_size, len(insert_data))
-                    batch_data = insert_data[start_idx:end_idx]
+                    end_idx = min(start_idx + batch_size, len(final_insert_data))
+                    batch_data = final_insert_data[start_idx:end_idx]
                     
                     cursor.executemany(insert_query, batch_data)
                     
@@ -402,8 +516,8 @@ class VectorStore:
                 INSERT INTO vector_chunks (
                     doc_id, chunk_index, original_text, vector_embedding, 
                     source_document_name, chunk_id_in_document, law_name,
-                    book, chapter, section, article, token_count
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    book, chapter, section, article, token_count, subject_area
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """
                 
                 # 分批执行插入
@@ -1037,6 +1151,89 @@ class VectorStore:
                 words.append(word)
         
         return words
+    
+    def _extract_basic_law_name(self, filename: str, content: str = "") -> str:
+        """
+        基础的法律名称提取方法（当法律名称提取器不可用时使用）
+        
+        Args:
+            filename: 文件名
+            content: 文本内容
+            
+        Returns:
+            提取的法律名称
+        """
+        import os
+        import re
+        
+        # 去除路径，只保留文件名
+        base_name = os.path.basename(filename)
+        # 去除扩展名
+        name_without_ext = os.path.splitext(base_name)[0]
+        
+        # 简单的法律名称模式
+        law_patterns = [
+            r'(民法)',
+            r'(刑法)',
+            r'(行政法)',
+            r'(宪法)',
+            r'(商法)',
+            r'(经济法)',
+            r'(劳动法)',
+            r'(环境法)',
+            r'(知识产权法)',
+        ]
+        
+        # 首先从文件名提取
+        for pattern in law_patterns:
+            if re.search(pattern, name_without_ext):
+                return re.search(pattern, name_without_ext).group(1)
+        
+        # 从内容的前几行提取
+        if content:
+            lines = content.split('\n')[:10]  # 只检查前10行
+            for line in lines:
+                for pattern in law_patterns:
+                    if re.search(pattern, line):
+                        return re.search(pattern, line).group(1)
+        
+        # 清理文件名作为默认值
+        clean_name = re.sub(r'\d{4}[.\d]*', '', name_without_ext)  # 去除日期
+        clean_name = re.sub(r'[^\u4e00-\u9fff\w]', '', clean_name)  # 只保留中文和字母数字
+        return clean_name if clean_name else "其他"
+    
+    def _get_subject_area_from_law_name(self, law_name: str) -> str:
+        """
+        从法律名称推断学科领域
+        
+        Args:
+            law_name: 法律名称
+            
+        Returns:
+            学科领域
+        """
+        if not law_name:
+            return "其他"
+        
+        # 学科领域映射
+        area_mapping = {
+            '民法': '民法',
+            '刑法': '刑法', 
+            '行政法': '行政法',
+            '宪法': '宪法',
+            '商法': '商法',
+            '经济法': '经济法',
+            '劳动法': '劳动法',
+            '环境法': '环境法',
+            '知识产权法': '知识产权法'
+        }
+        
+        # 检查包含关系
+        for key, area in area_mapping.items():
+            if key in law_name:
+                return area
+        
+        return "其他"
 
 def main():
     """测试向量存储功能"""
@@ -1079,7 +1276,8 @@ def main():
                 doc_id=doc_id,
                 texts=[text],
                 metadata_list=[meta],
-                source_document_name="测试文档"
+                source_document_name="测试文档",
+                subject_area="其他"
             )
             
             if success:

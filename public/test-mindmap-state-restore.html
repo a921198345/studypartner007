@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>知识导图状态恢复测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+        .test-title {
+            font-weight: bold;
+            color: #4299E1;
+            margin-bottom: 10px;
+        }
+        button {
+            background-color: #4299E1;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #3182CE;
+        }
+        .log-container {
+            background-color: #1a1a1a;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        .log-entry {
+            margin: 2px 0;
+        }
+        .log-time {
+            color: #888;
+            margin-right: 10px;
+        }
+        .success {
+            color: #4CAF50;
+        }
+        .error {
+            color: #f44336;
+        }
+        .warning {
+            color: #ff9800;
+        }
+        .info {
+            color: #2196F3;
+        }
+        iframe {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>知识导图状态恢复测试</h1>
+        
+        <div class="test-section">
+            <div class="test-title">测试场景</div>
+            <button onclick="testScenario1()">场景1: 展开多个节点后跳转</button>
+            <button onclick="testScenario2()">场景2: 选中第三级节点后跳转</button>
+            <button onclick="testScenario3()">场景3: 展开并选中深层节点</button>
+            <button onclick="clearState()">清除所有状态</button>
+        </div>
+
+        <div class="test-section">
+            <div class="test-title">手动操作</div>
+            <button onclick="navigateToMindMap()">进入知识导图</button>
+            <button onclick="navigateToQuestionBank()">跳转到题库</button>
+            <button onclick="navigateBackToMindMap()">返回知识导图（带恢复）</button>
+        </div>
+
+        <div class="test-section">
+            <div class="test-title">调试工具</div>
+            <button onclick="checkSessionStorage()">检查SessionStorage</button>
+            <button onclick="enableDebugMode()">启用调试模式</button>
+            <button onclick="simulateNodeExpand()">模拟节点展开</button>
+        </div>
+
+        <iframe id="testFrame" src="/knowledge-map"></iframe>
+
+        <div class="log-container" id="logContainer">
+            <div class="log-entry info">测试控制台已准备就绪...</div>
+        </div>
+    </div>
+
+    <script>
+        let debugMode = false;
+
+        function log(message, type = 'info') {
+            const logContainer = document.getElementById('logContainer');
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.innerHTML = `<span class="log-time">${time}</span>${message}`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        function navigateToMindMap() {
+            log('导航到知识导图页面...', 'info');
+            document.getElementById('testFrame').src = '/knowledge-map';
+        }
+
+        function navigateToQuestionBank() {
+            log('导航到题库页面...', 'info');
+            document.getElementById('testFrame').src = '/question-bank';
+        }
+
+        function navigateBackToMindMap() {
+            log('返回知识导图页面（带状态恢复）...', 'success');
+            document.getElementById('testFrame').src = '/knowledge-map?restoreState=true';
+        }
+
+        function checkSessionStorage() {
+            try {
+                const iframe = document.getElementById('testFrame');
+                const iframeWindow = iframe.contentWindow;
+                
+                log('检查SessionStorage内容:', 'info');
+                
+                // 获取所有mindMap相关的key
+                const keys = Object.keys(iframeWindow.sessionStorage).filter(key => 
+                    key.includes('mindMap') || key.includes('expandedNodes')
+                );
+                
+                if (keys.length === 0) {
+                    log('SessionStorage中没有找到知识导图相关数据', 'warning');
+                } else {
+                    keys.forEach(key => {
+                        const value = iframeWindow.sessionStorage.getItem(key);
+                        try {
+                            const parsed = JSON.parse(value);
+                            log(`${key}:`, 'info');
+                            log(JSON.stringify(parsed, null, 2), 'info');
+                        } catch (e) {
+                            log(`${key}: ${value}`, 'info');
+                        }
+                    });
+                }
+            } catch (e) {
+                log(`检查SessionStorage失败: ${e.message}`, 'error');
+            }
+        }
+
+        function clearState() {
+            try {
+                const iframe = document.getElementById('testFrame');
+                const iframeWindow = iframe.contentWindow;
+                
+                // 清除所有mindMap相关的sessionStorage
+                const keys = Object.keys(iframeWindow.sessionStorage).filter(key => 
+                    key.includes('mindMap') || key.includes('expandedNodes')
+                );
+                
+                keys.forEach(key => {
+                    iframeWindow.sessionStorage.removeItem(key);
+                    log(`已清除: ${key}`, 'success');
+                });
+                
+                log('所有状态已清除', 'success');
+            } catch (e) {
+                log(`清除状态失败: ${e.message}`, 'error');
+            }
+        }
+
+        function enableDebugMode() {
+            try {
+                const iframe = document.getElementById('testFrame');
+                const iframeWindow = iframe.contentWindow;
+                iframeWindow.mindMapDebug = true;
+                debugMode = true;
+                log('调试模式已启用，请查看浏览器控制台获取详细日志', 'success');
+            } catch (e) {
+                log(`启用调试模式失败: ${e.message}`, 'error');
+            }
+        }
+
+        function testScenario1() {
+            log('===== 测试场景1：展开多个节点后跳转 =====', 'info');
+            log('1. 请手动展开"民法"下的多个节点', 'info');
+            log('2. 点击"跳转到题库"', 'info');
+            log('3. 点击"返回知识导图（带恢复）"', 'info');
+            log('4. 验证之前展开的节点是否保持展开状态', 'info');
+        }
+
+        function testScenario2() {
+            log('===== 测试场景2：选中第三级节点后跳转 =====', 'info');
+            log('1. 请展开到第三级并点击一个节点（如"具体人格权"）', 'info');
+            log('2. 点击"跳转到题库"', 'info');
+            log('3. 点击"返回知识导图（带恢复）"', 'info');
+            log('4. 验证选中的节点是否仍然被选中', 'info');
+        }
+
+        function testScenario3() {
+            log('===== 测试场景3：展开并选中深层节点 =====', 'info');
+            log('1. 展开多层节点，直到第4或第5级', 'info');
+            log('2. 选中一个深层节点', 'info');
+            log('3. 记录当前的展开路径', 'info');
+            log('4. 跳转并返回，验证完整路径是否恢复', 'info');
+        }
+
+        function simulateNodeExpand() {
+            try {
+                const iframe = document.getElementById('testFrame');
+                const iframeWindow = iframe.contentWindow;
+                
+                // 创建模拟的展开状态
+                const mockState = {
+                    subject: "民法",
+                    expandedNodes: [
+                        ["民法"],
+                        ["民法", "（31）人身权"],
+                        ["民法", "（31）人身权", "（29）人格权"],
+                        ["民法", "（31）人身权", "（29）人格权", "具体人格权"]
+                    ],
+                    selectedNode: {
+                        name: "具体人格权",
+                        fullPath: ["民法", "（31）人身权", "（29）人格权", "具体人格权"],
+                        parentPath: ["（31）人身权", "（29）人格权"],
+                        __rd3t: { depth: 3 }
+                    },
+                    timestamp: Date.now()
+                };
+                
+                iframeWindow.sessionStorage.setItem('mindMapViewState_民法', JSON.stringify(mockState));
+                log('已设置模拟的展开状态', 'success');
+                log('请点击"返回知识导图（带恢复）"查看效果', 'info');
+            } catch (e) {
+                log(`模拟节点展开失败: ${e.message}`, 'error');
+            }
+        }
+
+        // 监听iframe加载事件
+        document.getElementById('testFrame').addEventListener('load', function() {
+            log('页面已加载: ' + this.src, 'success');
+            
+            // 如果启用了调试模式，自动启用iframe中的调试
+            if (debugMode) {
+                try {
+                    this.contentWindow.mindMapDebug = true;
+                } catch (e) {
+                    // 忽略跨域错误
+                }
+            }
+        });
+
+        // 初始化
+        log('知识导图状态恢复测试工具已初始化', 'success');
+        log('请按照测试场景进行操作', 'info');
+    </script>
+</body>
+</html>

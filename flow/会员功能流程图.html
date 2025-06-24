@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>会员功能流程图</title>
+    <script src="https://unpkg.com/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .mermaid {
+            text-align: center;
+        }
+        .legend {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 5px;
+        }
+        .legend h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .legend-item {
+            display: inline-block;
+            margin-right: 20px;
+            margin-bottom: 10px;
+        }
+        .legend-color {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            vertical-align: middle;
+            margin-right: 5px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>学习搭子 - 会员功能流程图</h1>
+        <div class="subtitle">展示非会员与会员用户的功能差异、限制及提醒策略</div>
+        
+        <div class="mermaid">
+graph TB
+    Start([用户访问学习搭子]) --> CheckAuth{是否已登录?}
+    
+    CheckAuth -->|否| RequireLogin[显示登录提示]
+    RequireLogin --> LoginChoice{用户选择}
+    LoginChoice -->|立即登录| Login[登录/注册]
+    LoginChoice -->|稍后再说| LimitedAccess[有限访问模式]
+    
+    CheckAuth -->|是| CheckMembership{是否为会员?}
+    Login --> CheckMembership
+    
+    CheckMembership -->|是| MemberAccess[会员权限]
+    CheckMembership -->|否| NonMemberAccess[非会员权限]
+    
+    %% 会员功能流程
+    MemberAccess --> MemberFeatures[会员功能]
+    MemberFeatures --> UnlimitedAI[AI问答: 无限次]
+    MemberFeatures --> AllMindmaps[知识导图: 全部8大学科]
+    MemberFeatures --> AllQuestions[真题库: 全部年份]
+    MemberFeatures --> UnlimitedNotes[学习笔记: 无限条数]
+    MemberFeatures --> AdvancedPlan[学习计划: AI督学+智能调整]
+    
+    %% 非会员功能流程
+    NonMemberAccess --> NonMemberFeatures[非会员功能]
+    NonMemberFeatures --> LimitedAI[AI问答: 每日3次]
+    NonMemberFeatures --> CivilLawOnly[知识导图: 仅民法]
+    NonMemberFeatures --> Year2022Only[真题库: 仅2022年]
+    NonMemberFeatures --> Max10Notes[学习笔记: 最多10条]
+    NonMemberFeatures --> BasicPlan[学习计划: 基础功能]
+    
+    %% AI问答限制检查
+    LimitedAI --> CheckAICount{今日已用3次?}
+    CheckAICount -->|否| UseAI[正常使用]
+    CheckAICount -->|是| ShowAIUpgrade[显示升级提示]
+    
+    %% 知识导图限制检查
+    CivilLawOnly --> SelectSubject{选择学科}
+    SelectSubject -->|民法| ShowMindmap[显示导图]
+    SelectSubject -->|其他学科| Show403[返回403+升级提示]
+    
+    %% 真题库限制检查
+    Year2022Only --> SelectYear{选择年份}
+    SelectYear -->|2022| ShowQuestions[显示题目]
+    SelectYear -->|其他年份| EmptyList[空列表+升级提示]
+    
+    %% 学习笔记限制检查
+    Max10Notes --> CheckNoteCount{笔记数≥10?}
+    CheckNoteCount -->|否| CreateNote[创建笔记]
+    CheckNoteCount -->|是| ShowNoteUpgrade[弹窗提示升级]
+    
+    %% 升级流程
+    ShowAIUpgrade --> UpgradeModal[升级会员弹窗]
+    Show403 --> UpgradeModal
+    EmptyList --> UpgradeModal
+    ShowNoteUpgrade --> UpgradeModal
+    
+    UpgradeModal --> UserDecision{用户决定}
+    UserDecision -->|升级| Payment[支付流程]
+    UserDecision -->|取消| NonMemberAccess
+    
+    Payment --> PaymentSuccess{支付成功?}
+    PaymentSuccess -->|是| UpdateRole[更新用户角色]
+    PaymentSuccess -->|否| NonMemberAccess
+    
+    UpdateRole --> MemberAccess
+    
+    %% 零点重置
+    ResetCron[Cron任务: 每日零点] -.->|重置daily_qa_count| LimitedAI
+    
+    style Start fill:#e8f4f8,stroke:#4a90e2
+    style MemberAccess fill:#d4f1d4,stroke:#5cb85c
+    style NonMemberAccess fill:#ffe4b5,stroke:#f0ad4e
+    style UpgradeModal fill:#ffcccc,stroke:#d9534f
+    style Payment fill:#ddd,stroke:#777
+    style ResetCron fill:#f0f0f0,stroke:#999,stroke-dasharray: 5 5
+        </div>
+        
+        <div class="legend">
+            <h3>图例说明</h3>
+            <div class="legend-item">
+                <span class="legend-color" style="background-color: #e8f4f8; border: 2px solid #4a90e2;"></span>
+                <span>起始/结束</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background-color: #d4f1d4; border: 2px solid #5cb85c;"></span>
+                <span>会员功能</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background-color: #ffe4b5; border: 2px solid #f0ad4e;"></span>
+                <span>非会员功能</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background-color: #ffcccc; border: 2px solid #d9534f;"></span>
+                <span>升级提示</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background-color: #ddd; border: 2px solid #777;"></span>
+                <span>支付流程</span>
+            </div>
+        </div>
+        
+        <div style="margin-top: 30px; padding: 20px; background: #f0f8ff; border-radius: 5px;">
+            <h3>功能限制对比</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: #e0e0e0;">
+                        <th style="padding: 10px; text-align: left; border: 1px solid #ccc;">功能模块</th>
+                        <th style="padding: 10px; text-align: left; border: 1px solid #ccc;">非会员</th>
+                        <th style="padding: 10px; text-align: left; border: 1px solid #ccc;">会员</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid #ccc;">法考 AI 问答</td>
+                        <td style="padding: 10px; border: 1px solid #ccc; color: #d9534f;">每日 3 次</td>
+                        <td style="padding: 10px; border: 1px solid #ccc; color: #5cb85c;">不限次数</td>
+                    </tr>
+                    <tr style="background: #f9f9f9;">
+                        <td style="padding: 10px; border: 1px solid #ccc;">法考知识导图</td>
+                        <td style="padding: 10px; border: 1px solid #ccc; color: #d9534f;">仅民法学科</td>
+                        <td style="padding: 10px; border: 1px solid #ccc; color: #5cb85c;">全部 8 大学科</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid #ccc;">法考真题库</td>
+                        <td style="padding: 10px; border: 1px solid #ccc; color: #d9534f;">仅 2022 年真题</td>
+                        <td style="padding: 10px; border: 1px solid #ccc; color: #5cb85c;">全部年份真题</td>
+                    </tr>
+                    <tr style="background: #f9f9f9;">
+                        <td style="padding: 10px; border: 1px solid #ccc;">学习笔记</td>
+                        <td style="padding: 10px; border: 1px solid #ccc; color: #d9534f;">最多 10 条</td>
+                        <td style="padding: 10px; border: 1px solid #ccc; color: #5cb85c;">不限条数</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid #ccc;">学习计划</td>
+                        <td style="padding: 10px; border: 1px solid #ccc; color: #f0ad4e;">基础功能</td>
+                        <td style="padding: 10px; border: 1px solid #ccc; color: #5cb85c;">AI 督学 + 智能调整</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {
+                curve: 'basis',
+                padding: 20
+            }
+        });
+    </script>
+</body>
+</html>

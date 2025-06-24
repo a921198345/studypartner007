@@ -14,6 +14,7 @@ import { NoteEditorDialog } from "@/components/notes/note-editor-dialog"
 import { NoteViewerDialog } from "@/components/notes/note-viewer-dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { useRouter } from "next/navigation"
+import { useFirstUseAuth } from '@/components/auth/first-use-auth-guard'
 
 // 定义笔记类型
 interface Note {
@@ -27,6 +28,7 @@ interface Note {
 }
 
 export default function NotesPage() {
+  const { checkAuthOnAction } = useFirstUseAuth('notes')
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("全部")
   const [categories, setCategories] = useState<{ category: string; count: number }[]>([])
@@ -76,6 +78,9 @@ export default function NotesPage() {
 
   // 打开编辑器
   const openEditor = (noteId?: number) => {
+    // 首次使用时触发登录提醒
+    checkAuthOnAction();
+    
     setEditingNoteId(noteId || null)
     setEditorOpen(true)
   }

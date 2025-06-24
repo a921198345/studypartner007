@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react"
 import dynamic from 'next/dynamic'
+import { useSearchParams } from 'next/navigation'
 import { MainNav } from "@/components/main-nav"
 import { Footer } from "@/components/footer"
 import ChatLayout from "@/components/ai-chat/ChatLayout"
@@ -16,11 +17,15 @@ import { SidebarSimpleFixed } from "@/components/ai-chat/sidebar-simple-fixed"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
-import { Menu, ChevronDown, PanelLeft } from "lucide-react"
+import { Menu, ChevronDown, PanelLeft, Calendar, BookOpen } from "lucide-react"
 import { v4 as uuidv4 } from 'uuid'
 import { askAIStream, AskAIParams } from "@/lib/api/aiService"
 import { useToast } from "@/components/ui/use-toast"
 import { useChatStore } from '@/hooks/useChatStore'
+import { getAuthHeaders } from '@/lib/auth-utils'
+import { useFirstUseAuth } from '@/components/auth/first-use-auth-guard'
+import { useStudyPlan, useStudySession } from '@/stores/study-plan-store'
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 // 扩展消息类型，添加流式相关属性
 interface Message {
@@ -29,12 +34,13 @@ interface Message {
   content: string;
   timestamp: string;
   isStreaming?: boolean;
-  imageBase64?: string;
   isError?: boolean;
 }
 
 export default function AIChat() {
   const { toast } = useToast();
+  const { checkAuthOnAction } = useFirstUseAuth('ai-chat');
+  const searchParams = useSearchParams();
   const { 
     messages, 
     addMessage, 
@@ -47,6 +53,10 @@ export default function AIChat() {
     updateConversationTitle,
     cleanupEmptyConversations
   } = useChatStore();
+  
+  // 学习计划集成
+  const { plan } = useStudyPlan();
+  const { isActive: isStudySessionActive, session, start: startStudySession, end: endStudySession } = useStudySession();
   const [isStreaming, setIsStreaming] = useState(false);
   const [currentStreamingMessageId, setCurrentStreamingMessageId] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -85,8 +95,21 @@ export default function AIChat() {
       if (storageSize > 4 * 1024 * 1024) { // 如果超过 4MB
         console.warn('localStorage 接近容量限制，清理旧数据...');
         // 清理旧的聊天数据
-        localStorage.removeItem('law-chat-storage');
-        window.location.reload(); // 重新加载页面
+        const chatStorage = localStorage.getItem('law-chat-storage');
+        if (chatStorage) {
+          try {
+            const data = JSON.parse(chatStorage);
+            // 只保留最近的对话
+            if (data.conversations && data.conversations.length > 5) {
+              data.conversations = data.conversations.slice(-5);
+              localStorage.setItem('law-chat-storage', JSON.stringify(data));
+            }
+          } catch (parseError) {
+            // 如果解析失败，直接删除
+            localStorage.removeItem('law-chat-storage');
+          }
+        }
+        // 不再自动刷新页面，避免无限循环
       }
     } catch (e) {
       console.error('检查 localStorage 大小失败:', e);
@@ -100,17 +123,42 @@ export default function AIChat() {
     }
   }, [desktopSidebarCollapsed, mounted]);
   
-  // 初始化对话 - 每次进入页面时创建新对话
+  // 处理来自知识导图的跳转参数
   useEffect(() => {
     if (mounted) {
-      // 每次进入页面时都自动创建新对话
+      const question = searchParams.get('q');
+      const source = searchParams.get('source');
+      
+      if (question && source === 'knowledge-map') {
+        // 如果有来自知识导图的问题，自动发送
+        const subject = searchParams.get('subject');
+        const keywords = searchParams.get('keywords');
+        
+        // 显示提示信息
+        toast({
+          description: `从知识导图跳转，正在为您解答：${question.substring(0, 30)}...`,
+          duration: 3000,
+        });
+        
+        // 延迟发送消息，确保对话已经创建
+        setTimeout(() => {
+          handleSendMessage(question);
+        }, 500);
+      }
+    }
+  }, [mounted, searchParams]);
+
+  // 初始化对话 - 只在没有当前对话时创建新对话
+  useEffect(() => {
+    if (mounted && !currentConversationId) {
+      // 只在没有当前对话时创建新对话
       // 先清理空对话
       cleanupEmptyConversations();
       // 创建新对话
       const newId = createNewConversation();
-      console.log('页面加载，自动创建新对话:', newId);
+      console.log('页面加载，创建新对话:', newId);
     }
-  }, [mounted]); // 只在mounted时执行一次，避免依赖循环
+  }, [mounted, currentConversationId]); // 依赖 currentConversationId，避免重复创建
   
   // 页面卸载时清理空对话
   useEffect(() => {
@@ -214,8 +262,11 @@ export default function AIChat() {
     }
   }, []);
   
-  const handleSendMessage = async (text: string, imageBase64?: string) => {
-    if (!text.trim() && !imageBase64) return;
+  const handleSendMessage = async (text: string) => {
+    if (!text.trim()) return;
+    
+    // 首次使用时触发登录提醒
+    checkAuthOnAction();
     
     // 如果没有当前对话，创建新对话
     let conversationId = currentConversationId;
@@ -233,9 +284,8 @@ export default function AIChat() {
     addMessage({
       id: userMessageId,
       role: 'user',
-      content: text || (imageBase64 ? '[图片]' : ''),
-      timestamp: new Date().toISOString(),
-      imageBase64: imageBase64
+      content: text,
+      timestamp: new Date().toISOString()
     });
     
     // 更新对话标题
@@ -261,15 +311,15 @@ export default function AIChat() {
     abortControllerRef.current = abortController;
     
     try {
-      // 直接调用 API，不使用复杂的封装
+      // 直接调用 API，包含认证头
       const response = await fetch('/api/ai/ask/stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...getAuthHeaders(),
         },
         body: JSON.stringify({
-          question: text || '请帮我解答这个问题',
-          imageBase64: imageBase64
+          question: text
         }),
         signal: abortController.signal
       });
@@ -496,6 +546,67 @@ export default function AIChat() {
               <div className="w-9" /> {/* 占位元素，保持标题居中 */}
             </div>
             
+            {/* 学习计划提示区域 */}
+            {plan && (
+              <Alert className="m-4 mb-0 border-blue-200 bg-blue-50">
+                <Calendar className="h-4 w-4" />
+                <AlertDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-medium">今日学习重点：</span>
+                      {plan.subjects_order && plan.subjects_order[0] ? (
+                        <span className="ml-2">{plan.subjects_order[0]}</span>
+                      ) : (
+                        <span className="ml-2">暂无安排</span>
+                      )}
+                      <span className="ml-4 text-sm text-muted-foreground">
+                        计划学习 {plan.schedule_settings?.daily_hours || 3} 小时
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      {!isStudySessionActive ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            if (plan.subjects_order && plan.subjects_order[0]) {
+                              startStudySession(plan.subjects_order[0], 'ai_chat');
+                              toast({
+                                description: '学习会话已开始，祝您学习愉快！',
+                              });
+                            }
+                          }}
+                        >
+                          <BookOpen className="h-3 w-3 mr-1" />
+                          开始学习
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            endStudySession();
+                            toast({
+                              description: '学习会话已结束，记得休息一下！',
+                            });
+                          }}
+                        >
+                          结束学习
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => window.location.href = '/learning-plan'}
+                      >
+                        查看计划
+                      </Button>
+                    </div>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <div className="flex-1 overflow-hidden">
               <ScrollArea className="h-full" ref={scrollAreaRef}>
                 <div className="pb-32">
@@ -570,7 +681,6 @@ export default function AIChat() {
                           content={message.content}
                           role={message.role}
                           isStreaming={isThisMessageStreaming}
-                          imageBase64={message.imageBase64}
                         />
                         
                         {/* AI回答的操作按钮 - 只在满足条件时显示 */}
@@ -581,6 +691,7 @@ export default function AIChat() {
                                 question={userQuestion}
                                 answer={message.content}
                                 chatId={message.id}
+                                preserveHtml={true}
                               />
                               <MindMapButton
                                 message={userQuestion}
@@ -633,7 +744,7 @@ export default function AIChat() {
                 <InputArea
                   onSendMessage={handleSendMessage}
                   isAiThinking={isStreaming}
-                  placeholder="输入您的法考问题或上传图片..."
+                  placeholder="输入您的法考问题..."
                   onStopGeneration={handleStopGeneration}
                 />
               </div>

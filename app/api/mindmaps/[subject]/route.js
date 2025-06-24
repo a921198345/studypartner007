@@ -1,7 +1,9 @@
 // app/api/mindmaps/[subject]/route.js
 import { NextResponse } from 'next/server';
 import db from '../../../../lib/db.js';
-import mysql from 'mysql2/promise'; 
+import mysql from 'mysql2/promise';
+import { verifyAuth } from '@/lib/auth-middleware';
+import { checkMembership, logFeatureUsage } from '@/lib/membership-middleware'; 
 
 // 默认民法知识导图数据
 const getDefaultMindMapData = (subject) => {
@@ -234,6 +236,39 @@ export async function GET(request, { params }) {
     const decodedSubject = decodeURIComponent(subject);
     console.log(`解码后的学科名称: ${decodedSubject}`);
     
+    // 验证用户身份
+    const auth_result = await verifyAuth(request);
+    if (!auth_result.success) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: '请先登录',
+          requireAuth: true
+        },
+        { status: 401 }
+      );
+    }
+    
+    const user_id = auth_result.user.user_id;
+    const is_member = checkMembership(auth_result.user);
+    
+    // 检查会员权限：非会员只能访问民法
+    if (!is_member && decodedSubject !== '民法') {
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: `查看${decodedSubject}知识导图需要升级会员`,
+          upgradeRequired: true,
+          availableSubjects: ['民法'],
+          currentSubject: decodedSubject
+        },
+        { status: 403 }
+      );
+    }
+    
+    // 记录使用日志
+    await logFeatureUsage(user_id, 'mindmap', 'view', decodedSubject);
+    
     // 添加内存缓存
     const cacheKey = `mindmap_cache_${decodedSubject}`;
     if (global[cacheKey]) {
@@ -290,6 +325,12 @@ export async function GET(request, { params }) {
         }
         
         if (mindmapContent) {
+          // 数据标准化处理：确保根节点名称为科目名称
+          if (mindmapContent.name === 'root' && mindmapContent.subject) {
+            mindmapContent.name = mindmapContent.subject;
+            delete mindmapContent.subject; // 清理冗余字段
+          }
+          
           const result = { 
             success: true, 
             mindmap: {
@@ -303,7 +344,7 @@ export async function GET(request, { params }) {
             timestamp: Date.now()
           };
           
-          console.log('从数据库返回知识导图数据并缓存');
+          console.log('从数据库返回标准化的知识导图数据并缓存');
           return NextResponse.json(result);
         }
       }

@@ -3,8 +3,8 @@
 import type React from "react"
 
 import { useState } from "react"
-import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/hooks/useAuth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -18,6 +18,7 @@ interface PhoneLoginProps {
 
 export function PhoneLogin({ onLoginSuccess, redirectUrl = "/learning-plan" }: PhoneLoginProps) {
   const router = useRouter()
+  const { login } = useAuth()
   const [phone, setPhone] = useState("")
   const [code, setCode] = useState("")
   const [countdown, setCountdown] = useState(0)
@@ -54,12 +55,12 @@ export function PhoneLogin({ onLoginSuccess, redirectUrl = "/learning-plan" }: P
 
     try {
       // 调用发送验证码的API
-      const response = await fetch('/api/sms/verify', {
+      const response = await fetch('/api/auth/send-otp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ phoneNumber: phone }),
+        body: JSON.stringify({ phone_number: phone }),
       });
 
       const data = await response.json();
@@ -67,7 +68,7 @@ export function PhoneLogin({ onLoginSuccess, redirectUrl = "/learning-plan" }: P
       if (data.success) {
         startCountdown()
       } else {
-        setError(data.message || "发送验证码失败，请稍后重试")
+        setError(data.error || "发送验证码失败，请稍后重试")
       }
     } catch (err) {
       console.error("发送验证码错误:", err)
@@ -85,8 +86,8 @@ export function PhoneLogin({ onLoginSuccess, redirectUrl = "/learning-plan" }: P
       return
     }
 
-    if (!code || code.length < 4) {
-      setError("请输入验证码")
+    if (!code || code.length !== 6) {
+      setError("请输入6位验证码")
       return
     }
 
@@ -94,26 +95,41 @@ export function PhoneLogin({ onLoginSuccess, redirectUrl = "/learning-plan" }: P
     setIsLoading(true)
 
     try {
-      // 使用NextAuth的signIn方法进行登录
-      const result = await signIn("credentials", {
-        redirect: false,
-        phone,
-        code,
-      })
+      // 调用验证OTP的API
+      const response = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          phone_number: phone,
+          otp: code 
+        }),
+      });
 
-      if (result?.error) {
-        // 处理登录错误
-        setError("登录失败：" + (result.error === "CredentialsSignin" ? "验证码错误或已过期" : result.error))
-        return
+      const data = await response.json();
+
+      if (data.success) {
+        // 使用auth hook管理认证状态
+        login(data.token, data.user);
+
+        // 登录成功的处理
+        if (onLoginSuccess) {
+          onLoginSuccess()
+        }
+
+        // 检查是否有保存的重定向路径
+        const savedRedirect = sessionStorage.getItem('redirectAfterLogin')
+        if (savedRedirect) {
+          sessionStorage.removeItem('redirectAfterLogin')
+          router.push(savedRedirect)
+        } else {
+          // 否则重定向到默认页面
+          router.push(redirectUrl)
+        }
+      } else {
+        setError(data.error || "登录失败，请稍后重试")
       }
-
-      // 登录成功的处理
-      if (onLoginSuccess) {
-        onLoginSuccess()
-      }
-
-      // 重定向到指定页面
-      router.push(redirectUrl)
     } catch (err) {
       console.error("登录错误:", err)
       setError("登录过程中发生错误，请稍后重试")

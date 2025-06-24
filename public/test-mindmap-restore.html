@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>知识导图状态恢复测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .button-group {
+            margin: 20px 0;
+            text-align: center;
+        }
+        button {
+            background-color: #4299E1;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #3182CE;
+        }
+        .log {
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 20px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .step {
+            background-color: #E3F2FD;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .step h3 {
+            margin-top: 0;
+            color: #1976D2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>知识导图状态恢复测试</h1>
+        
+        <div class="step">
+            <h3>测试步骤：</h3>
+            <ol>
+                <li>进入知识导图页面：<a href="/knowledge-map" target="_blank">打开知识导图</a></li>
+                <li>展开一些节点（例如：民法 → 人身权 → 人格权 → 具体人格权）</li>
+                <li>选中一个第三级或更深的节点</li>
+                <li>跳转到题库：<a href="/question-bank" target="_blank">打开题库</a></li>
+                <li>返回知识导图（带恢复参数）：<a href="/knowledge-map?restoreState=true" target="_blank">返回知识导图</a></li>
+                <li>验证之前展开的节点和选中的节点是否恢复</li>
+            </ol>
+        </div>
+
+        <div class="button-group">
+            <button onclick="checkSessionStorage()">检查SessionStorage</button>
+            <button onclick="clearStorage()">清除存储数据</button>
+            <button onclick="createTestState()">创建测试状态</button>
+        </div>
+
+        <div class="step">
+            <h3>测试场景：</h3>
+            <p><strong>场景1：</strong>展开民法下的多个分支，然后跳转并返回</p>
+            <p><strong>场景2：</strong>选中"具体人格权"节点，跳转到题库查看相关题目，然后返回</p>
+            <p><strong>场景3：</strong>展开到第4-5级深度的节点，测试深层路径恢复</p>
+        </div>
+
+        <div class="log" id="log">
+            等待操作...
+        </div>
+    </div>
+
+    <script>
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${time}] ${message}<br>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function checkSessionStorage() {
+            log('===== 检查SessionStorage =====');
+            const keys = Object.keys(sessionStorage);
+            const mindMapKeys = keys.filter(key => key.includes('mindMap'));
+            
+            if (mindMapKeys.length === 0) {
+                log('没有找到知识导图相关的存储数据');
+            } else {
+                mindMapKeys.forEach(key => {
+                    const value = sessionStorage.getItem(key);
+                    try {
+                        const parsed = JSON.parse(value);
+                        log(`${key}:`);
+                        log(`- 学科: ${parsed.subject}`);
+                        log(`- 展开节点数: ${parsed.expandedNodes?.length || 0}`);
+                        log(`- 选中节点: ${parsed.selectedNode?.name || '无'}`);
+                        log(`- 缩放级别: ${parsed.zoomLevel || 1}`);
+                    } catch (e) {
+                        log(`${key}: ${value}`);
+                    }
+                });
+            }
+        }
+
+        function clearStorage() {
+            const keys = Object.keys(sessionStorage);
+            const mindMapKeys = keys.filter(key => key.includes('mindMap'));
+            mindMapKeys.forEach(key => {
+                sessionStorage.removeItem(key);
+            });
+            log('已清除所有知识导图相关存储数据');
+        }
+
+        function createTestState() {
+            const testState = {
+                subject: "民法",
+                zoomLevel: 1,
+                expandedNodes: [
+                    ["民法"],
+                    ["民法", "（31）人身权"],
+                    ["民法", "（31）人身权", "（29）人格权"],
+                    ["民法", "（31）人身权", "（29）人格权", "具体人格权"],
+                    ["民法", "（28）财产权"],
+                    ["民法", "（28）财产权", "（9）物权"]
+                ],
+                selectedNode: {
+                    name: "具体人格权",
+                    fullPath: ["民法", "（31）人身权", "（29）人格权", "具体人格权"],
+                    parentPath: ["（31）人身权", "（29）人格权"],
+                    __rd3t: { depth: 3 }
+                },
+                timestamp: Date.now()
+            };
+            
+            sessionStorage.setItem('mindMapViewState_民法', JSON.stringify(testState));
+            log('已创建测试状态数据');
+            log('现在可以访问带有恢复参数的知识导图页面查看效果');
+        }
+
+        // 页面加载时自动检查
+        window.onload = function() {
+            log('测试页面已加载');
+            checkSessionStorage();
+        };
+    </script>
+</body>
+</html>

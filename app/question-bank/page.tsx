@@ -8,7 +8,7 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, BookOpen, Star, Filter, Lock } from "lucide-react"
+import { Search, BookOpen, Star, Filter, Lock, Calendar, Target } from "lucide-react"
 import { Footer } from "@/components/footer"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Link from "next/link"
@@ -16,6 +16,9 @@ import { questionApi, getWrongQuestions, getFavoriteQuestions } from "@/lib/api/
 import { AnswerHistoryV2 as AnswerHistory } from "@/components/question-bank/answer-history-v2"
 import { createAnswerSession } from "@/lib/answer-sessions"
 import { useToast } from "@/components/ui/use-toast"
+import { useFirstUseAuth } from '@/components/auth/first-use-auth-guard'
+import { useStudyPlan, useTodayProgress } from '@/stores/study-plan-store'
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 // 辅助函数：比较两个数组是否内容相同（忽略顺序）
 function arraysEqual(a: any[], b: any[]): boolean {
@@ -34,8 +37,69 @@ function arraysEqual(a: any[], b: any[]): boolean {
   return false;
 }
 
+// 生成智能搜索建议
+function generateSearchSuggestions(keywords: string[]): string[] {
+  const suggestions = new Set<string>();
+  
+  // 法律概念映射表
+  const conceptMap = {
+    '抢劫': ['盗窃', '诈骗', '抢夺', '故意伤害'],
+    '转化': ['既遂', '未遂', '中止', '预备'],
+    '事后': ['当场', '预备', '既遂'],
+    '犯罪': ['故意', '过失', '正当防卫'],
+    '客观': ['主观', '故意', '过失'],
+    '处分': ['占有', '所有权', '物权'],
+    '行为': ['犯罪', '违法', '责任'],
+    '婚姻': ['离婚', '家庭', '夫妻', '配偶'],
+    '家庭': ['婚姻', '继承', '遗产'],
+    '合同': ['协议', '契约', '效力', '履行']
+  };
+  
+  // 为每个关键词生成相关建议
+  for (const keyword of keywords) {
+    // 提取核心概念
+    const cleanKeyword = keyword
+      .replace(/[（）()【】\[\]]/g, '')
+      .replace(/[0-9]+[、\.]/g, '')
+      .replace(/第[一二三四五六七八九十\d]+[章节条]/g, '')
+      .trim();
+    
+    // 查找相关概念
+    for (const [key, values] of Object.entries(conceptMap)) {
+      if (cleanKeyword.includes(key) || key.includes(cleanKeyword)) {
+        values.forEach(value => suggestions.add(value));
+      }
+    }
+    
+    // 智能分词并添加建议
+    if (cleanKeyword.length >= 4) {
+      // 提取2-3字的关键概念
+      for (let i = 0; i <= cleanKeyword.length - 2; i++) {
+        const segment = cleanKeyword.substr(i, 2);
+        if (conceptMap[segment]) {
+          conceptMap[segment].forEach(value => suggestions.add(value));
+        }
+      }
+    }
+  }
+  
+  // 如果没有找到相关建议，提供一般性建议
+  if (suggestions.size === 0) {
+    return ['故意杀人', '正当防卫', '犯罪构成', '合同效力', '婚姻关系'];
+  }
+  
+  return Array.from(suggestions).slice(0, 5);
+}
+
 export default function QuestionBankPage() {
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const { checkAuthOnAction } = useFirstUseAuth('question-bank')
+  const { toast } = useToast()
+  
+  // 学习计划集成
+  const { plan } = useStudyPlan()
+  const { progress, updateProgress } = useTodayProgress()
   
   // 从URL参数初始化状态
   const [searchQuery, setSearchQuery] = useState("")
@@ -48,6 +112,18 @@ export default function QuestionBankPage() {
   const [selectedQuestionTypes, setSelectedQuestionTypes] = useState<string[]>(["全部题型"])
   const [selectedSubject, setSelectedSubject] = useState("all")
   const [selectedYears, setSelectedYears] = useState<string[]>(["all"])
+  
+  // 检查URL参数并设置初始学科
+  useEffect(() => {
+    const subjectParam = searchParams.get('subject')
+    if (subjectParam && subjectParam !== 'all') {
+      const validSubjects = ["刑法", "民法", "刑事诉讼法", "民事诉讼法", "行政法", "商经知", "三国法", "理论法"]
+      if (validSubjects.includes(subjectParam)) {
+        console.log('从URL参数设置学科筛选:', subjectParam)
+        setSelectedSubject(subjectParam)
+      }
+    }
+  }, [searchParams])
   const [questions, setQuestions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -70,14 +146,14 @@ export default function QuestionBankPage() {
 
   const subjects = [
     { id: "all", name: "全部科目" },
-    { id: "民法", name: "民法" },
     { id: "刑法", name: "刑法" },
-    { id: "民事诉讼法", name: "民事诉讼法" },
+    { id: "民法", name: "民法" },
     { id: "刑事诉讼法", name: "刑事诉讼法" },
-    { id: "商法", name: "商法与经济法" },
-    { id: "法理学", name: "理论法学" },
-    { id: "行政法", name: "行政法与行政诉讼法" },
+    { id: "民事诉讼法", name: "民事诉讼法" },
+    { id: "行政法", name: "行政法" },
+    { id: "商经知", name: "商经知" },
     { id: "三国法", name: "三国法" },
+    { id: "理论法", name: "理论法" },
   ]
 
   const years = [
@@ -92,9 +168,6 @@ export default function QuestionBankPage() {
 
   // 创建错题列表（为了保留"我的错题"标签页功能，但不显示错题标签）
   // const wrongQuestions = [2, 4, 6] // 假设这些ID是错题
-
-  const router = useRouter()
-  const { toast } = useToast()
 
   // 处理从AI聊天跳转过来的情况 - 简化版本
   useEffect(() => {
@@ -143,21 +216,68 @@ export default function QuestionBankPage() {
       } catch (e) {
         console.error('解析筛选条件失败:', e)
       }
-    } else if (source === 'ai-chat' && keywords) {
-      // 解析关键词数组
-      const keywordArray = keywords.split(',').map(k => k.trim()).filter(k => k)
-      setAiKeywords(keywordArray)
+    } else if ((source === 'ai-chat' || source === 'knowledge-map') && keywords) {
+      // 清理关键词函数：去除序号、括号等格式标记
+      const cleanKeyword = (keyword: string) => {
+        return keyword
+          .replace(/[（）()【】\[\]]/g, '') // 去除括号
+          .replace(/[0-9]+[、\.]/g, '') // 去除序号
+          .replace(/第[一二三四五六七八九十\d]+[章节条]/g, '') // 去除章节号
+          .trim()
+      };
+      
+      // 解析并清理关键词数组
+      const rawKeywordArray = keywords.split(',').map(k => k.trim()).filter(k => k)
+      const cleanedKeywordArray = rawKeywordArray.map(cleanKeyword).filter(k => k.length > 0)
+      
+      // 处理单独的knowledgePoint参数（从知识导图跳转时可能单独传递）
+      const knowledgePointParam = searchParams.get('knowledgePoint')
+      if (knowledgePointParam) {
+        const cleanedKnowledgePoint = cleanKeyword(knowledgePointParam)
+        if (cleanedKnowledgePoint && !cleanedKeywordArray.includes(cleanedKnowledgePoint)) {
+          cleanedKeywordArray.push(cleanedKnowledgePoint)
+        }
+      }
+      
+      setAiKeywords(cleanedKeywordArray)
       setIsFromAiChat(true)
+      
+      // 处理从知识导图跳转时的学科筛选
+      if (source === 'knowledge-map') {
+        const subjectParam = searchParams.get('subject')
+        const fromParam = searchParams.get('from')
+        
+        // 优先使用subject参数，如果没有则使用from参数
+        const targetSubject = subjectParam || fromParam
+        
+        if (targetSubject && targetSubject !== 'all') {
+          console.log('从知识导图跳转，设置学科筛选为:', targetSubject)
+          
+          // 验证目标学科是否在支持的学科列表中
+          const validSubjects = ["刑法", "民法", "刑事诉讼法", "民事诉讼法", "行政法", "商经知", "三国法", "理论法"]
+          if (validSubjects.includes(targetSubject)) {
+            setSelectedSubject(targetSubject)
+            console.log('学科筛选已设置为:', targetSubject)
+          } else {
+            console.warn('无效的学科名称:', targetSubject)
+          }
+        }
+      }
       
       // 简单保存搜索状态
       if (typeof window !== 'undefined') {
-        sessionStorage.setItem('aiKeywords', JSON.stringify(keywordArray))
+        sessionStorage.setItem('aiKeywords', JSON.stringify(cleanedKeywordArray))
+        // 保存来源信息
+        sessionStorage.setItem('searchSource', source || '')
       }
       
-      // 显示提示
+      // 根据来源显示不同的提示
+      const sourceText = source === 'knowledge-map' ? '知识导图' : 'AI问答'
+      const subjectInfo = source === 'knowledge-map' && searchParams.get('subject') ? 
+        `，限定${searchParams.get('subject')}学科` : ''
       toast({
-        description: `正在搜索包含"${keywordArray.join('、')}"的题目`,
-        duration: 3000,
+        description: `从${sourceText}跳转，正在搜索包含"${cleanedKeywordArray.join('、')}"的题目${subjectInfo}`,
+        duration: 4000,
       })
     } else if (typeof window !== 'undefined') {
       // 尝试恢复之前的AI搜索关键词
@@ -166,8 +286,22 @@ export default function QuestionBankPage() {
         try {
           const keywords = JSON.parse(savedKeywords)
           if (Array.isArray(keywords) && keywords.length > 0) {
-            setAiKeywords(keywords)
+            // 清理关键词函数：去除序号、括号等格式标记（防止sessionStorage中有旧数据）
+            const cleanKeyword = (keyword: string) => {
+              return keyword
+                .replace(/[（）()【】\[\]]/g, '') // 去除括号
+                .replace(/[0-9]+[、\.]/g, '') // 去除序号
+                .replace(/第[一二三四五六七八九十\d]+[章节条]/g, '') // 去除章节号
+                .trim()
+            };
+            
+            // 清理恢复的关键词
+            const cleanedKeywords = keywords.map(cleanKeyword).filter(k => k.length > 0)
+            setAiKeywords(cleanedKeywords)
             setIsFromAiChat(true)
+            
+            // 更新sessionStorage为清理后的关键词
+            sessionStorage.setItem('aiKeywords', JSON.stringify(cleanedKeywords))
           }
         } catch (e) {
           console.error('恢复AI关键词失败:', e)
@@ -299,6 +433,48 @@ export default function QuestionBankPage() {
               questionsData = searchResponse;
               console.log(`多关键词搜索结果: 找到 ${searchResponse.data?.pagination?.total || 0} 道题目`);
               console.log('搜索调试信息:', searchResponse.data?.debug);
+              
+              // 如果指定科目没有结果，尝试搜索所有科目
+              if (searchResponse.data?.pagination?.total === 0 && selectedSubject !== 'all') {
+                console.log(`${selectedSubject}科目未找到结果，扩展到所有科目搜索`);
+                
+                const allSubjectsResponse = await questionApi.searchWithMultipleKeywords({
+                  keywords: aiKeywords,
+                  subject: undefined, // 不限制科目
+                  year: selectedYears,
+                  questionType: !selectedQuestionTypes.includes('全部题型') ? 
+                    (selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题') : undefined,
+                  page: pagination.currentPage,
+                  limit: pagination.perPage
+                });
+                
+                if (allSubjectsResponse.success && allSubjectsResponse.data?.pagination?.total > 0) {
+                  questionsData = allSubjectsResponse;
+                  console.log(`扩展搜索找到 ${allSubjectsResponse.data.pagination.total} 道题目`);
+                  
+                  // 提示用户已扩展搜索范围
+                  toast({
+                    title: "搜索范围已扩展",
+                    description: `${selectedSubject}科目中未找到相关题目，已显示所有科目的搜索结果`,
+                    duration: 5000,
+                  });
+                  
+                  // 重置科目筛选为"全部"
+                  setSelectedSubject('all');
+                } else {
+                  // 如果扩展搜索仍无结果，提供智能建议
+                  console.log('扩展搜索仍无结果，提供智能建议');
+                  
+                  // 生成搜索建议
+                  const suggestions = generateSearchSuggestions(aiKeywords);
+                  
+                  toast({
+                    title: "未找到相关题目",
+                    description: `建议尝试搜索: ${suggestions.slice(0, 3).join('、')}`,
+                    duration: 8000,
+                  });
+                }
+              }
             } else {
               console.error('多关键词搜索失败:', searchResponse.message);
               // 使用空结果
@@ -1027,6 +1203,17 @@ export default function QuestionBankPage() {
         waitTime += 100;
       }
     }
+    
+    // 记录到学习计划进度
+    if (plan && selectedSubject) {
+      updateProgress({
+        questions_practiced: progress.questions_practiced + 1,
+        subjects_studied: progress.subjects_studied.includes(selectedSubject) 
+          ? progress.subjects_studied 
+          : [...progress.subjects_studied, selectedSubject]
+      });
+    }
+    
     // 创建新的答题会话（如果是开始练习）
     // 创建答题会话（异步处理，不阻塞跳转）
     const createSessionAsync = async () => {
@@ -1215,14 +1402,52 @@ export default function QuestionBankPage() {
       <main className="flex-1">
         <div className="container mx-auto py-6">
           <div className="flex items-center justify-between mb-6">
-            <h1 className="text-3xl font-bold gradient-text">法考真题库</h1>
+            <div className="flex items-center space-x-4">
+              <h1 className="text-3xl font-bold gradient-text">法考真题库</h1>
+              {/* 从知识导图跳转的返回按钮 */}
+              {((isFromAiChat && typeof window !== 'undefined' && sessionStorage.getItem('searchSource') === 'knowledge-map') || searchParams.get('source') === 'knowledge-map') && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const fromParam = searchParams.get('from');
+                    const knowledgePointParam = searchParams.get('knowledgePoint');
+                    
+                    if (fromParam) {
+                      // 构建返回URL，包含恢复状态的参数
+                      const returnParams = new URLSearchParams({
+                        subject: fromParam,
+                        restoreState: 'true'
+                      });
+                      
+                      // 如果有知识点参数，也传递过去用于恢复选中状态（需要清理）
+                      if (knowledgePointParam) {
+                        const cleanedKnowledgePoint = knowledgePointParam
+                          .replace(/[（）()【】\[\]]/g, '')
+                          .replace(/[0-9]+[、\.]/g, '')
+                          .replace(/第[一二三四五六七八九十\d]+[章节条]/g, '')
+                          .trim();
+                        returnParams.append('selectedKnowledge', cleanedKnowledgePoint);
+                      }
+                      
+                      router.push(`/knowledge-map?${returnParams.toString()}`);
+                    } else {
+                      router.push('/knowledge-map?restoreState=true');
+                    }
+                  }}
+                  className="text-sm"
+                >
+                  ← 返回知识导图
+                </Button>
+              )}
+            </div>
             <div className="flex items-center space-x-2">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <div className="relative flex-shrink-0">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10 transform -translate-y-1/2" />
                 <Input
-                  type="search"
+                  type="text"
                   placeholder="搜索题目内容..."
-                  className="w-[350px] pl-8 pr-10"
+                  className="w-[350px] pl-9 pr-9 border-border bg-background focus:ring-2 focus:ring-ring focus:ring-offset-1 focus:border-transparent"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => {
@@ -1235,25 +1460,66 @@ export default function QuestionBankPage() {
                 />
                 {searchQuery && (
                   <button
-                    className="absolute right-2 top-2 p-0.5 hover:bg-gray-100 rounded"
+                    className="absolute right-2 top-1/2 p-1 hover:bg-muted rounded-full transition-colors z-10 transform -translate-y-1/2"
                     onClick={() => {
                       setSearchQuery('')
                       setDebouncedSearchQuery('')
                     }}
                   >
-                    <svg className="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-4 w-4 text-muted-foreground hover:text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
                 )}
               </div>
               {debouncedSearchQuery && (
-                <div className="text-sm text-muted-foreground">
+                <div className="text-sm text-muted-foreground whitespace-nowrap">
                   正在搜索: "{debouncedSearchQuery}"
                 </div>
               )}
             </div>
           </div>
+
+          {/* 学习计划推荐区域 */}
+          {plan && plan.subjects_order && plan.subjects_order.length > 0 && (
+            <Alert className="mb-6 border-blue-200 bg-blue-50">
+              <Target className="h-4 w-4" />
+              <AlertDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-medium">今日练习推荐：</span>
+                    <span className="ml-2">
+                      {plan.subjects_order[0]}
+                      {plan.metadata?.key_milestones && plan.metadata.key_milestones[0] && (
+                        <span className="text-sm text-muted-foreground ml-3">
+                          目标：{plan.metadata.key_milestones[0]}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {selectedSubject !== plan.subjects_order[0] && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedSubject(plan.subjects_order[0]);
+                          toast({
+                            description: `已切换到${plan.subjects_order[0]}科目`,
+                          });
+                        }}
+                      >
+                        切换到推荐科目
+                      </Button>
+                    )}
+                    <Badge variant="secondary">
+                      今日已练习 {progress.questions_practiced} 题
+                    </Badge>
+                  </div>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="md:col-span-1 space-y-6">

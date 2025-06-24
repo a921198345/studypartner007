@@ -80,16 +80,23 @@ except ImportError as e:
 # =================================================================
 # 数据库类型：可以是 "mysql" 或 "sqlite"
 # 如果MySQL连接失败，将自动切换到SQLite
-DATABASE_TYPE = "sqlite"  # 使用SQLite作为本地数据库
+DATABASE_TYPE = "mysql"  # 使用MySQL作为主数据库
 
-# MySQL配置
+# MySQL配置 - 从环境变量读取
 MYSQL_CONFIG = {
-    'host': '8.141.4.192',        # 宝塔面板服务器的IP地址或域名
-    'port': 3306,                    # MySQL端口，宝塔面板默认是3306
-    'user': 'law_app_user',          # 宝塔面板中的应用程序用户
-    'password': 'Accd0726351x.',            # law_app_user的密码
-    'database': 'law_exam_assistant' # 宝塔面板中的数据库名称
+    'host': os.getenv('DB_HOST'),
+    'port': int(os.getenv('DB_PORT', 3306)),
+    'user': os.getenv('DB_USER'),
+    'password': os.getenv('DB_PASSWORD'),
+    'database': os.getenv('DB_NAME')
 }
+
+# 验证必要的环境变量
+required_env_vars = ['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME']
+missing_vars = [var for var in required_env_vars if not os.getenv(var)]
+if missing_vars:
+    print(f"警告：缺少必要的环境变量: {', '.join(missing_vars)}")
+    print("将使用SQLite作为后备数据库")
 
 # SQLite配置
 SQLITE_DB_PATH = os.path.join("data", "law_exam_assistant.db")
@@ -555,9 +562,22 @@ def list_mindmaps_endpoint():
     返回所有已存储在数据库中的学科知识导图的简要信息列表。
     不返回完整的知识导图数据，只返回学科名称、创建时间和更新时间等元数据。
     """
-    mindmaps = []
-    
     try:
+        # 与知识导图页面和validate_subject_area函数保持一致的学科列表
+        valid_subjects = [
+            '民法', 
+            '刑法', 
+            '民事诉讼法', 
+            '刑事诉讼法', 
+            '行政法', 
+            '商经知', 
+            '三国法', 
+            '理论法'
+        ]
+        
+        # 从数据库中获取已有的知识导图
+        mindmaps = []
+        
         if DATABASE_TYPE == "mysql" and MYSQL_AVAILABLE:
             # 使用MySQL
             conn = mysql.connector.connect(**MYSQL_CONFIG)
@@ -610,10 +630,29 @@ def list_mindmaps_endpoint():
             cursor.close()
             conn.close()
         
+        # 确保返回的学科列表包含所有有效学科
+        # 创建一个字典，键为学科名称，值为对应的mindmap对象
+        mindmap_dict = {m['subject_name']: m for m in mindmaps if 'subject_name' in m}
+        
+        # 构建最终返回的列表，确保包含所有有效学科
+        result_mindmaps = []
+        for subject in valid_subjects:
+            if subject in mindmap_dict:
+                # 如果数据库中有这个学科的知识导图，使用数据库中的数据
+                result_mindmaps.append(mindmap_dict[subject])
+            else:
+                # 否则，创建一个只有学科名称的条目
+                result_mindmaps.append({
+                    'id': None,
+                    'subject_name': subject,
+                    'created_at': None,
+                    'updated_at': None
+                })
+        
         return jsonify({
             'success': True,
-            'mindmaps': mindmaps,
-            'count': len(mindmaps),
+            'mindmaps': result_mindmaps,
+            'count': len(result_mindmaps),
             'database_type': DATABASE_TYPE
         })
 
@@ -718,6 +757,33 @@ def get_mindmap_endpoint(subject):
             'database_type': DATABASE_TYPE
         }), 500
 
+# 添加验证函数，确保学科名称与知识导图页面保持一致
+def validate_subject_area(subject_area):
+    """
+    验证学科名称是否与知识导图页面的学科列表一致
+    
+    Args:
+        subject_area: 要验证的学科名称
+        
+    Returns:
+        有效的学科名称（如果无效则返回'其他'）
+    """
+    # 与知识导图页面保持一致的学科列表
+    valid_subjects = [
+        '民法', 
+        '刑法', 
+        '民事诉讼法', 
+        '刑事诉讼法', 
+        '行政法', 
+        '商经知', 
+        '三国法', 
+        '理论法',
+        '其他'  # 允许"其他"作为有效选项
+    ]
+    
+    # 如果提供的学科名称有效，则返回它，否则返回"其他"
+    return subject_area if subject_area in valid_subjects else '其他'
+
 @app.route('/admin/api/upload_word', methods=['POST'])
 def upload_word():
     # 检查是否有文件被上传
@@ -727,8 +793,8 @@ def upload_word():
             'message': '没有选择文件'
         }), 400
     
-    # 获取学科分类（如果提供）
-    subject_area = request.form.get('subject_area', '')
+    # 获取并验证学科分类
+    subject_area = validate_subject_area(request.form.get('subject_area', ''))
     
     file = request.files['file']
     
@@ -1166,22 +1232,11 @@ def segment_document_text():
         elif strategy == 'legal_structure':
             # 法律结构分段返回文本段落
             segments = segment_text_legal_structure(text, chunk_size=chunk_size)
-            # 创建简单元数据
-            metadata = [{} for _ in segments]
-            
-            # 组合段落和元数据为结构化结果
-            structured_chunks = []
-            for i, (segment, meta) in enumerate(zip(segments, metadata)):
-                structured_chunks.append({
-                    "content": segment,
-                    "metadata": meta
-                })
-            
-            # 返回带有结构化元数据的分段结果
+
             return jsonify({
                 "success": True,
                 "message": f"文本已使用 {strategy} 策略成功分段为 {len(segments)} 块",
-                "chunks": structured_chunks,  # 带有元数据的结构化文本块
+                "chunks": segments,
                 "total_chunks": len(segments),
                 "strategy": strategy,
                 "chunk_size": chunk_size
@@ -1268,17 +1323,18 @@ def vectorize_document():
                 "message": f"未找到ID为{doc_id}的文档"
             }), 404
         
-        # 获取文档路径和名称
+        # 从查询结果中获取 subject_area 并验证
+        subject_area = validate_subject_area(document.get('subject_area', '其他'))
         file_path = document.get('file_path')
-        doc_name = document.get('doc_name', os.path.basename(file_path))
-        
-        # 检查文件是否存在
-        if not os.path.exists(file_path):
+        doc_name = document.get('doc_name')
+
+        # 如果文件路径不存在，则返回错误
+        if not file_path or not os.path.exists(file_path):
             return jsonify({
                 "success": False,
                 "message": f"文件不存在: {file_path}"
             }), 404
-            
+        
         # 从环境变量中获取API密钥
         api_key = os.environ.get("DEEPSEEK_API_KEY")
         
@@ -1297,7 +1353,7 @@ def vectorize_document():
         }
         
         # 定义后台处理函数
-        def process_document_in_background(doc_id, file_path, doc_name, chunk_size, api_key):
+        def process_document_in_background(doc_id, file_path, doc_name, chunk_size, api_key, subject_area):
             try:
                 # 更新状态：开始提取文本
                 processing_status[doc_id] = {
@@ -1340,8 +1396,11 @@ def vectorize_document():
                     "message": f"分段完成，共{len(segments)}个文本段落"
                 }
                 
-                # 准备元数据
-                metadata_list = [{} for _ in segments]  # 简单元数据
+                # 确保subject_area有效
+                validated_subject_area = validate_subject_area(subject_area)
+                
+                # 生成每个段落的元数据，仅包含 subject_area（后续可扩展法律层级）
+                metadata_list = [{ 'subject_area': validated_subject_area } for _ in segments]
                 
                 # 更新状态：开始向量化
                 processing_status[doc_id] = {
@@ -1354,16 +1413,14 @@ def vectorize_document():
                 if DATABASE_TYPE == "mysql" and MYSQL_AVAILABLE:
                     vector_store = VectorStore(
                         database_type="mysql",
-                        mysql_config=MYSQL_CONFIG,
-                        api_key=api_key,
-                        embedding_model="text-embedding-ada-002"  # 更新为DeepSeek支持的嵌入模型
+                        db_config=MYSQL_CONFIG,
+                        api_key=api_key
                     )
                 else:
                     # 使用SQLite作为备用
                     vector_store = VectorStore(
                         database_type="sqlite",
-                        api_key=api_key,
-                        embedding_model="text-embedding-ada-002"  # 更新为DeepSeek支持的嵌入模型
+                        api_key=api_key
                     )
         
                 # 分批处理文本段落，避免一次性处理过多段落导致卡顿
@@ -1378,10 +1435,9 @@ def vectorize_document():
                     end_idx = min(start_idx + batch_size, total_segments)
                     
                     batch_segments = segments[start_idx:end_idx]
-                    batch_metadata = metadata_list[start_idx:end_idx]
                     
                     # 处理当前批次的段落
-                    for i, (segment, metadata) in enumerate(zip(batch_segments, batch_metadata)):
+                    for i, segment in enumerate(batch_segments):
                         # 计算总体进度
                         overall_idx = start_idx + i
                         progress = 60 + int((overall_idx / total_segments) * 35)
@@ -1397,7 +1453,8 @@ def vectorize_document():
                     doc_id=doc_id,
                     texts=segments,
                     metadata_list=metadata_list,
-                    source_document_name=doc_name
+                    source_document_name=doc_name,
+                    subject_area=validated_subject_area  # 使用验证后的subject_area
                 )
                 
                 if not success:
@@ -1428,7 +1485,7 @@ def vectorize_document():
         # 启动后台线程进行处理
         threading.Thread(
             target=process_document_in_background,
-            args=(doc_id, file_path, doc_name, chunk_size, api_key)
+            args=(doc_id, file_path, doc_name, chunk_size, api_key, subject_area) # subject_area已经在上面通过validate_subject_area验证过了
         ).start()
         
         # 立即返回，后台继续处理
@@ -1513,16 +1570,14 @@ def search_documents():
         if DATABASE_TYPE == "mysql" and MYSQL_AVAILABLE:
             vector_store = VectorStore(
                 database_type="mysql",
-                mysql_config=MYSQL_CONFIG,
-                api_key=api_key,
-                embedding_model="text-embedding-ada-002"  # 更新为DeepSeek支持的嵌入模型
+                db_config=MYSQL_CONFIG,
+                api_key=api_key
             )
         else:
             # 使用SQLite作为备用
             vector_store = VectorStore(
                 database_type="sqlite",
-                api_key=api_key,
-                embedding_model="text-embedding-ada-002"  # 更新为DeepSeek支持的嵌入模型
+                api_key=api_key
             )
             
         # 加载向量索引并进行搜索

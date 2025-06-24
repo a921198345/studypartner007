@@ -1,4 +1,5 @@
 // 定义AI服务相关的接口和函数
+import { getAuthHeaders } from '@/lib/auth-utils'
 
 export interface AskAIParams {
   question: string;
@@ -48,11 +49,12 @@ export const askAIStream = async (params: AskAIParams, callbacks: AIStreamCallba
       sessionId: params.sessionId
     }));
     
-    // 准备请求参数
+    // 准备请求参数（包含认证头）
     const requestParams = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...getAuthHeaders(),
       },
       body: JSON.stringify(params),
     };
@@ -240,6 +242,7 @@ export const askAI = async (params: AskAIParams): Promise<AskAIResponse> => {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(params),
   });
