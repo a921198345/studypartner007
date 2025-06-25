@@ -19,47 +19,97 @@ export default function MembershipPurchasePage() {
   const [selectedPlan, setSelectedPlan] = useState('3month'); // 默认选择3个月
 
   useEffect(() => {
-    const userInfo = getUserInfo();
-    if (userInfo) {
-      setUser(userInfo);
-    }
-  }, []);
+    const checkAuth = async () => {
+      const token = getAuthToken();
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+      
+      const userInfo = await getUserInfo();
+      if (userInfo) {
+        setUser(userInfo);
+      }
+    };
+    
+    checkAuth();
+  }, [router]);
 
+  // 会员套餐配置
   const membershipPlans = [
     {
+      id: 'free',
+      name: '免费版',
+      price: 0,
+      duration: '永久',
+      features: [
+        '民法知识导图',
+        '每日5次AI问答',
+        '基础功能使用'
+      ],
+      buttonText: '当前版本',
+      isRecommended: false,
+      disabled: true
+    },
+    {
       id: '1month',
-      title: '1个月会员',
+      name: '1个月会员', 
       price: 39.9,
-      duration_days: 30,
-      popular: false
+      duration: '月',
+      features: [
+        '访问所有8个学科知识导图',
+        '无限制AI问答和聊天',
+        '保存无限制学习笔记',
+        '高级搜索和筛选功能',
+        '学习进度跟踪',
+        '专属客服支持'
+      ],
+      buttonText: '立即升级',
+      isRecommended: false,
+      disabled: false
     },
     {
       id: '3month',
-      title: '3个月会员',
+      name: '3个月会员',
       price: 99,
-      duration_days: 90,
-      popular: true
+      duration: '3个月',
+      features: [
+        '访问所有8个学科知识导图', 
+        '无限制AI问答和聊天',
+        '保存无限制学习笔记',
+        '高级搜索和筛选功能',
+        '学习进度跟踪',
+        '专属客服支持'
+      ],
+      buttonText: '立即升级',
+      isRecommended: true,
+      disabled: false
     }
   ];
 
-  const handleUpgrade = async (planId) => {
+  const handleUpgrade = async (planId: string) => {
     if (!user) {
       toast({
-        title: "请先登录",
-        description: "升级会员需要先登录账户",
+        title: "错误",
+        description: "请先登录",
         variant: "destructive",
       });
-      router.push('/login');
       return;
     }
 
-    const selectedPlan = membershipPlans.find(plan => plan.id === planId);
-    if (!selectedPlan) return;
-
     setIsLoading(true);
-
+    
     try {
       const token = getAuthToken();
+      const plan = membershipPlans.find(p => p.id === planId);
+      
+      if (!plan) {
+        throw new Error('无效的套餐');
+      }
+
+      // 根据套餐ID设置天数
+      const durationDays = planId === '1month' ? 30 : 90;
+
       const response = await fetch('/api/membership/simple-upgrade', {
         method: 'POST',
         headers: {
@@ -68,22 +118,13 @@ export default function MembershipPurchasePage() {
         },
         body: JSON.stringify({
           membership_type: 'paid',
-          duration_days: selectedPlan.duration_days
-        })
+          duration_days: durationDays
+        }),
       });
 
-      const data = await response.json();
+      const result = await response.json();
 
-      if (response.ok) {
-        toast({
-          title: "升级成功！",
-          description: `恭喜您成为会员（${selectedPlan.title}），可以使用所有功能了！`,
-        });
-        
-        // 更新本地用户信息
-        const updatedUser = { ...user, membership_type: 'paid' };
-        localStorage.setItem('user_info', JSON.stringify(updatedUser));
-        
+      if (result.success) {
         // 清除知识导图缓存
         Object.keys(localStorage).forEach(key => {
           if (key.startsWith('mindmap_cache_')) {
@@ -93,13 +134,18 @@ export default function MembershipPurchasePage() {
         
         // 设置强制刷新标记，用于MindMapViewer重新加载
         localStorage.setItem('force_mindmap_refresh', 'true');
-        
-        // 跳转回知识导图
+
+        toast({
+          title: "升级成功！",
+          description: `您已成功升级为${plan.name}！`,
+        });
+
+        // 延迟跳转，让用户看到成功消息
         setTimeout(() => {
           router.push('/knowledge-map');
-        }, 2000);
+        }, 1500);
       } else {
-        throw new Error(data.message || '升级失败');
+        throw new Error(result.error || '升级失败');
       }
     } catch (error) {
       console.error('升级失败:', error);
@@ -113,141 +159,115 @@ export default function MembershipPurchasePage() {
     }
   };
 
-  const features = [
-    { icon: <Crown className="w-5 h-5" />, text: "访问所有8个学科知识导图" },
-    { icon: <Zap className="w-5 h-5" />, text: "无限制AI问答和聊天" },
-    { icon: <Star className="w-5 h-5" />, text: "保存无限制学习笔记" },
-    { icon: <Check className="w-5 h-5" />, text: "高级搜索和筛选功能" },
-    { icon: <Check className="w-5 h-5" />, text: "学习进度跟踪" },
-    { icon: <Check className="w-5 h-5" />, text: "专属客服支持" },
-  ];
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <MainNav />
+    <div className="flex min-h-screen flex-col">
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-16 items-center">
+          <MainNav />
+        </div>
+      </header>
       
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-5xl mx-auto">
-          {/* 页面标题 */}
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">
-              升级为会员
-            </h1>
-            <p className="text-xl text-gray-600">
-              解锁所有功能，助力您的法考之路
-            </p>
+      <main className="flex-1">
+        <div className="container mx-auto py-12">
+          <div className="text-center mb-12">
+            <h1 className="text-4xl font-bold mb-4">升级为会员</h1>
+            <p className="text-xl text-muted-foreground">解锁所有功能，助力您的法考之路</p>
           </div>
 
-          {/* 会员卡片 */}
-          <div className="grid md:grid-cols-3 gap-6 mb-8">
-            {/* 免费版 */}
-            <Card className="relative">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
-                  免费版
-                </CardTitle>
-                <div className="text-3xl font-bold">￥0</div>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-green-500" />
-                    <span>民法知识导图</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-green-500" />
-                    <span>每日5次AI问答</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-green-500" />
-                    <span>基础功能使用</span>
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            {/* 会员版选项 */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {membershipPlans.map((plan) => (
               <Card 
-                key={plan.id}
-                className={`relative ${plan.popular ? 'border-2 border-yellow-400 bg-gradient-to-br from-yellow-50 to-orange-50' : 'border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50'}`}
+                key={plan.id} 
+                className={`relative ${plan.isRecommended ? 'border-primary shadow-lg scale-105' : ''} ${plan.disabled ? 'opacity-75' : ''}`}
               >
-                {plan.popular && (
-                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                    <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-4 py-1">
-                      推荐
-                    </Badge>
-                  </div>
+                {plan.isRecommended && (
+                  <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-orange-400 to-orange-600">
+                    推荐
+                  </Badge>
                 )}
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Crown className={`w-5 h-5 ${plan.popular ? 'text-yellow-500' : 'text-blue-500'}`} />
-                    {plan.title}
-                  </CardTitle>
-                  <div className={`text-3xl font-bold ${plan.popular ? 'text-yellow-600' : 'text-blue-600'}`}>
-                    ￥{plan.price}
-                    <span className="text-sm font-normal text-gray-500">/{plan.id === '1month' ? '月' : '3个月'}</span>
+                
+                <CardHeader className="text-center pb-8">
+                  <div className="mb-4">
+                    {plan.id === 'free' && <Star className="w-12 h-12 mx-auto text-gray-400" />}
+                    {plan.id === '1month' && <Zap className="w-12 h-12 mx-auto text-blue-500" />}
+                    {plan.id === '3month' && <Crown className="w-12 h-12 mx-auto text-yellow-500" />}
+                  </div>
+                  <CardTitle className="text-2xl mb-2">{plan.name}</CardTitle>
+                  <div className="text-4xl font-bold">
+                    ¥ {plan.price}
+                    <span className="text-base font-normal text-muted-foreground">/{plan.duration}</span>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2 mb-6">
-                    {features.map((feature, index) => (
-                      <li key={index} className="flex items-center gap-2">
-                        <div className={plan.popular ? 'text-yellow-500' : 'text-blue-500'}>{feature.icon}</div>
-                        <span>{feature.text}</span>
+
+                <CardContent className="space-y-6">
+                  <ul className="space-y-3">
+                    {plan.features.map((feature, index) => (
+                      <li key={index} className="flex items-center space-x-2">
+                        <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
+                        <span className="text-sm">{feature}</span>
                       </li>
                     ))}
                   </ul>
-                  
+
                   <Button 
+                    className="w-full" 
+                    disabled={plan.disabled || isLoading}
                     onClick={() => handleUpgrade(plan.id)}
-                    disabled={isLoading}
-                    className={`w-full font-semibold py-3 ${
-                      plan.popular 
-                        ? 'bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600' 
-                        : 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600'
-                    } text-white`}
+                    variant={plan.isRecommended ? "default" : "outline"}
                   >
-                    {isLoading ? "处理中..." : "立即升级"}
+                    {isLoading ? "处理中..." : plan.buttonText}
                   </Button>
                 </CardContent>
               </Card>
             ))}
           </div>
 
-          {/* 临时说明 */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
-            <h3 className="text-lg font-semibold text-blue-800 mb-2">
-              🎯 开发测试阶段说明
-            </h3>
-            <p className="text-blue-700 mb-4">
-              当前为开发测试阶段，点击"立即升级"将直接激活您的会员权限，无需实际支付。
-            </p>
-            <div className="bg-white rounded p-4 border border-blue-200">
-              <h4 className="font-medium text-blue-800 mb-2">升级后您将获得：</h4>
-              <ul className="text-sm text-blue-700 space-y-1">
-                <li>• 访问所有法考学科知识导图（民法、刑法、行政法等8个学科）</li>
-                <li>• 无限制使用AI问答功能</li>
-                <li>• 保存无限制数量的学习笔记</li>
-                <li>• 会员权限根据所选套餐确定有效期</li>
-              </ul>
+          <div className="mt-12 max-w-4xl mx-auto">
+            <Card className="bg-gradient-to-r from-red-50 to-orange-50 border-red-200">
+              <CardContent className="p-6">
+                <div className="flex items-start space-x-3">
+                  <div className="text-red-500 mt-1">
+                    🔥
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-red-800 mb-2">开发测试阶段说明</h3>
+                    <p className="text-red-700 text-sm leading-relaxed">
+                      当前为开发测试阶段，点击"立即升级"将直接激活您的会员权限，无需实际支付。
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="mt-8 text-center">
+              <h3 className="text-lg font-semibold mb-4">升级后将获得：</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div className="space-y-2">
+                  <div className="font-medium">• 访问所有法考学科知识导图</div>
+                  <div className="text-muted-foreground">（民法、刑法、民事诉讼法、刑事诉讼法、行政法、商经知、三国法、理论法）</div>
+                </div>
+                <div className="space-y-2">
+                  <div className="font-medium">• 无限制使用AI问答功能</div>
+                  <div className="text-muted-foreground">无限制AI问答和聊天</div>
+                </div>
+                <div className="space-y-2">
+                  <div className="font-medium">• 保存无限制学习笔记</div>
+                  <div className="text-muted-foreground">高级搜索和筛选功能</div>
+                </div>
+                <div className="space-y-2">
+                  <div className="font-medium">• 学习进度跟踪</div>
+                  <div className="text-muted-foreground">跟踪您的学习进度</div>
+                </div>
+                <div className="space-y-2">
+                  <div className="font-medium">• 专属客服支持</div>
+                  <div className="text-muted-foreground">专业的客服支持</div>
+                </div>
+              </div>
             </div>
           </div>
-
-          {/* 返回按钮 */}
-          <div className="text-center">
-            <Button
-              variant="outline"
-              onClick={() => router.back()}
-              className="px-8"
-            >
-              返回上一页
-            </Button>
-          </div>
         </div>
-      </div>
-      
+      </main>
+
       <Footer />
     </div>
   );
