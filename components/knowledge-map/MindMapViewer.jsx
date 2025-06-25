@@ -350,8 +350,25 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
             setIsLoading(true); // 开始获取数据前，设置加载状态为true
             setError(null);     // 清除任何之前的错误信息
             
+            // 检查是否需要强制刷新（用于会员升级后）
+            const forceRefresh = localStorage.getItem('force_mindmap_refresh');
+            if (forceRefresh) {
+                console.log('🔄 检测到强制刷新标记，清除所有缓存');
+                localStorage.removeItem('force_mindmap_refresh');
+                // 清除localStorage缓存
+                Object.keys(localStorage).forEach(key => {
+                    if (key.startsWith('mindmap-')) {
+                        localStorage.removeItem(key);
+                    }
+                });
+                // 清除内存缓存
+                if (window.mindMapCache) {
+                    window.mindMapCache = {};
+                }
+            }
+            
             // 检查内存缓存
-            if (window.mindMapCache && window.mindMapCache[subject]) {
+            if (window.mindMapCache && window.mindMapCache[subject] && !forceRefresh) {
                 const memoryCache = window.mindMapCache[subject];
                 const now = new Date().getTime();
                 const cacheAge = now - memoryCache.timestamp;
@@ -371,8 +388,8 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
             const cachedData = localStorage.getItem(`mindmap-${subject}`);
             const cachedTimestamp = localStorage.getItem(`mindmap-${subject}-timestamp`);
             
-            // 如果有缓存且不超过2小时，使用缓存数据
-            if (cachedData && cachedTimestamp) {
+            // 如果有缓存且不超过2小时，使用缓存数据（除非强制刷新）
+            if (cachedData && cachedTimestamp && !forceRefresh) {
                 const now = new Date().getTime();
                 const cacheAge = now - parseInt(cachedTimestamp);
                 if (cacheAge < 7200000) { // 2小时 = 7200000毫秒
@@ -411,16 +428,41 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
         // 提取实际获取新数据的函数
         const fetchFreshData = async () => {
             try {
+                // 获取认证信息
+                const authToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                
+                // 如果有认证token，添加到请求头
+                if (authToken) {
+                    headers['Authorization'] = `Bearer ${authToken}`;
+                }
+                
                 // 使用fetch API从指定的后端端点获取数据
-                const response = await fetch(`/api/mindmaps/${subject}`);
+                const response = await fetch(`/api/mindmaps/${subject}`, {
+                    method: 'GET',
+                    headers: headers
+                });
 
-                // 检查HTTP响应状态是否表示成功
+                // 解析响应数据（不论成功还是失败）
+                const data = await response.json();
+
+                // 检查HTTP响应状态
                 if (!response.ok) {
+                    // 特殊处理403错误（会员权限）
+                    if (response.status === 403 && data.upgradeRequired) {
+                        setError({
+                            type: 'upgrade_required',
+                            message: data.message,
+                            availableSubjects: data.availableSubjects,
+                            currentSubject: data.currentSubject,
+                            requireAuth: data.requireAuth
+                        });
+                        return; // 不使用默认数据
+                    }
                     throw new Error(`获取导图数据失败，状态码: ${response.status}`);
                 }
-
-                // 将响应体解析为JSON格式
-                const data = await response.json();
 
                 // 检查API返回的数据结构是否符合预期
                 if (data && data.success && data.mindmap && data.mindmap.map_data) {
@@ -782,7 +824,7 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
         data: mindMapData,
         orientation: "horizontal",
         pathFunc: "bezier",
-        initialDepth: 3,
+        initialDepth: 2,
         translate: { x: 150, y: 300 },
         zoomable: true,
         separation: { siblings: 1.2, nonSiblings: 2.5 },
@@ -814,6 +856,61 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
 
     // 如果加载过程中发生错误，显示错误信息
     if (error) {
+        // 如果是升级要求错误，显示升级提示
+        if (typeof error === 'object' && error.type === 'upgrade_required') {
+            return (
+                <div className="flex flex-col items-center justify-center p-10 space-y-6">
+                    <div className="w-16 h-16 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-2xl">🔒</span>
+                    </div>
+                    <div className="text-center space-y-3">
+                        <h3 className="text-lg font-semibold text-gray-800">
+                            {error.currentSubject} 知识导图需要会员权限
+                        </h3>
+                        <p className="text-gray-600 max-w-md">
+                            {error.message}
+                        </p>
+                        {error.availableSubjects && error.availableSubjects.length > 0 && (
+                            <p className="text-sm text-gray-500">
+                                免费用户可以查看：{error.availableSubjects.join('、')}
+                            </p>
+                        )}
+                        <div className="flex gap-3 justify-center mt-4">
+                            {error.requireAuth ? (
+                                <button
+                                    onClick={() => {
+                                        // 保存当前页面，登录后回到这里
+                                        sessionStorage.setItem('redirectAfterLogin', window.location.pathname + window.location.search);
+                                        window.location.href = '/login';
+                                    }}
+                                    className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                                >
+                                    立即登录
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => {
+                                        // 跳转到会员购买页面
+                                        window.location.href = '/membership/purchase';
+                                    }}
+                                    className="px-6 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-lg hover:from-yellow-600 hover:to-orange-600 transition-all"
+                                >
+                                    升级会员
+                                </button>
+                            )}
+                            <button
+                                onClick={() => window.location.href = '/knowledge-map?subject=民法'}
+                                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                            >
+                                查看民法
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        
+        // 普通错误显示
         return <div className="flex justify-center p-10">加载知识导图失败: {error}</div>;
     }
 

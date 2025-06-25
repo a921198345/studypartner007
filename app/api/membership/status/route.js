@@ -69,7 +69,8 @@ export async function GET(request) {
     );
     
     // 计算会员状态
-    const is_active_member = user.membership_type === 'active_member';
+    const valid_member_types = ['active_member', 'premium', 'vip', 'paid'];
+    const is_active_member = valid_member_types.includes(user.membership_type);
     const is_expired = user.membership_expires_at && 
                       new Date(user.membership_expires_at) < new Date();
     

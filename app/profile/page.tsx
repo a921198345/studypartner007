@@ -9,14 +9,136 @@ import { Progress } from "@/components/ui/progress"
 import { Settings, BookOpen, Star, Calendar, FileText, Lock } from "lucide-react"
 import { Footer } from "@/components/footer"
 import { UserInfoCard } from "@/components/profile/user-info-card"
+import { useState, useEffect } from "react"
 
 export default function ProfilePage() {
-  const user = {
-    id: "user123",
-    name: "小法同学",
-    phone: "15612348888",
-    avatar: "/placeholder.svg?height=96&width=96",
-    membershipStatus: "free_user" as const,
+  const [user, setUser] = useState(null);
+  const [membershipData, setMembershipData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // 获取用户会员信息
+  useEffect(() => {
+    const fetchMembershipStatus = async () => {
+      try {
+        const authToken = localStorage.getItem('auth_token');
+        if (!authToken) {
+          setError('请先登录');
+          setLoading(false);
+          return;
+        }
+
+        const response = await fetch('/api/membership/status', {
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+          const membershipInfo = data.data;
+          setUser({
+            id: membershipInfo.user.user_id,
+            name: membershipInfo.user.nickname || "法考学员",
+            phone: membershipInfo.user.phone_number,
+            avatar: membershipInfo.user.avatar_url || "/placeholder.svg?height=96&width=96",
+            membershipStatus: membershipInfo.membership.type,
+            membershipExpiry: membershipInfo.membership.expiresAt ? new Date(membershipInfo.membership.expiresAt) : undefined
+          });
+          setMembershipData(membershipInfo);
+        } else {
+          setError(data.message || '获取用户信息失败');
+        }
+      } catch (err) {
+        console.error('获取会员状态失败:', err);
+        setError('网络错误，请稍后重试');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMembershipStatus();
+  }, []);
+
+  // 处理升级会员
+  const handleUpgrade = async () => {
+    try {
+      // 简单的临时升级功能（开发阶段）
+      const authToken = localStorage.getItem('auth_token');
+      if (!authToken) {
+        alert('请先登录');
+        return;
+      }
+
+      const confirmed = confirm('确定要升级为付费会员吗？\n\n在开发阶段，这将直接升级您的账户。\n实际产品中这里会跳转到支付页面。');
+      
+      if (confirmed) {
+        // 这里应该调用支付API，但现在我们直接升级用户
+        const response = await fetch('/api/membership/purchase', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            plan: 'monthly',
+            payment_method: 'test'
+          })
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+          alert('升级成功！正在刷新页面...');
+          window.location.reload();
+        } else {
+          alert(`升级失败: ${data.message}`);
+        }
+      }
+    } catch (error) {
+      console.error('升级失败:', error);
+      alert('升级过程中出现错误，请稍后重试');
+    }
+  };
+
+  // 如果正在加载
+  if (loading) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="container flex h-16 items-center">
+            <MainNav />
+          </div>
+        </header>
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
+            <p>正在加载用户信息...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // 如果有错误
+  if (error) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="container flex h-16 items-center">
+            <MainNav />
+          </div>
+        </header>
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-red-500 mb-4">{error}</p>
+            <Button onClick={() => window.location.href = '/login'}>去登录</Button>
+          </div>
+        </main>
+      </div>
+    );
   }
 
   return (
@@ -34,7 +156,7 @@ export default function ProfilePage() {
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="md:col-span-1 space-y-6">
-              <UserInfoCard user={user} onUpgrade={() => console.log("Upgrade clicked")} />
+              <UserInfoCard user={user} onUpgrade={handleUpgrade} />
 
               <Card>
                 <CardHeader className="pb-2">

@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth-middleware';
-import { getConnection } from '@/lib/db';
-import { v4 as uuidv4 } from 'uuid';
+import db from '@/lib/db';
 
 // 会员套餐配置
 const MEMBERSHIP_PLANS = {
@@ -67,7 +66,8 @@ export async function POST(request) {
     );
     
     let end_date;
-    if (users.length > 0 && users[0].membership_type === 'active_member' && users[0].membership_expires_at) {
+    const validMemberTypes = ['active_member', 'paid', 'premium', 'vip'];
+    if (users.length > 0 && validMemberTypes.includes(users[0].membership_type) && users[0].membership_expires_at) {
       // 如果用户已经是会员，在现有期限基础上延长
       const current_expires = new Date(users[0].membership_expires_at);
       if (current_expires > now) {
@@ -169,7 +169,7 @@ async function processPaymentSuccess(connection, order_id, user_id, membership_e
     // 更新用户会员状态
     await connection.execute(
       `UPDATE users 
-       SET membership_type = 'active_member', membership_expires_at = ? 
+       SET membership_type = 'paid', membership_expires_at = ? 
        WHERE user_id = ?`,
       [membership_end_date, user_id]
     );

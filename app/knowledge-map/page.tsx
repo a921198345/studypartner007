@@ -33,8 +33,15 @@ const MindMapViewer = dynamic(
 );
 
 const MindMapQuickNav = dynamic(
-  () => import('@/components/knowledge-map/MindMapQuickNav.jsx'),
-  { ssr: false }
+  () => import('@/components/knowledge-map/MindMapQuickNav'),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center space-x-2 mb-3">
+        <div className="text-sm text-gray-500 animate-pulse">加载导航中...</div>
+      </div>
+    )
+  }
 );
 
 export default function KnowledgeMapPage() {

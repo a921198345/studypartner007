@@ -236,38 +236,41 @@ export async function GET(request, { params }) {
     const decodedSubject = decodeURIComponent(subject);
     console.log(`解码后的学科名称: ${decodedSubject}`);
     
-    // 验证用户身份
-    const auth_result = await verifyAuth(request);
-    if (!auth_result.success) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          message: '请先登录',
-          requireAuth: true
-        },
-        { status: 401 }
-      );
+    // 尝试验证用户身份（可选认证）
+    const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
+    let user_id = null;
+    let is_member = false;
+    
+    if (authHeader) {
+      const auth_result = await verifyAuth(authHeader);
+      
+      if (auth_result.success) {
+        user_id = auth_result.user.user_id;
+        is_member = checkMembership(auth_result.user);
+        
+        // 记录使用日志（仅在已认证时）
+        try {
+          await logFeatureUsage(user_id, 'mindmap', 'view', decodedSubject);
+        } catch (logError) {
+          console.warn('记录使用日志失败:', logError.message);
+        }
+      }
     }
     
-    const user_id = auth_result.user.user_id;
-    const is_member = checkMembership(auth_result.user);
-    
-    // 检查会员权限：非会员只能访问民法
+    // 检查会员权限：未登录用户和非会员只能访问民法
     if (!is_member && decodedSubject !== '民法') {
       return NextResponse.json(
         { 
           success: false, 
-          message: `查看${decodedSubject}知识导图需要升级会员`,
+          message: user_id ? `查看${decodedSubject}知识导图需要升级会员` : '查看其他学科知识导图需要登录并升级会员',
           upgradeRequired: true,
+          requireAuth: !user_id,
           availableSubjects: ['民法'],
           currentSubject: decodedSubject
         },
         { status: 403 }
       );
     }
-    
-    // 记录使用日志
-    await logFeatureUsage(user_id, 'mindmap', 'view', decodedSubject);
     
     // 添加内存缓存
     const cacheKey = `mindmap_cache_${decodedSubject}`;
