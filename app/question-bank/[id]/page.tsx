@@ -353,21 +353,90 @@ export default function QuestionPage() {
           }
         }
       } else {
-        console.log("没有筛选后的题目列表或列表为空，创建备用导航");
-        // 使用已通过 fetchTotalQuestions 获取的 totalAllQuestions，如果它大于0
-        const dummyCount = totalAllQuestions > 0 ? totalAllQuestions : 25; 
-        questionsToDisplay = Array.from({ length: dummyCount }, (_, i) => ({ id: i + 1, question_code: `DUMMY${i + 1}` }));
-        currentIndex = questionsToDisplay.findIndex(q => q.id === currentId);
-        
-        if (currentIndex === -1) { // 如果在生成的虚拟列表中还是找不到
-            if (currentId > 0 && currentId <= dummyCount) { // ID在范围内
-                 currentIndex = currentId -1; 
-            } else { // ID超出范围，或者 dummyCount 为0的极端情况
-                 questionsToDisplay.push({ id: currentId, question_code: `Q${currentId}`});
-                 // 如果添加了，需要重新排序或决定其位置
-                 // questionsToDisplay.sort((a,b) => a.id - b.id);
-                 currentIndex = questionsToDisplay.findIndex(q => q.id === currentId);
+        console.log("没有筛选后的题目列表或列表为空，从API获取完整题目列表用于导航");
+        // 直接从API获取完整的题目列表用于导航
+        try {
+          const response = await questionApi.getQuestions({ 
+            fetchAllIdsAndCodes: true,
+            limit: 1000 // 确保能获取所有题目
+          });
+          
+          if (response.success && response.data && response.data.questions) {
+            console.log(`从API获取完整题目列表用于导航，共${response.data.questions.length}题`);
+            questionsToDisplay = response.data.questions.map(q => ({
+              id: q.id,
+              question_code: q.question_code || `Q${q.id}`
+            }));
+            
+            // 保存到localStorage供后续使用
+            localStorage.setItem('allQuestionsList', JSON.stringify({
+              questions: questionsToDisplay,
+              timestamp: Date.now()
+            }));
+            
+            currentIndex = questionsToDisplay.findIndex(q => q.id === currentId);
+            if (currentIndex === -1 && currentId > 0) {
+              // 如果当前题目不在列表中，添加它
+              questionsToDisplay.push({ id: currentId, question_code: `Q${currentId}` });
+              questionsToDisplay.sort((a, b) => a.id - b.id);
+              currentIndex = questionsToDisplay.findIndex(q => q.id === currentId);
             }
+          } else {
+            console.log("API获取题目列表失败，使用totalAllQuestions创建备用导航");
+            // 如果API请求失败，使用totalAllQuestions创建备用导航
+            const dummyCount = totalAllQuestions > 0 ? totalAllQuestions : 1865; // 默认使用1865
+            questionsToDisplay = Array.from({ length: dummyCount }, (_, i) => ({ 
+              id: i + 1, 
+              question_code: `Q${i + 1}` 
+            }));
+            currentIndex = questionsToDisplay.findIndex(q => q.id === currentId);
+            
+            if (currentIndex === -1) {
+              if (currentId > 0 && currentId <= dummyCount) {
+                currentIndex = currentId - 1; 
+              } else {
+                questionsToDisplay.push({ id: currentId, question_code: `Q${currentId}`});
+                questionsToDisplay.sort((a, b) => a.id - b.id);
+                currentIndex = questionsToDisplay.findIndex(q => q.id === currentId);
+              }
+            }
+          }
+        } catch (error) {
+          console.error("获取完整题目列表失败:", error);
+          // 作为最后的备用方案，检查localStorage中是否有缓存的完整列表
+          try {
+            const cachedListStr = localStorage.getItem('allQuestionsList');
+            if (cachedListStr) {
+              const cachedList = JSON.parse(cachedListStr);
+              if (cachedList && cachedList.questions && (Date.now() - cachedList.timestamp < 3600000)) {
+                console.log(`使用缓存的完整题目列表，共${cachedList.questions.length}题`);
+                questionsToDisplay = cachedList.questions;
+                currentIndex = questionsToDisplay.findIndex(q => q.id === currentId);
+              }
+            }
+          } catch (cacheError) {
+            console.error("读取缓存的完整题目列表失败:", cacheError);
+          }
+          
+          // 如果缓存也失败，使用totalAllQuestions创建备用导航
+          if (questionsToDisplay.length === 0) {
+            const dummyCount = totalAllQuestions > 0 ? totalAllQuestions : 1865;
+            questionsToDisplay = Array.from({ length: dummyCount }, (_, i) => ({ 
+              id: i + 1, 
+              question_code: `Q${i + 1}` 
+            }));
+            currentIndex = questionsToDisplay.findIndex(q => q.id === currentId);
+            
+            if (currentIndex === -1) {
+              if (currentId > 0 && currentId <= dummyCount) {
+                currentIndex = currentId - 1; 
+              } else {
+                questionsToDisplay.push({ id: currentId, question_code: `Q${currentId}`});
+                questionsToDisplay.sort((a, b) => a.id - b.id);
+                currentIndex = questionsToDisplay.findIndex(q => q.id === currentId);
+              }
+            }
+          }
         }
       }
       

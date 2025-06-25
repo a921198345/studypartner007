@@ -39,6 +39,8 @@ export async function GET(request) {
     const searchQuery = searchParams.get('search'); // 新增搜索参数
     // 新增参数: 获取所有ID和题号
     const fetchAllIdsAndCodes = searchParams.get('fetchAllIdsAndCodes') === 'true';
+    // 新增参数: 获取所有题目总数，不受筛选条件影响
+    const getAllCount = searchParams.get('getAllCount') === 'true';
     
     // 调试日志
     console.log('API收到的搜索参数:', {
@@ -47,8 +49,41 @@ export async function GET(request) {
       questionType,
       searchQuery,
       fetchAllIdsAndCodes,
+      getAllCount,
       url: request.url
     });
+    
+    // 如果只是要获取所有题目总数，直接返回
+    if (getAllCount) {
+      const connection = await pool.getConnection();
+      try {
+        const [totalResult] = await connection.execute('SELECT COUNT(*) as total FROM questions');
+        const totalCount = totalResult[0]?.total || 0;
+        console.log(`获取所有题目总数: ${totalCount}`);
+        
+        return NextResponse.json({
+          success: true,
+          data: {
+            pagination: {
+              total: totalCount,
+              page: 1,
+              limit: 1,
+              totalPages: Math.ceil(totalCount / limit)
+            },
+            questions: [] // 不返回具体题目数据
+          }
+        });
+      } catch (error) {
+        console.error('获取所有题目总数失败:', error);
+        return NextResponse.json({
+          success: false,
+          message: "获取题目总数失败",
+          data: { total: 0 }
+        }, { status: 500 });
+      } finally {
+        connection.release();
+      }
+    }
     
     // 计算偏移量
     const offset = (page - 1) * limit;
@@ -190,67 +225,20 @@ export async function GET(request) {
         
         console.log(`查询到 ${allQuestions.length} 条记录，共 ${total} 条记录`);
         
-        // 暂时禁用二次筛选，保持一致性
-        let finalQuestions = allQuestions;
-        // if (searchQuery && isPreciseLegalTerm(searchQuery.trim())) {
-        //   console.log(`对精确术语 "${searchQuery}" 进行二次筛选（fetchAllIdsAndCodes模式）`);
-        //   
-        //   // 需要获取完整数据进行筛选
-        //   const fullDataQuery = `
-        //     SELECT 
-        //       id, 
-        //       question_code,
-        //       question_text, 
-        //       options_json
-        //     FROM questions 
-        //     ${whereClause} 
-        //     ORDER BY id
-        //   `;
-        //   
-        //   const [fullQuestions] = await connection.execute(fullDataQuery, params);
-        //   
-        //   // 格式化数据
-        //   const formattedFullQuestions = fullQuestions.map(q => ({
-        //     id: q.id,
-        //     question_code: q.question_code,
-        //     question_text: q.question_text,
-        //     options: typeof q.options_json === 'string' 
-        //       ? JSON.parse(q.options_json) 
-        //       : q.options_json
-        //   }));
-        //   
-        //   // 进行精确筛选
-        //   const beforeFilter = formattedFullQuestions.length;
-        //   const filteredQuestions = filterRelevantQuestions(formattedFullQuestions, searchQuery.trim());
-        //   console.log(`筛选前: ${beforeFilter} 条，筛选后: ${filteredQuestions.length} 条`);
-        //   
-        //   // 只保留ID和题号
-        //   finalQuestions = filteredQuestions.map(q => ({
-        //     id: q.id,
-        //     question_code: q.question_code || null
-        //   }));
-        //   
-        //   // 更新总数
-        //   total = filteredQuestions.length;
-        // }
-        
-        // 构建响应数据
-        const response = {
+        // 返回所有题目的ID和题号
+        return NextResponse.json({
           success: true,
-          message: "获取所有题目ID和题号成功",
           data: {
-            questions: finalQuestions.map(q => ({
-              id: q.id,
-              question_code: q.question_code || null
-            })),
+            questions: allQuestions,
             pagination: {
-              total,
-              totalItems: finalQuestions.length
+              total: total,
+              actualTotal: total,
+              page: 1,
+              limit: allQuestions.length,
+              totalPages: 1
             }
           }
-        };
-        
-        return NextResponse.json(response);
+        });
       } else {
         // 正常分页查询
     const dataQuery = `
