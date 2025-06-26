@@ -73,3 +73,4 @@ wheels/
 venv/
 venv_*/
 .venv data/vector_store.db
+data/vector_store.db
