@@ -72,4 +72,4 @@ wheels/
 *.egg
 venv/
 venv_*/
-.venv 
+.venv data/vector_store.db

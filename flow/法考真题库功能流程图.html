@@ -1,669 +1,207 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>法考真题库功能流程图 - 学习搭子</title>
-    <style>
-        body {
-            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
-            line-height: 1.6;
-            margin: 20px;
-            background-color: #f4f4f4;
-            color: #333;
-        }
-        .container {
-            background-color: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            margin-bottom: 30px;
-        }
-        h1, h2 {
-            color: #333;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 10px;
-        }
-        .rule {
-            border: 1px dashed #ccc;
-            padding: 15px;
-            margin-top: 20px;
-            background-color: #f0f8ff;
-        }
-        .rule-title {
-            font-weight: bold;
-            color: #337ab7;
-        }
-        .info-box {
-            background-color: #f8f9fa;
-            border-left: 4px solid #6c757d;
-            padding: 10px 15px;
-            margin: 10px 0;
-            font-size: 0.9em;
-        }
-        .new-feature {
-            background-color: #fffcf0;
-            border-left: 5px solid #ffc107;
-            padding: 10px;
-            margin: 10px 0;
-        }
-        
-        /* 流程图样式 */
-        .flowchart {
-            margin: 20px 0;
-            padding: 20px;
-            background-color: white;
-            border-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            overflow-x: auto;
-        }
-        .flowchart-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        .node {
-            position: relative;
-            margin: 15px 0;
-            text-align: center;
-        }
-        .process-node {
-            background-color: white;
-            border: 2px solid #007bff;
-            border-radius: 5px;
-            padding: 10px 15px;
-            min-width: 200px;
-            display: inline-block;
-        }
-        .decision-node {
-            background-color: #f0f8ff;
-            border: 2px solid #007bff;
-            border-radius: 5px;
-            padding: 10px 15px;
-            min-width: 200px;
-            display: inline-block;
-        }
-        .start-end-node {
-            background-color: #e6e6fa;
-            border: 2px solid #9370db;
-            border-radius: 25px;
-            padding: 10px 15px;
-            min-width: 200px;
-            display: inline-block;
-        }
-        .highlight-node {
-            background-color: #fff8e1;
-            border: 2px solid #ffc107;
-        }
-        .new-feature-node {
-            background-color: #fffcf0;
-            border: 2px solid #ffc107;
-        }
-        .arrow {
-            height: 30px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-        }
-        .arrow::after {
-            content: "";
-            width: 0;
-            height: 0;
-            border-left: 10px solid transparent;
-            border-right: 10px solid transparent;
-            border-top: 10px solid #007bff;
-            position: absolute;
-            bottom: 0;
-        }
-        .arrow-line {
-            height: 20px;
-            width: 2px;
-            background-color: #007bff;
-        }
-        .branches {
-            display: flex;
-            justify-content: center;
-            width: 100%;
-        }
-        .branch {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin: 0 10px;
-            position: relative;
-        }
-        .branch-label {
-            position: absolute;
-            top: -25px;
-            background-color: white;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: 0.8em;
-            color: #007bff;
-        }
-        .note {
-            margin-top: 10px;
-            padding: 10px;
-            background-color: #fffde7;
-            border-left: 4px solid #ffeb3b;
-            font-size: 0.9em;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>法考真题库功能流程图 - 学习搭子</h1>
-        <p>文档依据：<a href="javascript:void(0);" title="产品需求文档.md">产品需求文档.md</a>, <a href="javascript:void(0);" title="真题库功能.md">真题库功能.md</a></p>
-
-        <h2>1. 题库浏览与选择流程</h2>
-        <div class="flowchart">
-            <div class="flowchart-container">
-                <div class="node">
-                    <div class="start-end-node">开始: 用户进入真题库页面</div>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="process-node">显示筛选区和题目列表</div>
-                </div>
-                <div class="note">
-                    <p><strong>筛选区包含：</strong></p>
-                    <ul>
-                        <li>学科筛选（刑法、民法、民事诉讼法等）</li>
-                        <li>年份筛选（2023年、2022年等）</li>
-                        <li>题型筛选（单选、多选、判断等）</li>
-                    </ul>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="process-node">用户选择筛选条件</div>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="process-node">系统筛选并显示符合条件的题目</div>
-                </div>
-                <div class="info-box">
-                    题目列表以卡片式布局展示，含题目编号、年份、类型等信息
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="decision-node">检查用户登录状态</div>
-                </div>
-                
-                <div class="branches">
-                    <div class="branch">
-                        <div class="branch-label">未登录</div>
-                        <div class="arrow"><div class="arrow-line"></div></div>
-                        <div class="node">
-                            <div class="process-node highlight-node">触发登录流程</div>
-                        </div>
-                        <div class="note">
-                            引导用户完成登录/注册，登录成功后返回题库页面
-                        </div>
-                    </div>
-                    
-                    <div class="branch">
-                        <div class="branch-label">已登录</div>
-                        <div class="arrow"><div class="arrow-line"></div></div>
-                        <div class="node">
-                            <div class="process-node">继续流程</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="node" style="margin-top: 20px;">
-                    <div class="decision-node">检查用户权限与年份选择</div>
-                </div>
-                
-                <div class="branches">
-                    <div class="branch">
-                        <div class="branch-label">免费用户 + 非2023年</div>
-                        <div class="arrow"><div class="arrow-line"></div></div>
-                        <div class="node">
-                            <div class="process-node highlight-node">显示会员升级提示</div>
-                        </div>
-                        <div class="note">
-                            提示内容包含会员权益介绍和升级按钮
-                        </div>
-                    </div>
-                    
-                    <div class="branch">
-                        <div class="branch-label">免费用户 + 2023年<br>或会员用户</div>
-                        <div class="arrow"><div class="arrow-line"></div></div>
-                        <div class="node">
-                            <div class="process-node">允许访问并继续流程</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="node" style="margin-top: 20px;">
-                    <div class="process-node">用户选择练习方式</div>
-                </div>
-                
-                <div class="branches">
-                    <div class="branch">
-                        <div class="branch-label">单题练习</div>
-                        <div class="arrow"><div class="arrow-line"></div></div>
-                        <div class="node">
-                            <div class="process-node">进入单题作答流程</div>
-                        </div>
-                    </div>
-                    
-                    <div class="branch">
-                        <div class="branch-label">连续练习</div>
-                        <div class="arrow"><div class="arrow-line"></div></div>
-                        <div class="node">
-                            <div class="process-node">进入批量做题流程</div>
-                        </div>
-                    </div>
-                    
-                    <div class="branch">
-                        <div class="branch-label">随机练习</div>
-                        <div class="arrow"><div class="arrow-line"></div></div>
-                        <div class="node">
-                            <div class="process-node">系统随机选题<br>进入批量做题流程</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="node" style="margin-top: 20px;">
-                    <div class="start-end-node">结束: 完成题库浏览与选择</div>
-                </div>
-            </div>
-        </div>
-
-        <h2>2. 单题作答流程</h2>
-        <div class="flowchart">
-            <div class="flowchart-container">
-                <div class="node">
-                    <div class="start-end-node">开始: 用户进入单题作答页面</div>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="process-node">系统展示题目内容</div>
-                </div>
-                <div class="note">
-                    <p>显示内容包括：</p>
-                    <ul>
-                        <li>题号、年份、类型等基本信息</li>
-                        <li>题干内容</li>
-                        <li>选项（单选/多选/判断题）</li>
-                    </ul>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="process-node">用户选择答案</div>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="process-node">用户点击"提交答案"</div>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="process-node">系统评判答案正确性</div>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="decision-node">答案是否正确？</div>
-                </div>
-                
-                <div class="branches">
-                    <div class="branch">
-                        <div class="branch-label">正确</div>
-                        <div class="arrow"><div class="arrow-line"></div></div>
-                        <div class="node">
-                            <div class="process-node">显示"答对"标记<br>更新用户正确率</div>
-                        </div>
-                    </div>
-                    
-                    <div class="branch">
-                        <div class="branch-label">错误</div>
-                        <div class="arrow"><div class="arrow-line"></div></div>
-                        <div class="node">
-                            <div class="process-node">显示"答错"标记<br>将题目加入错题集</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="node" style="margin-top: 20px;">
-                    <div class="process-node">显示正确答案和详细解析</div>
-                </div>
-                <div class="note">
-                    <p>解析内容采用费曼学习法风格，包含：</p>
-                    <ul>
-                        <li>正确答案理由说明并举例</li>
-                        <li>法条引用和链接</li>
-                        <li>相关案例参考</li>
-                    </ul>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="process-node">提供"收藏题目"选项</div>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="process-node new-feature-node">提供"查看相关知识导图"选项</div>
-                </div>
-                
-                <div class="branches">
-                    <div class="branch">
-                        <div class="branch-label">免费用户</div>
-                        <div class="arrow"><div class="arrow-line"></div></div>
-                        <div class="node">
-                            <div class="decision-node">是否为民法题目？</div>
-                        </div>
-                        
-                        <div class="branches">
-                            <div class="branch">
-                                <div class="branch-label">是</div>
-                                <div class="arrow"><div class="arrow-line"></div></div>
-                                <div class="node">
-                                    <div class="process-node">允许使用知识导图联动</div>
-                                </div>
-                            </div>
-                            
-                            <div class="branch">
-                                <div class="branch-label">否</div>
-                                <div class="arrow"><div class="arrow-line"></div></div>
-                                <div class="node">
-                                    <div class="process-node highlight-node">提示升级会员</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="branch">
-                        <div class="branch-label">会员用户</div>
-                        <div class="arrow"><div class="arrow-line"></div></div>
-                        <div class="node">
-                            <div class="process-node">无限制使用知识导图联动</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="node" style="margin-top: 20px;">
-                    <div class="process-node">提供导航选项</div>
-                </div>
-                <div class="note">
-                    <ul>
-                        <li>上一题/下一题按钮</li>
-                        <li>题号指示器（当前题号/总题数）</li>
-                        <li>答题卡，可快速跳转到任意题目</li>
-                    </ul>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="start-end-node">结束: 完成单题作答</div>
-                </div>
-            </div>
-        </div>
-
-        <h2>3. 批量做题流程</h2>
-        <div class="flowchart">
-            <div class="flowchart-container">
-                <div class="node">
-                    <div class="start-end-node">开始: 用户选择一组题目练习</div>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="process-node">系统加载第一道题目</div>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="process-node">显示答题卡和进度指示</div>
-                </div>
-                <div class="note">
-                    <p>答题卡展示：</p>
-                    <ul>
-                        <li>未做题：默认样式</li>
-                        <li>已做题：答对显示绿色，答错显示红色</li>
-                        <li>当前题：突出显示当前位置</li>
-                    </ul>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="process-node">用户完成当前题目作答</div>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="decision-node">是否为最后一题？</div>
-                </div>
-                
-                <div class="branches">
-                    <div class="branch">
-                        <div class="branch-label">否</div>
-                        <div class="arrow"><div class="arrow-line"></div></div>
-                        <div class="node">
-                            <div class="process-node">用户点击"下一题"</div>
-                        </div>
-                        <div class="arrow"><div class="arrow-line"></div></div>
-                        <div class="node">
-                            <div class="process-node">加载下一题</div>
-                        </div>
-                        <div class="arrow"><div class="arrow-line"></div></div>
-                        <div class="node">
-                            <div class="process-node">返回作答流程</div>
-                        </div>
-                    </div>
-                    
-                    <div class="branch">
-                        <div class="branch-label">是</div>
-                        <div class="arrow"><div class="arrow-line"></div></div>
-                        <div class="node">
-                            <div class="process-node">显示练习完成提示</div>
-                        </div>
-                        <div class="arrow"><div class="arrow-line"></div></div>
-                        <div class="node">
-                            <div class="process-node">生成练习报告</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="node" style="margin-top: 20px;">
-                    <div class="process-node">展示练习统计数据</div>
-                </div>
-                <div class="note">
-                    <ul>
-                        <li>总题数</li>
-                        <li>答对题数与正确率</li>
-                        <li>答错题数与错误率</li>
-                        <li>用时统计</li>
-                    </ul>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="start-end-node">结束: 完成批量做题</div>
-                </div>
-            </div>
-        </div>
-
-        <h2>4. 知识导图联动流程</h2>
-        <div class="flowchart">
-            <div class="flowchart-container">
-                <div class="node">
-                    <div class="start-end-node new-feature-node">开始: 用户点击"查看相关知识导图"</div>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="process-node new-feature-node">系统分析题目关联的知识点</div>
-                </div>
-                <div class="info-box">
-                    <p>系统根据题目预设的关联知识点或实时分析结果，确定相关知识点</p>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="process-node new-feature-node">跳转至知识导图页面</div>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="process-node new-feature-node">自动定位并高亮相关知识点</div>
-                </div>
-                <div class="note">
-                    <ul>
-                        <li>展开相关知识点所在的分支</li>
-                        <li>其他分支保持折叠状态</li>
-                        <li>高亮显示与题目相关的具体知识点</li>
-                    </ul>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="process-node">用户查看知识点详情</div>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="process-node new-feature-node">提供相关题目链接</div>
-                </div>
-                <div class="info-box">
-                    在知识点详情中显示与该知识点相关的其他试题链接
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="start-end-node new-feature-node">结束: 完成知识导图联动</div>
-                </div>
-            </div>
-        </div>
-
-        <h2>5. 错题管理流程</h2>
-        <div class="flowchart">
-            <div class="flowchart-container">
-                <div class="node">
-                    <div class="start-end-node">开始: 用户访问错题集</div>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="process-node">系统展示错题统计信息</div>
-                </div>
-                <div class="note">
-                    <ul>
-                        <li>错题总数</li>
-                        <li>按学科分布</li>
-                        <li>已解决/未解决数量</li>
-                    </ul>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="process-node">用户筛选错题</div>
-                </div>
-                <div class="info-box">
-                    <p>筛选条件：</p>
-                    <ul>
-                        <li>按学科</li>
-                        <li>按错误次数</li>
-                        <li>按解决状态（已解决/未解决）</li>
-                        <li>按时间（最近错误）</li>
-                    </ul>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="process-node">系统显示筛选后的错题列表</div>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="process-node">用户选择错题进行练习</div>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="process-node">用户再次作答错题</div>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="decision-node">答案是否正确？</div>
-                </div>
-                
-                <div class="branches">
-                    <div class="branch">
-                        <div class="branch-label">正确</div>
-                        <div class="arrow"><div class="arrow-line"></div></div>
-                        <div class="node">
-                            <div class="process-node">将题目从错题集中删除</div>
-                        </div>
-                        <div class="note">
-                            用户答对后，该题目会直接从错题集中删除
-                        </div>
-                    </div>
-                    
-                    <div class="branch">
-                        <div class="branch-label">错误</div>
-                        <div class="arrow"><div class="arrow-line"></div></div>
-                        <div class="node">
-                            <div class="process-node">增加错误计数</div>
-                        </div>
-                        <div class="note">
-                            记录再次错误的时间和错误次数
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="node" style="margin-top: 20px;">
-                    <div class="process-node">显示详细解析</div>
-                </div>
-                <div class="arrow"><div class="arrow-line"></div></div>
-                
-                <div class="node">
-                    <div class="start-end-node">结束: 完成错题管理</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="rule">
-            <p class="rule-title">相关业务规则摘要：</p>
-            <p><strong>用户权限控制：</strong></p>
-            <ul>
-                <li>免费用户仅可访问2023年的法考真题库。</li>
-                <li>免费用户仅能查看民法学科的知识导图。</li>
-                <li>会员用户可访问所有年份的真题库和所有学科的知识导图。</li>
-                <li>错题集和收藏功能对所有用户开放。</li>
-            </ul>
-            <p><strong>答题规则：</strong></p>
-            <ul>
-                <li>单选题：仅可选择一个选项，答案完全匹配才算正确。</li>
-                <li>多选题：必须选择全部正确选项且不多选，才算正确。</li>
-                <li>判断题：选择"正确"或"错误"，必须与标准答案一致。</li>
-                <li>提交后无法修改答案，但可查看解析并再次练习。</li>
-            </ul>
-            <p><strong>错题管理规则：</strong></p>
-            <ul>
-                <li>答错的题目自动加入错题集。</li>
-                <li>用户在错题集中重新作答该题目，若答对，则从错题集中删除。</li>
-                <li>可根据错误次数、解决状态等筛选错题。</li>
-            </ul>
-            <p><strong>知识导图联动规则：</strong></p>
-            <ul>
-                <li>免费用户仅可使用民法学科的智能联动功能。</li>
-                <li>会员用户可无限制使用所有学科的智能联动功能。</li>
-                <li>系统自动识别题目关联的知识点，实现导图定位。</li>
-                <li>支持从知识导图查看相关试题的双向联动。</li>
-            </ul>
-        </div>
-    </div>
-</body>
-</html> 
+   import re
+   import json
+   import sys
+   import os
+   import mysql.connector
+   from datetime import datetime
+   from docx import Document
+   
+   def extract_questions(file_path):
+       """从Word文档中提取所有题目"""
+       doc = Document(file_path)
+       questions = []
+       current_question = None
+       
+       for para in doc.paragraphs:
+           text = para.text.strip()
+           if not text:
+               continue
+           
+           # 检查是否是新题目开始
+           question_match = re.search(r'【(\d{8})】(.*)', text)
+           if question_match:
+               # 如果有当前题目，添加到列表
+               if current_question:
+                   questions.append(current_question)
+               
+               # 创建新题目
+               question_code = question_match.group(1)
+               year = int(question_code[:4])  # 从题号提取年份
+               
+               current_question = {
+                   'question_code': question_code,
+                   'year': year,
+                   'question_text': question_match.group(2).strip(),
+                   'options': {},
+                   'analysis': '',
+                   'correct_answer': '',
+                   'question_type': 1  # 默认为单选题
+               }
+           elif current_question:
+               # 处理选项
+               option_match = re.match(r'([A-D])\.(.+)', text)
+               if option_match:
+                   option_key = option_match.group(1)
+                   option_value = option_match.group(2).strip()
+                   current_question['options'][option_key] = option_value
+               
+               # 处理解析
+               elif '【解析】' in text:
+                   current_question['analysis'] = text.replace('【解析】', '').strip()
+                   
+                   # 从解析中尝试提取答案
+                   answer_match = re.search(r'答案[：:]([A-D]+)', text)
+                   if answer_match:
+                       answers = answer_match.group(1).strip()
+                       current_question['correct_answer'] = answers
+                       
+                       # 判断题目类型：单选还是多选
+                       if len(answers) > 1:
+                           current_question['question_type'] = 2  # 多选
+                       else:
+                           current_question['question_type'] = 1  # 单选
+               
+               # 如果没有明确标记，但行中包含"答案"
+               elif '答案' in text:
+                   answer_match = re.search(r'答案[：:]([A-D]+)', text)
+                   if answer_match:
+                       answers = answer_match.group(1).strip()
+                       current_question['correct_answer'] = answers
+                       
+                       # 判断题目类型：单选还是多选
+                       if len(answers) > 1:
+                           current_question['question_type'] = 2  # 多选
+                       else:
+                           current_question['question_type'] = 1  # 单选
+               else:
+                   # 如果是普通段落，添加到题干
+                   if current_question['analysis']:
+                       current_question['analysis'] += " " + text
+                   else:
+                       current_question['question_text'] += " " + text
+       
+       # 添加最后一个题目
+       if current_question:
+           questions.append(current_question)
+       
+       return questions
+   
+   def save_questions_to_db(questions, subject, db_config):
+       """将题目保存到数据库"""
+       conn = None
+       cursor = None
+       
+       try:
+           conn = mysql.connector.connect(**db_config)
+           cursor = conn.cursor()
+           
+           # 准备插入数据的SQL语句
+           insert_sql = """
+           INSERT INTO questions (
+               question_code, subject, year, question_text, 
+               options_json, correct_answer, explanation_text, 
+               question_type, created_at, updated_at
+           ) VALUES (
+               %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW()
+           )
+           """
+           
+           # 准备更新数据的SQL语句
+           update_sql = """
+           UPDATE questions SET
+               subject = %s,
+               year = %s,
+               question_text = %s,
+               options_json = %s,
+               correct_answer = %s,
+               explanation_text = %s,
+               question_type = %s,
+               updated_at = NOW()
+           WHERE question_code = %s
+           """
+           
+           success_count = 0
+           update_count = 0
+           
+           for question in questions:
+               options_json = json.dumps(question['options'], ensure_ascii=False)
+               
+               # 先检查题目是否已存在
+               check_sql = "SELECT id FROM questions WHERE question_code = %s"
+               cursor.execute(check_sql, (question['question_code'],))
+               result = cursor.fetchone()
+               
+               if result:
+                   # 更新已有题目
+                   cursor.execute(update_sql, (
+                       subject,
+                       question['year'],
+                       question['question_text'],
+                       options_json,
+                       question['correct_answer'],
+                       question['analysis'],
+                       question['question_type'],
+                       question['question_code']
+                   ))
+                   update_count += 1
+               else:
+                   # 插入新题目
+                   cursor.execute(insert_sql, (
+                       question['question_code'],
+                       subject,
+                       question['year'],
+                       question['question_text'],
+                       options_json,
+                       question['correct_answer'],
+                       question['analysis'],
+                       question['question_type']
+                   ))
+                   success_count += 1
+           
+           conn.commit()
+           print(f"成功导入 {success_count} 个新题目，更新 {update_count} 个已有题目！")
+           
+       except Exception as e:
+           print(f"数据库操作出错: {e}")
+           if conn:
+               conn.rollback()
+       finally:
+           if cursor:
+               cursor.close()
+           if conn:
+               conn.close()
+   
+   def main():
+       if len(sys.argv) < 3:
+           print("用法: python parse_exam_questions.py <Word文件路径> <学科名称>")
+           print("例如: python parse_exam_questions.py 民法.docx 民法")
+           return
+       
+       file_path = sys.argv[1]
+       subject = sys.argv[2]
+       
+       if not os.path.exists(file_path):
+           print(f"错误: 文件 '{file_path}' 不存在")
+           return
+       
+       # 数据库配置
+       db_config = {
+           'host': 'localhost',  # 或者宝塔面板中的数据库地址
+           'user': 'your_username',  # 替换为你的数据库用户名
+           'password': 'your_password',  # 替换为你的数据库密码
+           'database': 'law_exam_assistant'  # 替换为你的数据库名
+       }
+       
+       try:
+           print(f"正在解析文件: {file_path}...")
+           questions = extract_questions(file_path)
+           print(f"共解析出 {len(questions)} 个题目")
+           
+           print(f"正在将题目保存到数据库...")
+           save_questions_to_db(questions, subject, db_config)
+           
+       except Exception as e:
+           print(f"程序出错: {e}")
+   
+   if __name__ == "__main__":
+       main()

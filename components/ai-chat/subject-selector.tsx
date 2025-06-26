@@ -8,14 +8,14 @@ interface SubjectSelectorProps {
 
 export function SubjectSelector({ selectedSubject, onSubjectChange }: SubjectSelectorProps) {
   const subjects = [
-    "民法",
     "刑法",
-    "民事诉讼法",
+    "民法",
     "刑事诉讼法",
-    "商法与经济法",
-    "理论法学",
+    "民事诉讼法",
     "行政法与行政诉讼法",
+    "商经知",
     "三国法",
+    "理论法",
   ]
 
   return (

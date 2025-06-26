@@ -27,16 +27,16 @@ export function PlanWizard({ onComplete, onCancel }: PlanWizardProps) {
   const [currentProgress, setCurrentProgress] = useState(0)
   const [selfSetPlan, setSelfSetPlan] = useState(false)
 
-  // 学科列表
+  // 学科列表 - 使用中文名称作为ID
   const [subjects, setSubjects] = useState([
-    { id: "civil", name: "民法" },
-    { id: "criminal", name: "刑法" },
-    { id: "civilProcedure", name: "民事诉讼法" },
-    { id: "criminalProcedure", name: "刑事诉讼法" },
-    { id: "commercial", name: "商法与经济法" },
-    { id: "theory", name: "理论法学" },
-    { id: "administrative", name: "行政法与行政诉讼法" },
-    { id: "international", name: "三国法" },
+    { id: "刑法", name: "刑法" },
+    { id: "民法", name: "民法" },
+    { id: "刑事诉讼法", name: "刑事诉讼法" },
+    { id: "民事诉讼法", name: "民事诉讼法" },
+    { id: "行政法", name: "行政法" },
+    { id: "商经知", name: "商经知" },
+    { id: "三国法", name: "三国法" },
+    { id: "理论法", name: "理论法" },
   ])
 
   const handleNext = () => {

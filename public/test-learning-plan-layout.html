@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学习计划排版测试</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 学习计划文本格式化 */
+        .study-plan-content {
+            font-size: 0.875rem;
+            line-height: 1.625;
+            color: rgb(55 65 81);
+        }
+
+        .study-plan-content h1, 
+        .study-plan-content h2, 
+        .study-plan-content h3 {
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            margin-top: 1rem;
+            color: rgb(17 24 39);
+        }
+
+        .study-plan-content h1 {
+            font-size: 1.125rem;
+        }
+
+        .study-plan-content h2 {
+            font-size: 1rem;
+        }
+
+        .study-plan-content h3 {
+            font-size: 0.875rem;
+        }
+
+        .study-plan-content p {
+            margin-bottom: 0.75rem;
+            line-height: 1.625;
+        }
+
+        .study-plan-content ul, 
+        .study-plan-content ol {
+            margin-bottom: 0.75rem;
+            margin-left: 1rem;
+        }
+
+        .study-plan-content li {
+            line-height: 1.625;
+            margin-bottom: 0.25rem;
+        }
+
+        .study-plan-content strong {
+            font-weight: 600;
+            color: rgb(17 24 39);
+        }
+
+        .study-plan-content em {
+            font-style: italic;
+            color: rgb(75 85 99);
+        }
+
+        /* 任务列表项样式 */
+        .task-list-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.15s;
+        }
+
+        .task-list-item:hover {
+            background-color: rgb(249 250 251);
+        }
+
+        .task-list-item input[type="checkbox"] {
+            margin-top: 0.25rem;
+        }
+
+        .task-list-item label {
+            font-size: 0.875rem;
+            line-height: 1.625;
+            cursor: pointer;
+            flex: 1;
+        }
+
+        .task-list-item.completed label {
+            text-decoration: line-through;
+            color: rgb(107 114 128);
+        }
+
+        @media (max-width: 640px) {
+            .study-plan-content {
+                font-size: 0.75rem;
+            }
+            
+            .study-plan-content h1 {
+                font-size: 1rem;
+            }
+            
+            .study-plan-content h2 {
+                font-size: 0.875rem;
+            }
+            
+            .study-plan-content h3 {
+                font-size: 0.75rem;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 p-4">
+    <div class="max-w-4xl mx-auto space-y-6">
+        <h1 class="text-2xl font-bold text-center mb-8">学习计划排版测试页面</h1>
+        
+        <!-- 测试卡片 1: 带有复选框的任务列表 -->
+        <div class="bg-white rounded-lg border border-gray-200 shadow-sm">
+            <div class="p-4 border-b border-gray-100">
+                <h2 class="text-lg font-semibold flex items-center gap-2">
+                    <svg class="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    今日学习计划
+                </h2>
+            </div>
+            <div class="p-4">
+                <div class="space-y-2">
+                    <div class="task-list-item">
+                        <input type="checkbox" class="mt-1 flex-shrink-0">
+                        <label class="task-list-item-label text-gray-700">
+                            1. 民法物权编：学习所有权的概念和特征（1小时）
+                        </label>
+                    </div>
+                    <div class="task-list-item">
+                        <input type="checkbox" class="mt-1 flex-shrink-0">
+                        <label class="task-list-item-label text-gray-700">
+                            2. 完成民法基础练习题10道，重点关注物权变动规则
+                        </label>
+                    </div>
+                    <div class="task-list-item completed">
+                        <input type="checkbox" checked class="mt-1 flex-shrink-0">
+                        <label class="task-list-item-label">
+                            3. 复习上周刑法总论内容，整理笔记要点
+                        </label>
+                    </div>
+                    <div class="font-semibold text-gray-900 mt-4 mb-2 text-sm">
+                        重点学习内容
+                    </div>
+                    <div class="text-sm leading-relaxed text-gray-700 py-1">
+                        今日重点掌握物权法的基本概念，特别是所有权与他物权的区别，以及物权变动的基本规则。
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 测试卡片 2: 学习计划内容格式 -->
+        <div class="bg-white rounded-lg border border-gray-200 shadow-sm">
+            <div class="p-4 border-b border-gray-100">
+                <h2 class="text-lg font-semibold flex items-center gap-2">
+                    <svg class="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    总体规划思路
+                </h2>
+            </div>
+            <div class="p-4">
+                <div class="study-plan-content whitespace-pre-wrap">### 学习目标设定
+
+根据您当前的学习基础和时间安排，本计划将帮助您系统性地掌握法律专业知识。
+
+**主要学习重点：**
+- 民法：物权法、债权法、侵权责任法
+- 刑法：犯罪构成理论、刑罚制度
+- 行政法：行政主体、行政行为、行政救济
+
+### 学习方法建议
+
+1. **理论学习**：每日安排2小时系统学习
+2. **练习巩固**：完成相关练习题强化理解
+3. **复习总结**：定期回顾和总结学习成果
+
+*注意：学习过程中要注重理论与实践的结合，多做案例分析。*
+                </div>
+            </div>
+        </div>
+
+        <!-- 测试卡片 3: 响应式布局测试 -->
+        <div class="bg-white rounded-lg border border-gray-200 shadow-sm">
+            <div class="p-4 border-b border-gray-100">
+                <h2 class="text-lg font-semibold">响应式布局测试</h2>
+            </div>
+            <div class="p-4">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div class="flex-1">
+                        <h3 class="text-lg md:text-xl font-semibold">我的学习计划</h3>
+                        <p class="mt-2 text-sm text-gray-600">学习科目：民法、刑法、行政法</p>
+                    </div>
+                    <div class="flex gap-3 md:gap-4 text-center">
+                        <div class="flex-1 md:flex-none">
+                            <div class="text-xl md:text-2xl font-bold text-blue-600">3</div>
+                            <div class="text-xs text-gray-500">学习科目</div>
+                        </div>
+                        <div class="flex-1 md:flex-none">
+                            <div class="text-xl md:text-2xl font-bold text-green-600">2/12</div>
+                            <div class="text-xs text-gray-500">学习进度（周）</div>
+                        </div>
+                        <div class="flex-1 md:flex-none">
+                            <div class="text-xl md:text-2xl font-bold text-orange-600">65%</div>
+                            <div class="text-xs text-gray-500">今日完成度</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 测试卡片 4: 按钮布局测试 -->
+        <div class="bg-white rounded-lg border border-gray-200 shadow-sm">
+            <div class="p-4 border-b border-gray-100">
+                <h2 class="text-lg font-semibold">按钮布局测试</h2>
+            </div>
+            <div class="p-4">
+                <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                    <div class="flex gap-2 overflow-x-auto">
+                        <button class="flex items-center gap-2 whitespace-nowrap flex-shrink-0 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <span class="hidden sm:inline">今日学习计划</span>
+                            <span class="sm:hidden">今日计划</span>
+                        </button>
+                        <button class="flex items-center gap-2 whitespace-nowrap flex-shrink-0 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                            <span class="hidden sm:inline">本周学习计划</span>
+                            <span class="sm:hidden">本周计划</span>
+                        </button>
+                    </div>
+                    
+                    <div class="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 sm:px-4 py-2 rounded-lg border border-blue-200 text-center sm:text-left">
+                        <svg class="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span class="text-xs sm:text-sm font-medium">
+                            距离法考还有 <span class="font-bold text-base sm:text-lg text-red-600">88</span> 天
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center text-gray-500 text-sm mt-8">
+            排版修复测试页面 - 请在不同设备上查看效果
+        </div>
+    </div>
+
+    <script>
+        // 简单的交互功能
+        document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const taskItem = this.closest('.task-list-item');
+                if (this.checked) {
+                    taskItem.classList.add('completed');
+                } else {
+                    taskItem.classList.remove('completed');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

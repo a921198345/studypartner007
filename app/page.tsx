@@ -9,8 +9,11 @@ import { Card, CardContent } from "@/components/ui/card"
 import { MainNav } from "@/components/main-nav"
 import { Footer } from "@/components/footer"
 import { ImageCarousel } from "@/components/image-carousel"
+import { DelayedAuthGuard } from "@/components/auth/delayed-auth-guard"
+import { useRouter } from "next/navigation"
 
 export default function Home() {
+  const router = useRouter()
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -57,11 +60,20 @@ export default function Home() {
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.5, duration: 0.5 }}
                 >
-                  <Link href="/learning-plan">
-                    <Button size="lg" className="gap-2 text-base px-8 py-6">
-                      立即开始 <ArrowRight className="h-4 w-4" />
-                    </Button>
-          </Link>
+                  <DelayedAuthGuard
+                    authTitle="开始法考学习"
+                    authMessage="请先登录以开始您的个性化学习计划"
+                  >
+                    {({ requireAuth }) => (
+                      <Button 
+                        size="lg" 
+                        className="gap-2 text-base px-8 py-6"
+                        onClick={() => requireAuth(() => router.push('/learning-plan'))}
+                      >
+                        立即开始 <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </DelayedAuthGuard>
                 </motion.div>
                 <motion.div
                   className="grid grid-cols-3 gap-8 pt-8"

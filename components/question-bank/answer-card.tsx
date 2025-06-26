@@ -1,10 +1,11 @@
 "use client"
 
+import React from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { Clock } from "lucide-react"
+import { Clock, CheckCircle2, XCircle } from "lucide-react"
 import { useState, useEffect } from "react"
 
 interface AnswerCardProps {
@@ -13,6 +14,9 @@ interface AnswerCardProps {
   correctAnswers: number
   startTime: Date
   onFinish?: () => void
+  isCorrect: boolean
+  correctAnswer: string
+  explanation: string
 }
 
 export function AnswerCard({
@@ -21,8 +25,15 @@ export function AnswerCard({
   correctAnswers,
   startTime,
   onFinish,
+  isCorrect,
+  correctAnswer,
+  explanation,
 }: AnswerCardProps) {
   const [elapsedTime, setElapsedTime] = useState(0)
+
+  // 添加调试日志，检查解析内容
+  console.log("AnswerCard接收到的解析内容:", explanation);
+  console.log("解析内容类型:", typeof explanation);
 
   // 计算已用时间
   useEffect(() => {
@@ -51,7 +62,7 @@ export function AnswerCard({
   const progress = Math.round((answeredQuestions / totalQuestions) * 100)
 
   return (
-    <Card>
+    <Card className="mb-6">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg flex items-center justify-between">
           <span>答题进度</span>
@@ -80,7 +91,6 @@ export function AnswerCard({
           <Progress
             value={accuracy}
             className="h-2"
-            indicatorClassName={accuracy >= 60 ? "bg-green-500" : "bg-red-500"}
           />
         </div>
 
@@ -94,6 +104,37 @@ export function AnswerCard({
             <div className="text-xs text-gray-500">答错题数</div>
           </div>
         </div>
+
+        <div className="flex items-center mb-4">
+          {isCorrect ? (
+            <div className="flex items-center text-green-500">
+              <CheckCircle2 className="h-5 w-5 mr-2" />
+              <span className="font-medium">回答正确</span>
+            </div>
+          ) : (
+            <div className="flex items-center text-red-500">
+              <XCircle className="h-5 w-5 mr-2" />
+              <span className="font-medium">回答错误</span>
+            </div>
+          )}
+        </div>
+
+        <div className="mb-4">
+          <div className="text-sm text-gray-500 mb-1">正确答案:</div>
+          <div className="font-medium">{correctAnswer}</div>
+        </div>
+
+        {explanation && explanation.trim() !== "" ? (
+          <div className="mt-4">
+            <h3 className="text-lg font-medium mb-2">题目解析</h3>
+            <div className="text-sm bg-gray-50 p-4 rounded-md whitespace-pre-wrap">{explanation}</div>
+          </div>
+        ) : (
+          <div className="mt-4">
+            <h3 className="text-lg font-medium mb-2">题目解析</h3>
+            <div className="text-sm bg-gray-50 p-4 rounded-md">暂无解析</div>
+          </div>
+        )}
 
         {answeredQuestions === totalQuestions && (
           <Button className="w-full" onClick={onFinish}>

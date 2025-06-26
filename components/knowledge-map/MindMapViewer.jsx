@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Tree from 'react-d3-tree';
 
 // 这是一个基础的MindMapViewer组件
@@ -57,23 +57,83 @@ const DEFAULT_CIVIL_LAW_DATA = {
   ]
 };
 
+// 解码节点文本的辅助函数
+const decodeNodeText = (encodedText) => {
+  if (!encodedText) return '';
+  
+  try {
+    // URL解码
+    let decoded = decodeURIComponent(encodedText);
+    
+    // 移除HTML标签，提取纯文本
+    decoded = decoded.replace(/<[^>]*>/g, '');
+    
+    // 解码HTML实体
+    const htmlEntities = {
+      '&amp;': '&',
+      '&lt;': '<',
+      '&gt;': '>',
+      '&quot;': '"',
+      '&#39;': "'",
+      '&nbsp;': ' '
+    };
+    
+    for (const [entity, char] of Object.entries(htmlEntities)) {
+      decoded = decoded.replace(new RegExp(entity, 'g'), char);
+    }
+    
+    return decoded.trim();
+  } catch (error) {
+    console.warn('解码文本失败:', error.message);
+    return encodedText;
+  }
+};
+
+// 获取节点显示名称的函数
+const getNodeDisplayName = (nodeDatum) => {
+  // 如果有名称且不是"未命名节点"，直接返回
+  if (nodeDatum.name && nodeDatum.name !== '未命名节点' && nodeDatum.name.trim()) {
+    return nodeDatum.name;
+  }
+  
+  // 尝试从attributes中解码_mubu_text
+  if (nodeDatum.attributes && nodeDatum.attributes._mubu_text) {
+    const decoded = decodeNodeText(nodeDatum.attributes._mubu_text);
+    if (decoded) {
+      return decoded;
+    }
+  }
+  
+  // 最后返回原名称或默认值
+  return nodeDatum.name || '未命名节点';
+};
+
 // 递归搜索节点，为匹配项添加searchMatch属性
 const searchNodes = (node, searchTerm) => {
   if (!node || !searchTerm) return false;
   
-  // 将搜索词和节点名称转换为小写以进行不区分大小写的比较
-  const searchTermLower = searchTerm.toLowerCase();
-  const nodeName = (node.name || '').toLowerCase();
+  // 支持多个搜索词（用逗号分隔）
+  const searchTerms = searchTerm.includes(',') 
+    ? searchTerm.split(',').map(term => term.trim().toLowerCase()).filter(term => term)
+    : [searchTerm.toLowerCase()];
   
-  // 检查当前节点是否匹配
-  const isMatch = nodeName.includes(searchTermLower);
+  const nodeName = getNodeDisplayName(node).toLowerCase();
+  
+  // 检查当前节点是否匹配任何搜索词
+  let isMatch = false;
+  for (const term of searchTerms) {
+    if (nodeName.includes(term)) {
+      isMatch = true;
+      break;
+    }
+  }
   
   // 设置当前节点的searchMatch属性
   node.searchMatch = isMatch;
   
   // 递归搜索子节点
   let hasMatchingChild = false;
-  if (node.children && node.children.length > 0) {
+  if (node.children && Array.isArray(node.children) && node.children.length > 0) {
     for (const child of node.children) {
       // 如果任何子节点匹配，则将hasMatchingChild设置为true
       if (searchNodes(child, searchTerm)) {
@@ -99,7 +159,7 @@ const countAllNodes = (node) => {
   let count = 1;
   
   // 递归计算所有子节点
-  if (node.children && node.children.length > 0) {
+  if (node.children && Array.isArray(node.children) && node.children.length > 0) {
     for (const child of node.children) {
       count += countAllNodes(child);
     }
@@ -110,7 +170,7 @@ const countAllNodes = (node) => {
 
 // 这是一个基础的MindMapViewer组件
 // 它会尝试从 /api/mindmaps/民法 获取数据并使用 react-d3-tree 展示
-const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '', onNodeCountUpdate }) => {
+const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '', onNodeCountUpdate, onNodeSelect, shouldRestoreState = false, onStateRestored, forceNavigationTrigger = null, onNavigationComplete }) => {
     // mindMapData 用于存储从API获取的树状数据
     const [mindMapData, setMindMapData] = useState(null);
     // 保存一个原始的未经搜索处理的数据副本
@@ -127,6 +187,8 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
     const [zoomLevel, setZoomLevel] = useState(customZoom);
     // 保存节点总数
     const [totalNodeCount, setTotalNodeCount] = useState(0);
+    // 保存当前选中的节点
+    const [selectedNode, setSelectedNode] = useState(null);
 
     // 处理自定义缩放级别变化
     useEffect(() => {
@@ -143,6 +205,144 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
         }
     }, [totalNodeCount, onNodeCountUpdate]);
 
+    // 简化的查找函数，用于状态恢复和导航
+    const findNodeInDataSimple = useCallback((data, targetName) => {
+        if (!data) return null;
+        if (data.name === targetName) return data;
+        // 添加防御性检查，确保children存在且是数组
+        if (data.children && Array.isArray(data.children) && data.children.length > 0) {
+            for (const child of data.children) {
+                const found = findNodeInDataSimple(child, targetName);
+                if (found) return found;
+            }
+        }
+        return null;
+    }, []);
+
+    // 处理状态恢复
+    useEffect(() => {
+        if (shouldRestoreState && mindMapData && onStateRestored) {
+            console.log('🔄 开始恢复状态...');
+            
+            try {
+                // 1. 尝试从 localStorage 恢复状态
+                const stateKey = `mindmap_state_${subject}`;
+                const savedState = localStorage.getItem(stateKey);
+                
+                if (savedState) {
+                    const parsedState = JSON.parse(savedState);
+                    console.log('📋 找到保存的状态:', parsedState);
+                    
+                    // 2. 恢复选中的节点
+                    if (parsedState.selectedNode && onNodeSelect) {
+                        const targetNode = findNodeInDataSimple(mindMapData, parsedState.selectedNode.name);
+                        if (targetNode) {
+                            console.log('🎯 恢复选中节点:', targetNode.name);
+                            setSelectedNode(targetNode);
+                            
+                            // 如果有保存的父级路径，构建完整路径
+                            const savedParentNodes = parsedState.selectedParentNodes || [];
+                            const fullPath = [...savedParentNodes, targetNode.name];
+                            
+                            console.log('🔄 恢复节点路径:', fullPath);
+                            console.log('🔄 保存的父级路径:', savedParentNodes);
+                            console.log('🔄 目标节点:', targetNode.name);
+                            
+                            // 直接调用 onNodeSelect，并传递正确的父级路径
+                            setTimeout(() => {
+                                onNodeSelect(
+                                    targetNode, 
+                                    parsedState.selectedNodeLevel || fullPath.length, 
+                                    savedParentNodes
+                                );
+                                
+                                // 如果节点需要展开到特定位置，触发导航
+                                if (fullPath.length > 2) {
+                                    // 递归展开父节点
+                                    const expandParentNodes = (data, path, index = 0) => {
+                                        if (!data || index >= path.length - 1) return;
+                                        
+                                        if (data.name === path[index]) {
+                                            // 确保节点展开
+                                            if (data.__rd3t) {
+                                                data.__rd3t.collapsed = false;
+                                            }
+                                            
+                                            // 继续展开子节点
+                                            if (Array.isArray(data.children)) {
+                                                for (const child of data.children) {
+                                                    expandParentNodes(child, path, index + 1);
+                                                }
+                                            }
+                                        } else if (Array.isArray(data.children)) {
+                                            // 在子节点中查找
+                                            for (const child of data.children) {
+                                                expandParentNodes(child, path, index);
+                                            }
+                                        }
+                                    };
+                                    
+                                    // 展开路径上的所有父节点
+                                    expandParentNodes(mindMapData, fullPath, 0);
+                                }
+                            }, 500);
+                        }
+                    }
+                } else {
+                    console.log('❌ 未找到保存的状态数据');
+                }
+                
+                // 延迟通知状态恢复完成
+                setTimeout(() => {
+                    console.log('✅ 状态恢复完成');
+                    onStateRestored();
+                }, 1000);
+                
+            } catch (error) {
+                console.error('❌ 状态恢复过程中出错:', error);
+                onStateRestored();
+            }
+        }
+    }, [shouldRestoreState, mindMapData, subject, onStateRestored, onNodeSelect, findNodeInDataSimple]);
+
+    // 监听强制导航触发器
+    useEffect(() => {
+        if (forceNavigationTrigger && forceNavigationTrigger.path && forceNavigationTrigger.path.length > 0 && mindMapData) {
+            console.log('🧭 开始强制导航到:', forceNavigationTrigger.path);
+            
+            const targetPath = forceNavigationTrigger.path;
+            const targetNodeName = targetPath[targetPath.length - 1];
+            
+            // 直接查找并选中目标节点
+            const targetNode = findNodeInDataSimple(mindMapData, targetNodeName);
+            
+            if (targetNode && onNodeSelect) {
+                console.log('🎯 导航找到目标节点:', targetNodeName);
+                setSelectedNode(targetNode);
+                
+                // 计算父级路径
+                const parentPath = targetPath.slice(0, -1).filter(p => p !== subject);
+                const nodeLevel = targetPath.length;
+                
+                // 延迟选中节点
+                setTimeout(() => {
+                    onNodeSelect(targetNode, nodeLevel, parentPath);
+                    console.log('✅ 导航完成，节点已选中');
+                    
+                    // 通知导航完成
+                    if (onNavigationComplete) {
+                        onNavigationComplete();
+                    }
+                }, 300);
+            } else {
+                console.log('❌ 导航目标节点未找到:', targetNodeName);
+                if (onNavigationComplete) {
+                    onNavigationComplete();
+                }
+            }
+        }
+    }, [forceNavigationTrigger, mindMapData, subject, onNodeSelect, onNavigationComplete, findNodeInDataSimple]);
+
     // useEffect Hook 用于在组件首次渲染后执行副作用操作，如此处用于获取数据
     useEffect(() => {
         // 定义一个异步函数来获取知识导图数据
@@ -150,23 +350,69 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
             setIsLoading(true); // 开始获取数据前，设置加载状态为true
             setError(null);     // 清除任何之前的错误信息
             
-            // 检查是否有缓存数据
+            // 检查是否需要强制刷新（用于会员升级后）
+            const forceRefresh = localStorage.getItem('force_mindmap_refresh');
+            if (forceRefresh) {
+                console.log('🔄 检测到强制刷新标记，清除所有缓存');
+                localStorage.removeItem('force_mindmap_refresh');
+                // 清除localStorage缓存
+                Object.keys(localStorage).forEach(key => {
+                    if (key.startsWith('mindmap-')) {
+                        localStorage.removeItem(key);
+                    }
+                });
+                // 清除内存缓存
+                if (window.mindMapCache) {
+                    window.mindMapCache = {};
+                }
+            }
+            
+            // 检查内存缓存
+            if (window.mindMapCache && window.mindMapCache[subject] && !forceRefresh) {
+                const memoryCache = window.mindMapCache[subject];
+                const now = new Date().getTime();
+                const cacheAge = now - memoryCache.timestamp;
+                
+                // 内存缓存有效期10分钟
+                if (cacheAge < 600000) {
+                    console.log('使用内存缓存数据');
+                    setMindMapData(memoryCache.data);
+                    setOriginalData(JSON.parse(JSON.stringify(memoryCache.data)));
+                    setTotalNodeCount(countAllNodes(memoryCache.data));
+                    setIsLoading(false);
+                    return;
+                }
+            }
+            
+            // 检查localStorage缓存
             const cachedData = localStorage.getItem(`mindmap-${subject}`);
             const cachedTimestamp = localStorage.getItem(`mindmap-${subject}-timestamp`);
             
-            // 如果有缓存且不超过30分钟，先使用缓存数据快速渲染
-            if (cachedData && cachedTimestamp) {
+            // 如果有缓存且不超过2小时，使用缓存数据（除非强制刷新）
+            if (cachedData && cachedTimestamp && !forceRefresh) {
                 const now = new Date().getTime();
                 const cacheAge = now - parseInt(cachedTimestamp);
-                if (cacheAge < 1800000) { // 30分钟 = 1800000毫秒
+                if (cacheAge < 7200000) { // 2小时 = 7200000毫秒
                     try {
                         const parsedCache = JSON.parse(cachedData);
                         setMindMapData(parsedCache);
-                        setOriginalData(JSON.parse(JSON.stringify(parsedCache))); // 深拷贝
+                        setOriginalData(JSON.parse(JSON.stringify(parsedCache)));
+                        setTotalNodeCount(countAllNodes(parsedCache));
                         setIsLoading(false);
                         
-                        // 后台仍然加载新数据，但用户已经可以看到缓存的内容
-                        setTimeout(() => fetchFreshData(), 100);
+                        // 保存到内存缓存
+                        if (!window.mindMapCache) window.mindMapCache = {};
+                        window.mindMapCache[subject] = {
+                            data: parsedCache,
+                            timestamp: now
+                        };
+                        
+                        console.log('使用localStorage缓存数据');
+                        
+                        // 如果缓存超过30分钟，后台静默更新
+                        if (cacheAge > 1800000) {
+                            setTimeout(() => fetchFreshData(), 100);
+                        }
                         return;
                     } catch (e) {
                         console.error("缓存数据解析失败:", e);
@@ -182,16 +428,41 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
         // 提取实际获取新数据的函数
         const fetchFreshData = async () => {
             try {
+                // 获取认证信息
+                const authToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                
+                // 如果有认证token，添加到请求头
+                if (authToken) {
+                    headers['Authorization'] = `Bearer ${authToken}`;
+                }
+                
                 // 使用fetch API从指定的后端端点获取数据
-                const response = await fetch(`/api/mindmaps/${subject}`);
+                const response = await fetch(`/api/mindmaps/${subject}`, {
+                    method: 'GET',
+                    headers: headers
+                });
 
-                // 检查HTTP响应状态是否表示成功
+                // 解析响应数据（不论成功还是失败）
+                const data = await response.json();
+
+                // 检查HTTP响应状态
                 if (!response.ok) {
+                    // 特殊处理403错误（会员权限）
+                    if (response.status === 403 && data.upgradeRequired) {
+                        setError({
+                            type: 'upgrade_required',
+                            message: data.message,
+                            availableSubjects: data.availableSubjects,
+                            currentSubject: data.currentSubject,
+                            requireAuth: data.requireAuth
+                        });
+                        return; // 不使用默认数据
+                    }
                     throw new Error(`获取导图数据失败，状态码: ${response.status}`);
                 }
-
-                // 将响应体解析为JSON格式
-                const data = await response.json();
 
                 // 检查API返回的数据结构是否符合预期
                 if (data && data.success && data.mindmap && data.mindmap.map_data) {
@@ -202,10 +473,23 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
                     const nodeCount = countAllNodes(data.mindmap.map_data);
                     setTotalNodeCount(nodeCount);
                     
-                    // 缓存数据
+                    // 缓存数据到localStorage和内存
                     try {
-                        localStorage.setItem(`mindmap-${subject}`, JSON.stringify(data.mindmap.map_data));
-                        localStorage.setItem(`mindmap-${subject}-timestamp`, new Date().getTime().toString());
+                        const now = new Date().getTime();
+                        const mapData = data.mindmap.map_data;
+                        
+                        // localStorage缓存
+                        localStorage.setItem(`mindmap-${subject}`, JSON.stringify(mapData));
+                        localStorage.setItem(`mindmap-${subject}-timestamp`, now.toString());
+                        
+                        // 内存缓存
+                        if (!window.mindMapCache) window.mindMapCache = {};
+                        window.mindMapCache[subject] = {
+                            data: mapData,
+                            timestamp: now
+                        };
+                        
+                        console.log('数据已缓存到localStorage和内存');
                     } catch (e) {
                         console.warn("无法缓存导图数据:", e);
                     }
@@ -281,8 +565,108 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
         }
     }, [searchTerm, originalData]);
 
-    // 自定义节点组件
-    const renderCustomNodeElement = ({ nodeDatum, toggleNode }) => {
+    // 获取节点层级的函数
+    const getNodeLevel = useCallback((nodeDatum) => {
+        // 优先使用 __rd3t.depth，这是最可靠的
+        if (nodeDatum.__rd3t && typeof nodeDatum.__rd3t.depth === 'number') {
+            return nodeDatum.__rd3t.depth;
+        }
+        // 降级方案：简单估算
+        return 0;
+    }, []);
+
+    // 处理节点选择的函数
+    const handleNodeSelect = useCallback((nodeDatum, event) => {
+        event.stopPropagation(); // 阻止事件冒泡到圆圈点击
+        
+        const nodeLevel = getNodeLevel(nodeDatum);
+        
+        // 只有第三级及以后且不是叶子节点的节点才能被选中查看详情
+        const isLeafNode = !nodeDatum.children || nodeDatum.children.length === 0;
+        if (nodeLevel >= 3 && !isLeafNode) {
+            setSelectedNode(nodeDatum);
+            
+            // 构建真实的父级路径 - 通过查找节点在树中的位置
+            const parentPath = [];
+            
+            // 递归查找节点路径的函数
+            const findNodePath = (data, targetName, currentPath = []) => {
+                // 添加空值检查
+                if (!data || !data.name) {
+                    return null;
+                }
+                
+                if (data.name === targetName) {
+                    return [...currentPath, data.name];
+                }
+                
+                if (Array.isArray(data.children) && data.children.length > 0) {
+                    for (const child of data.children) {
+                        const path = findNodePath(child, targetName, [...currentPath, data.name]);
+                        if (path) {
+                            return path;
+                        }
+                    }
+                }
+                
+                return null;
+            };
+            
+            // 查找完整路径
+            const dataToSearch = originalData || mindMapData;
+            if (dataToSearch) {
+                const fullPath = findNodePath(dataToSearch, nodeDatum.name);
+                if (fullPath && fullPath.length > 2) {
+                    // 去掉根节点和当前节点，得到父级路径
+                    parentPath.push(...fullPath.slice(1, -1));
+                }
+            } else {
+                console.warn('导图数据未加载，使用节点自身的父级信息');
+                // 如果没有完整数据，尝试从节点本身获取父级信息
+                if (nodeDatum.parent) {
+                    let parent = nodeDatum.parent;
+                    const tempPath = [];
+                    while (parent && parent.data && parent.data.name) {
+                        tempPath.unshift(parent.data.name);
+                        parent = parent.parent;
+                    }
+                    // 去掉根节点
+                    if (tempPath.length > 0) {
+                        parentPath.push(...tempPath.slice(1));
+                    }
+                }
+            }
+            
+            // 保存当前状态到 localStorage
+            try {
+                const currentState = {
+                    selectedNode: {
+                        name: nodeDatum.name,
+                        data: nodeDatum
+                    },
+                    selectedNodeLevel: nodeLevel,
+                    selectedParentNodes: parentPath,
+                    searchTerm: searchTerm,
+                    zoomLevel: zoomLevel,
+                    timestamp: Date.now()
+                };
+                
+                const stateKey = `mindmap_state_${subject}`;
+                localStorage.setItem(stateKey, JSON.stringify(currentState));
+                console.log('💾 节点状态已保存:', nodeDatum.name);
+            } catch (error) {
+                console.error('❌ 保存状态失败:', error);
+            }
+            
+            // 通知父组件节点被选中
+            if (onNodeSelect) {
+                onNodeSelect(nodeDatum, nodeLevel, parentPath);
+            }
+        }
+    }, [onNodeSelect, getNodeLevel, subject, searchTerm, zoomLevel]);
+
+    // 优化的自定义节点组件，使用useCallback减少重新渲染
+    const renderCustomNodeElement = useCallback(({ nodeDatum, toggleNode }) => {
         // 正确检测折叠的子节点
         const collapsed = nodeDatum.__rd3t && nodeDatum.__rd3t.collapsed;
         
@@ -308,11 +692,23 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
             return width + 30;  // 添加更多边距
         };
 
-        const textWidth = getTextWidth(nodeDatum.name || '');
+        // 获取节点显示文本
+        const displayText = getNodeDisplayName(nodeDatum);
+        const textWidth = getTextWidth(displayText);
         
         // 检查节点是否匹配搜索条件
         const isMatch = nodeDatum.searchMatch;
         const isPathToMatch = nodeDatum.pathToMatch;
+        
+        // 获取节点层级
+        const nodeLevel = getNodeLevel(nodeDatum);
+        
+        // 判断是否可以点击查看详情（第三级及以后，但不是叶子节点）
+        const isLeafNode = !nodeDatum.children || nodeDatum.children.length === 0;
+        const canShowDetails = nodeLevel >= 3 && !isLeafNode;
+        
+        // 判断是否为当前选中的节点
+        const isSelected = selectedNode && selectedNode.name === nodeDatum.name;
 
         // 节点样式，可以根据需要调整
         const nodeStyles = {
@@ -334,7 +730,6 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
                 alignmentBaseline: 'middle',
                 textRendering: 'geometricPrecision', // 提高字体渲染精度
                 letterSpacing: '0.5px', // 增加字间距
-                textShadow: '0px 1px 2px white, 0px -1px 2px white, 1px 0px 2px white, -1px 0px 2px white',
             },
             childCountText: {
                 fontSize: '14px', // 增大数字大小
@@ -344,31 +739,20 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
                 alignmentBaseline: 'middle',
             },
             rect: {
-                fill: isMatch ? 'rgba(255, 235, 235, 1)' : isPathToMatch ? 'rgba(255, 250, 230, 1)' : 'white',
-                stroke: isMatch ? '#FC8181' : isPathToMatch ? '#F6E05E' : '#cbd5e0',
-                strokeWidth: isMatch || isPathToMatch ? 2 : 1.5,
+                fill: isSelected ? '#fef3c7' : (isMatch ? 'rgba(255, 235, 235, 1)' : isPathToMatch ? 'rgba(255, 250, 230, 1)' : (canShowDetails ? '#f3f4f6' : '#f9fafb')),
+                stroke: isSelected ? '#f59e0b' : (isMatch ? '#FC8181' : isPathToMatch ? '#F6E05E' : (canShowDetails ? '#d1d5db' : '#e5e7eb')),
+                strokeWidth: isSelected ? 2 : (isMatch || isPathToMatch ? 2 : 1.5),
+                cursor: canShowDetails ? 'pointer' : 'default'
             }
         };
 
         return (
-            <g onClick={toggleNode} style={{ cursor: 'pointer' }}>
-                {/* 增加白色背景的不透明度，提高文字可见性 */}
-                {nodeDatum.name && (
-                    <rect
-                        x={nodeStyles.nameText.x - 8} // 增加左侧边距
-                        y={-14} // 增加上下边距
-                        width={textWidth}
-                        height={28} // 增加高度
-                        fill={nodeStyles.rect.fill}
-                        fillOpacity="1"
-                        rx={5}
-                        ry={5}
-                        stroke={nodeStyles.rect.stroke} // 更明显的边框颜色
-                        strokeWidth={nodeStyles.rect.strokeWidth} // 调整边框宽度
-                    />
-                )}
-                
-                <circle {...nodeStyles.circle} />
+            <g>
+                {/* 节点圆圈 - 用于展开/折叠 */}
+                <circle 
+                    {...nodeStyles.circle} 
+                    onClick={toggleNode}
+                />
                 
                 {/* 显示子节点数量在圆圈内 */}
                 {hiddenChildrenCount > 0 && (
@@ -376,34 +760,157 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
                         x="0"
                         y="1"
                         style={nodeStyles.childCountText}
-                        dominantBaseline="middle" // 确保文字垂直居中
-                        textAnchor="middle" // 确保文字水平居中
+                        dominantBaseline="middle"
+                        textAnchor="middle"
+                        onClick={toggleNode}
+                        style={{ ...nodeStyles.childCountText, pointerEvents: 'none' }}
                     >
                         {hiddenChildrenCount}
                     </text>
                 )}
                 
-                {/* 增加SVG文本可访问性属性 */}
+                {/* 节点文本框 - 用于选择节点查看详情 */}
+                {displayText && (
+                    <rect
+                        x={nodeStyles.nameText.x - 8}
+                        y={-14}
+                        width={textWidth}
+                        height={28}
+                        fill={nodeStyles.rect.fill}
+                        fillOpacity="1"
+                        rx={5}
+                        ry={5}
+                        stroke={nodeStyles.rect.stroke}
+                        strokeWidth={nodeStyles.rect.strokeWidth}
+                        style={{ cursor: nodeStyles.rect.cursor }}
+                        onClick={canShowDetails ? (event) => handleNodeSelect(nodeDatum, event) : undefined}
+                    />
+                )}
+                
+                {/* 节点文本 */}
                 <text 
                     {...nodeStyles.nameText}
                     dominantBaseline="middle"
-                    paintOrder="stroke fill" // 先绘制描边再填充，提高清晰度
+                    paintOrder="stroke fill"
+                    style={{ 
+                        ...nodeStyles.nameText, 
+                        pointerEvents: 'none',
+                        userSelect: 'none'
+                    }}
                 >
-                    {nodeDatum.name}
+                    {displayText}
                 </text>
+                
+                {/* 详情图标（只在可查看详情的节点上显示） */}
+                {canShowDetails && (
+                    <text
+                        x={nodeStyles.nameText.x + textWidth - 5}
+                        y="0"
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                        fontSize="10"
+                        fill="#6b7280"
+                        style={{ pointerEvents: 'none' }}
+                    >
+                        📖
+                    </text>
+                )}
             </g>
         );
-    };
+    }, [searchTerm, selectedNode, getNodeLevel, handleNodeSelect]); // 更新依赖数组
+    
+    // 使用useMemo优化Tree组件的props
+    const treeProps = useMemo(() => ({
+        data: mindMapData,
+        orientation: "horizontal",
+        pathFunc: "bezier",
+        initialDepth: 2,
+        translate: { x: 150, y: 300 },
+        zoomable: true,
+        separation: { siblings: 1.2, nonSiblings: 2.5 },
+        nodeSize: { x: 400, y: 120 },
+        renderCustomNodeElement,
+        depthFactor: 500,
+        centeringTransitionDuration: 600,
+        shouldCollapseNeighborNodes: false,
+        zoom: zoomLevel,
+        scaleExtent: { min: 0.1, max: 3 },
+        enableLegacyTransitions: false,
+        transitionDuration: 200,
+        collapsible: true,
+        pathClassFunc: () => 'mind-map-path'
+    }), [mindMapData, zoomLevel, renderCustomNodeElement]);
 
     // --- UI渲染逻辑 ---
 
     // 如果正在加载数据，显示加载提示
     if (isLoading) {
-        return <div className="flex justify-center p-10">正在加载知识导图...</div>;
+        return (
+            <div className="flex flex-col items-center justify-center p-10 space-y-4">
+                <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-500 rounded-full animate-spin"></div>
+                <div className="text-gray-600">正在加载知识导图...</div>
+                <div className="text-sm text-gray-400">首次加载可能需要几秒钟</div>
+            </div>
+        );
     }
 
     // 如果加载过程中发生错误，显示错误信息
     if (error) {
+        // 如果是升级要求错误，显示升级提示
+        if (typeof error === 'object' && error.type === 'upgrade_required') {
+            return (
+                <div className="flex flex-col items-center justify-center p-10 space-y-6">
+                    <div className="w-16 h-16 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-2xl">🔒</span>
+                    </div>
+                    <div className="text-center space-y-3">
+                        <h3 className="text-lg font-semibold text-gray-800">
+                            {error.currentSubject} 知识导图需要会员权限
+                        </h3>
+                        <p className="text-gray-600 max-w-md">
+                            {error.message}
+                        </p>
+                        {error.availableSubjects && error.availableSubjects.length > 0 && (
+                            <p className="text-sm text-gray-500">
+                                免费用户可以查看：{error.availableSubjects.join('、')}
+                            </p>
+                        )}
+                        <div className="flex gap-3 justify-center mt-4">
+                            {error.requireAuth ? (
+                                <button
+                                    onClick={() => {
+                                        // 保存当前页面，登录后回到这里
+                                        sessionStorage.setItem('redirectAfterLogin', window.location.pathname + window.location.search);
+                                        window.location.href = '/login';
+                                    }}
+                                    className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                                >
+                                    立即登录
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => {
+                                        // 跳转到会员购买页面
+                                        window.location.href = '/membership/purchase';
+                                    }}
+                                    className="px-6 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-lg hover:from-yellow-600 hover:to-orange-600 transition-all"
+                                >
+                                    升级会员
+                                </button>
+                            )}
+                            <button
+                                onClick={() => window.location.href = '/knowledge-map?subject=民法'}
+                                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                            >
+                                查看民法
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        
+        // 普通错误显示
         return <div className="flex justify-center p-10">加载知识导图失败: {error}</div>;
     }
 
@@ -425,12 +932,20 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
             {/* 如果有搜索匹配项，显示提示 */}
             {searchTerm && (
                 <div className="absolute top-2 left-2 right-2 bg-blue-100 text-blue-800 p-2 text-center text-sm z-10 rounded-md">
-                    正在搜索: "{searchTerm}" - 匹配项以红色显示，匹配项路径以黄色显示
+                    正在搜索: {searchTerm.includes(',') 
+                        ? searchTerm.split(',').map(term => term.trim()).filter(term => term).map((term, index, arr) => (
+                            <span key={term}>
+                                "{term}"{index < arr.length - 1 ? '、' : ''}
+                            </span>
+                          ))
+                        : `"${searchTerm}"`
+                    } - 匹配项以红色显示，匹配项路径以黄色显示
                 </div>
             )}
             
             {/* 添加预加载字体以确保字体正确渲染 */}
-            <style jsx global>{`
+            <style dangerouslySetInnerHTML={{
+                __html: `
                 @font-face {
                     font-family: 'SimSun';
                     font-display: swap;
@@ -460,31 +975,24 @@ const MindMapViewer = ({ subject = '民法', customZoom = 0.45, searchTerm = '',
                     -webkit-font-smoothing: antialiased;
                     -moz-osx-font-smoothing: grayscale;
                 }
-            `}</style>
+                `
+            }} />
             
             <Tree
                 ref={treeRef}
-                data={mindMapData}
-                orientation="horizontal"
-                pathFunc="bezier"
-                initialDepth={2}
-                translate={{ x: 150, y: 300 }}
-                zoomable={true}
-                separation={{ siblings: 1.3, nonSiblings: 2.8 }}
-                nodeSize={{ x: 440, y: 140 }}
-                renderCustomNodeElement={renderCustomNodeElement}
-                depthFactor={600}
-                centeringTransitionDuration={800}
-                shouldCollapseNeighborNodes={true}
-                zoom={zoomLevel} // 使用状态变量
-                scaleExtent={{ min: 0.1, max: 3 }}
-                enableLegacyTransitions={true}
-                transitionDuration={300}
-                collapsible={true}
-                pathClassFunc={() => 'mind-map-path'}
+                {...treeProps}
             />
         </div>
     );
 };
 
-export default MindMapViewer; 
+// 使用React.memo优化组件，只在props真正变化时重新渲染
+export default React.memo(MindMapViewer, (prevProps, nextProps) => {
+  return (
+    prevProps.subject === nextProps.subject &&
+    prevProps.customZoom === nextProps.customZoom &&
+    prevProps.searchTerm === nextProps.searchTerm &&
+    prevProps.shouldRestoreState === nextProps.shouldRestoreState &&
+    JSON.stringify(prevProps.forceNavigationTrigger) === JSON.stringify(nextProps.forceNavigationTrigger)
+  );
+}); 
