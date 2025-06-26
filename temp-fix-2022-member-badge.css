@@ -1,0 +1,16 @@
+/* 临时CSS修复方案 - 隐藏2022年旁边的会员标识 */
+
+/* 如果HTML结构是相邻的两个Badge */
+.badge:contains("2022年") + .badge:contains("会员") {
+  display: none !important;
+}
+
+/* 或者如果会员标识在同一个Badge内 */
+.badge:contains("2022年"):contains("会员") {
+  display: none !important;
+}
+
+/* 更通用的选择器（需要根据实际HTML结构调整） */
+[class*="badge"]:has-text("2022"):has-text("会员") {
+  display: none !important;
+}

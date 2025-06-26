@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { MainNav } from "@/components/main-nav";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { getAuthToken, getUserInfo } from '@/lib/auth-utils';
 
 export default function MembershipPurchasePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [user, setUser] = useState(null);
@@ -33,7 +34,22 @@ export default function MembershipPurchasePage() {
     };
     
     checkAuth();
-  }, [router]);
+    
+    // 检查URL参数中是否有指定的套餐
+    const planParam = searchParams.get('plan');
+    const autoStart = searchParams.get('autoStart');
+    
+    if (planParam && ['1month', '3month'].includes(planParam)) {
+      setSelectedPlan(planParam);
+      
+      // 如果有 autoStart 参数，自动开始购买流程
+      if (autoStart === 'true') {
+        setTimeout(() => {
+          handlePurchase(planParam);
+        }, 500); // 短暂延迟确保页面已加载
+      }
+    }
+  }, [router, searchParams]);
 
   // 会员套餐配置
   const membershipPlans = [
@@ -178,7 +194,14 @@ export default function MembershipPurchasePage() {
             {membershipPlans.map((plan) => (
               <Card 
                 key={plan.id} 
-                className={`relative ${plan.isRecommended ? 'border-primary shadow-lg scale-105' : ''} ${plan.disabled ? 'opacity-75' : ''}`}
+                className={`relative cursor-pointer transition-all ${
+                  plan.isRecommended ? 'border-primary shadow-lg scale-105' : ''
+                } ${
+                  plan.disabled ? 'opacity-75' : ''
+                } ${
+                  selectedPlan === plan.id ? 'ring-2 ring-primary border-primary' : 'hover:shadow-md'
+                }`}
+                onClick={() => !plan.disabled && setSelectedPlan(plan.id)}
               >
                 {plan.isRecommended && (
                   <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-orange-400 to-orange-600">
@@ -211,11 +234,13 @@ export default function MembershipPurchasePage() {
 
                   <Button 
                     className="w-full" 
-                    disabled={plan.disabled || isLoading}
+                    disabled={plan.disabled || isLoading || (selectedPlan !== plan.id && !plan.disabled)}
                     onClick={() => handleUpgrade(plan.id)}
-                    variant={plan.isRecommended ? "default" : "outline"}
+                    variant={selectedPlan === plan.id ? "default" : "outline"}
                   >
-                    {isLoading ? "处理中..." : plan.buttonText}
+                    {isLoading && selectedPlan === plan.id ? "处理中..." : 
+                     selectedPlan === plan.id ? (plan.disabled ? plan.buttonText : "立即购买") : 
+                     plan.buttonText}
                   </Button>
                 </CardContent>
               </Card>

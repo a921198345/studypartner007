@@ -143,6 +143,7 @@ export default function QuestionBankPage() {
   const [activeTab, setActiveTab] = useState("all")
   const [isFetchingAllIds, setIsFetchingAllIds] = useState(false)
   const [isNavigationReady, setIsNavigationReady] = useState(false) // 添加导航数据准备状态
+  const requestIdRef = useRef(0) // 添加请求ID来防止竞态条件
 
   const subjects = [
     { id: "all", name: "全部科目" },
@@ -158,12 +159,16 @@ export default function QuestionBankPage() {
 
   const years = [
     { id: "all", name: "全部年份" },
-    { id: "2024", name: "2024年", free: true },
-    { id: "2023", name: "2023年", free: true },
+    // { id: "2024", name: "2024年", free: false }, // 暂无数据
+    // { id: "2023", name: "2023年", free: false }, // 暂无数据
     { id: "2022", name: "2022年", free: true },
     { id: "2021", name: "2021年", free: false },
     { id: "2020", name: "2020年", free: false },
     { id: "2019", name: "2019年", free: false },
+    { id: "2018", name: "2018年", free: false },
+    { id: "2017", name: "2017年", free: false },
+    { id: "2016", name: "2016年", free: false },
+    { id: "2015", name: "2015年", free: false },
   ]
 
   // 创建错题列表（为了保留"我的错题"标签页功能，但不显示错题标签）
@@ -403,6 +408,15 @@ export default function QuestionBankPage() {
         return;
       }
       
+      // 增加请求ID以防止竞态条件
+      const currentRequestId = ++requestIdRef.current;
+      console.log(`开始新的请求 #${currentRequestId}，筛选条件:`, {
+        selectedYears,
+        selectedSubject,
+        selectedQuestionTypes,
+        debouncedSearchQuery
+      });
+      
       try {
         setLoading(true)
         
@@ -494,15 +508,25 @@ export default function QuestionBankPage() {
             }
           } else {
             // 普通搜索
-            console.log('调用API时的搜索参数:', {
+            console.log('调用API时的筛选参数:', {
+              selectedSubject,
+              selectedYears,
+              selectedQuestionTypes,
               debouncedSearchQuery,
               searchQuery,
               hasSearch: !!debouncedSearchQuery
             });
             
+            const yearParam = selectedYears.includes('all') ? undefined : selectedYears;
+            console.log('年份参数处理:', {
+              selectedYears,
+              includesAll: selectedYears.includes('all'),
+              yearParam
+            });
+            
             const response = await questionApi.getQuestions({
               subject: selectedSubject !== 'all' ? selectedSubject : undefined,
-              year: selectedYears.includes('all') ? undefined : selectedYears,
+              year: yearParam,
               question_type: !selectedQuestionTypes.includes('全部题型') ? selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题' : undefined,
               search: debouncedSearchQuery || undefined,
               page: pagination.currentPage,
@@ -513,6 +537,12 @@ export default function QuestionBankPage() {
           }
           
           if (questionsData.success) {
+            // 检查是否是最新的请求
+            if (currentRequestId !== requestIdRef.current) {
+              console.log(`忽略过期的请求 #${currentRequestId}，当前最新请求是 #${requestIdRef.current}`);
+              return;
+            }
+            
             setQuestions(questionsData.data.questions);
             
             // 更新分页信息和题目总数
@@ -527,7 +557,7 @@ export default function QuestionBankPage() {
             // 确保AI搜索的结果总数正确显示
             setActualTotalQuestions(prevTotal => {
               if (prevTotal !== newTotal) {
-                console.log(`更新题目总数: ${prevTotal} -> ${newTotal}`);
+                console.log(`请求 #${currentRequestId} 更新题目总数: ${prevTotal} -> ${newTotal}`);
               }
               return newTotal;
             });
@@ -1153,11 +1183,14 @@ export default function QuestionBankPage() {
 
   // 处理年份选择变化
   const handleYearChange = (yearId: string, checked: boolean) => {
+    console.log('handleYearChange 被调用:', { yearId, checked, currentYears: selectedYears });
+    
     setSelectedYears(prev => {
       let newYears;
       if (yearId === 'all') {
         newYears = checked ? ['all'] : [];
       } else {
+        // 重要：选择具体年份时，需要移除'all'
         newYears = prev.filter(y => y !== 'all');
         
         if (checked) {
@@ -1168,11 +1201,13 @@ export default function QuestionBankPage() {
           newYears = newYears.filter(y => y !== yearId);
         }
 
+        // 如果没有选择任何年份，默认选择'all'
         if (newYears.length === 0) {
           newYears = ['all'];
         }
       }
       
+      console.log('年份选择更新:', { prev, newYears });
       return newYears;
     });
     // 重置分页
@@ -1824,6 +1859,13 @@ export default function QuestionBankPage() {
                                 <div className="flex items-center space-x-2">
                                   {question.year && (
                                     <Badge variant="outline">{question.year}</Badge>
+                                  )}
+                                  
+                                  {question.year && !['2022'].includes(String(question.year)) && (
+                                    <Badge variant="outline" className="bg-yellow-50">
+                                      <Lock className="h-3 w-3 mr-1" />
+                                      会员
+                                    </Badge>
                                   )}
                                   
                                   {question.subject && (

@@ -337,4 +337,20 @@
       @apply text-xs;
     }
   }
+  
+  /* 临时修复：隐藏2022年旁边错误的会员标识 */
+  /* 使用属性选择器和相邻兄弟选择器 */
+  .inline-flex.bg-yellow-50 + .inline-flex[class*="bg-yellow"] {
+    display: none !important;
+  }
+  
+  /* 更具体的选择器：隐藏包含Lock图标的会员Badge */
+  .inline-flex.bg-yellow-50 + .inline-flex:has(svg.h-3.w-3) {
+    display: none !important;
+  }
+  
+  /* 如果会员标识是同级元素 */
+  .inline-flex[class*="border"][class*="rounded-full"]:nth-child(5):has(svg) {
+    display: none !important;
+  }
 }

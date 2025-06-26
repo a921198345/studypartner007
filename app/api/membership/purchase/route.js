@@ -174,11 +174,11 @@ async function processPaymentSuccess(connection, order_id, user_id, membership_e
       [membership_end_date, user_id]
     );
     
-    // 重置用户使用计数
-    await connection.execute(
-      'UPDATE users SET daily_ai_queries_used = 0 WHERE user_id = ?',
-      [user_id]
-    );
+    // 重置用户使用计数（暂时跳过，因为字段不存在）
+    // await connection.execute(
+    //   'UPDATE users SET daily_ai_queries_used = 0 WHERE user_id = ?',
+    //   [user_id]
+    // );
     
     // 提交事务
     await connection.commit();

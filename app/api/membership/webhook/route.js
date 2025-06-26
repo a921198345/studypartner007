@@ -130,14 +130,14 @@ async function processPaymentSuccess(connection, order_id, user_id, membership_e
       [membership_end_date, user_id]
     );
     
-    // 重置用户的使用限制
-    await connection.execute(
-      `UPDATE users 
-       SET daily_ai_queries_used = 0,
-           last_ai_query_date = NULL
-       WHERE user_id = ?`,
-      [user_id]
-    );
+    // 重置用户的使用限制（暂时跳过不存在的字段）
+    // await connection.execute(
+    //   `UPDATE users 
+    //    SET daily_ai_queries_used = 0,
+    //        last_ai_query_date = NULL
+    //    WHERE user_id = ?`,
+    //   [user_id]
+    // );
     
     // 记录会员激活日志
     await connection.execute(

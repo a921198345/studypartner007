@@ -10,9 +10,16 @@ export async function POST(request) {
       return NextResponse.json({ error: '未提供认证信息' }, { status: 401 });
     }
 
-    const auth_result = await verifyAuth(authHeader);
+    const auth_result = verifyAuth(authHeader);
+    console.log('认证结果:', auth_result);
+    
     if (!auth_result.success) {
       return NextResponse.json({ error: '认证失败' }, { status: 401 });
+    }
+
+    if (!auth_result.user) {
+      console.error('认证成功但用户信息为空:', auth_result);
+      return NextResponse.json({ error: '用户信息获取失败' }, { status: 401 });
     }
 
     const user_id = auth_result.user.user_id;
@@ -27,7 +34,7 @@ export async function POST(request) {
     // 检查users表结构，确保有必要的字段
     try {
       const columns = await db.query('SHOW COLUMNS FROM users');
-      const hasExpiresAt = columns.some(col => col.Field === 'membership_expires_at');
+      const hasExpiresAt = columns && columns.some(col => col.Field === 'membership_expires_at');
       
       if (!hasExpiresAt) {
         // 添加membership_expires_at字段
@@ -43,7 +50,7 @@ export async function POST(request) {
 
     // 更新用户会员状态
     try {
-      await db.query(`
+      const updateResult = await db.query(`
         UPDATE users 
         SET membership_type = ?, membership_expires_at = ?
         WHERE user_id = ?
@@ -52,12 +59,12 @@ export async function POST(request) {
       console.log(`✅ 用户 ${user_id} 会员状态更新成功`);
 
       // 获取更新后的用户信息
-      const [updatedUsers] = await db.query(
+      const updatedUsers = await db.query(
         'SELECT user_id, phone_number, nickname, membership_type, membership_expires_at FROM users WHERE user_id = ?',
         [user_id]
       );
 
-      if (updatedUsers.length === 0) {
+      if (!updatedUsers || updatedUsers.length === 0) {
         throw new Error('用户不存在');
       }
 
@@ -80,7 +87,7 @@ export async function POST(request) {
       console.error('数据库更新失败:', dbError);
       return NextResponse.json({
         error: '数据库更新失败',
-        details: dbError.message
+        details: dbError?.message || '未知错误'
       }, { status: 500 });
     }
 

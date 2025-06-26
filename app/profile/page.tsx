@@ -5,13 +5,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Settings, BookOpen, Star, Calendar, FileText, Lock } from "lucide-react"
+import { Settings, BookOpen, Star, Lock } from "lucide-react"
 import { Footer } from "@/components/footer"
 import { UserInfoCard } from "@/components/profile/user-info-card"
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [user, setUser] = useState(null);
   const [membershipData, setMembershipData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -45,7 +46,8 @@ export default function ProfilePage() {
             phone: membershipInfo.user.phone_number,
             avatar: membershipInfo.user.avatar_url || "/placeholder.svg?height=96&width=96",
             membershipStatus: membershipInfo.membership.type,
-            membershipExpiry: membershipInfo.membership.expiresAt ? new Date(membershipInfo.membership.expiresAt) : undefined
+            membershipExpiry: membershipInfo.membership.expiresAt ? new Date(membershipInfo.membership.expiresAt) : undefined,
+            isActive: membershipInfo.membership.isActive
           });
           setMembershipData(membershipInfo);
         } else {
@@ -62,44 +64,14 @@ export default function ProfilePage() {
     fetchMembershipStatus();
   }, []);
 
-  // 处理升级会员
-  const handleUpgrade = async () => {
-    try {
-      // 简单的临时升级功能（开发阶段）
-      const authToken = localStorage.getItem('auth_token');
-      if (!authToken) {
-        alert('请先登录');
-        return;
-      }
-
-      const confirmed = confirm('确定要升级为付费会员吗？\n\n在开发阶段，这将直接升级您的账户。\n实际产品中这里会跳转到支付页面。');
-      
-      if (confirmed) {
-        // 这里应该调用支付API，但现在我们直接升级用户
-        const response = await fetch('/api/membership/purchase', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${authToken}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            plan: 'monthly',
-            payment_method: 'test'
-          })
-        });
-
-        const data = await response.json();
-        
-        if (data.success) {
-          alert('升级成功！正在刷新页面...');
-          window.location.reload();
-        } else {
-          alert(`升级失败: ${data.message}`);
-        }
-      }
-    } catch (error) {
-      console.error('升级失败:', error);
-      alert('升级过程中出现错误，请稍后重试');
+  // 处理升级/续费会员
+  const handleUpgrade = (planId = null) => {
+    // 如果指定了套餐ID，则直接跳转到对应的支付页面
+    if (planId) {
+      router.push(`/membership/purchase?plan=${planId}`);
+    } else {
+      // 否则跳转到套餐选择页面
+      router.push('/membership/purchase');
     }
   };
 
@@ -157,48 +129,6 @@ export default function ProfilePage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="md:col-span-1 space-y-6">
               <UserInfoCard user={user} onUpgrade={handleUpgrade} />
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">学习统计</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span>总学习时长</span>
-                      <span className="font-medium">42小时</span>
-                    </div>
-                    <Progress value={42} className="h-2" />
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span>总做题数</span>
-                      <span className="font-medium">156题</span>
-                    </div>
-                    <Progress value={30} className="h-2" />
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span>正确率</span>
-                      <span className="font-medium">78%</span>
-                    </div>
-                    <Progress value={78} className="h-2" />
-                  </div>
-
-                  <div className="pt-2 grid grid-cols-2 gap-2">
-                    <div className="bg-gray-50 p-2 rounded text-center">
-                      <div className="text-lg font-semibold text-primary">14天</div>
-                      <div className="text-xs text-gray-500">连续学习</div>
-                    </div>
-                    <div className="bg-gray-50 p-2 rounded text-center">
-                      <div className="text-lg font-semibold text-primary">3.5h</div>
-                      <div className="text-xs text-gray-500">今日学习</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
 
             <div className="md:col-span-3">
@@ -224,11 +154,27 @@ export default function ProfilePage() {
                       <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                         <div>
                           <h3 className="font-medium">当前状态</h3>
-                          <p className="text-sm text-gray-500">免费用户</p>
+                          <p className="text-sm text-gray-500">
+                            {user?.membershipStatus === 'paid' && user?.isActive ? '付费会员' : '免费用户'}
+                          </p>
+                          {user?.membershipExpiry && (
+                            <p className="text-xs text-gray-400">
+                              到期时间：{user.membershipExpiry.toLocaleDateString()}
+                            </p>
+                          )}
                         </div>
-                        <Badge variant="outline">
-                          <Lock className="h-3 w-3 mr-1" />
-                          功能受限
+                        <Badge variant={user?.membershipStatus === 'paid' && user?.isActive ? 'default' : 'outline'}>
+                          {user?.membershipStatus === 'paid' && user?.isActive ? (
+                            <>
+                              <Star className="h-3 w-3 mr-1" />
+                              会员权益
+                            </>
+                          ) : (
+                            <>
+                              <Lock className="h-3 w-3 mr-1" />
+                              功能受限
+                            </>
+                          )}
                         </Badge>
                       </div>
 
@@ -315,7 +261,12 @@ export default function ProfilePage() {
                             </div>
                           </CardContent>
                           <CardFooter>
-                            <Button className="w-full">立即开通</Button>
+                            <Button 
+                              className="w-full" 
+                              onClick={() => handleUpgrade('1month')}
+                            >
+                              {user?.membershipStatus === 'paid' && user?.isActive ? '续费会员' : '立即开通'}
+                            </Button>
                           </CardFooter>
                         </Card>
 
@@ -422,146 +373,17 @@ export default function ProfilePage() {
                             </div>
                           </CardContent>
                           <CardFooter>
-                            <Button className="w-full">立即开通</Button>
+                            <Button 
+                              className="w-full" 
+                              onClick={() => handleUpgrade('3month')}
+                            >
+                              {user?.membershipStatus === 'paid' && user?.isActive ? '续费会员' : '立即开通'}
+                            </Button>
                           </CardFooter>
                         </Card>
                       </div>
                     </CardContent>
                   </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>学习计划</CardTitle>
-                      <CardDescription>查看您的学习进度和计划</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                        <div>
-                          <h3 className="font-medium">距离法考</h3>
-                          <p className="text-sm text-gray-500">2025年9月</p>
-                        </div>
-                        <Badge variant="outline">
-                          <Calendar className="h-3 w-3 mr-1" />
-                          还有120天
-                        </Badge>
-                      </div>
-
-                      <div>
-                        <h3 className="font-medium mb-3">学科进度</h3>
-                        <div className="space-y-3">
-                          <div>
-                            <div className="flex justify-between text-sm mb-1">
-                              <span>民法</span>
-                              <span className="font-medium">45%</span>
-                            </div>
-                            <Progress value={45} className="h-2" />
-                          </div>
-                          <div>
-                            <div className="flex justify-between text-sm mb-1">
-                              <span>刑法</span>
-                              <span className="font-medium">30%</span>
-                            </div>
-                            <Progress value={30} className="h-2" />
-                          </div>
-                          <div>
-                            <div className="flex justify-between text-sm mb-1">
-                              <span>民事诉讼法</span>
-                              <span className="font-medium">20%</span>
-                            </div>
-                            <Progress value={20} className="h-2" />
-                          </div>
-                          <div>
-                            <div className="flex justify-between text-sm mb-1">
-                              <span>刑事诉讼法</span>
-                              <span className="font-medium">15%</span>
-                            </div>
-                            <Progress value={15} className="h-2" />
-                          </div>
-                        </div>
-                      </div>
-
-                      <Button className="w-full">
-                        <Lock className="h-4 w-4 mr-2" />
-                        查看完整学习计划（会员功能）
-                      </Button>
-                    </CardContent>
-                  </Card>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center">
-                          <Star className="h-5 w-5 mr-2 text-yellow-400" />
-                          我的收藏
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-3">
-                          <div className="p-3 bg-gray-50 rounded-lg">
-                            <div className="flex items-center justify-between mb-1">
-                              <Badge variant="outline">民法</Badge>
-                              <Badge variant="secondary">单选题</Badge>
-                            </div>
-                            <p className="text-sm line-clamp-2">
-                              根据《民法典》规定，下列关于民事法律行为有效要件的说法，正确的是：
-                            </p>
-                          </div>
-                          <div className="p-3 bg-gray-50 rounded-lg">
-                            <div className="flex items-center justify-between mb-1">
-                              <Badge variant="outline">民事诉讼法</Badge>
-                              <Badge variant="secondary">单选题</Badge>
-                            </div>
-                            <p className="text-sm line-clamp-2">关于民事诉讼中的管辖权，下列说法正确的是：</p>
-                          </div>
-                        </div>
-                      </CardContent>
-                      <CardFooter>
-                        <Button variant="outline" className="w-full">
-                          查看全部收藏
-                        </Button>
-                      </CardFooter>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center">
-                          <FileText className="h-5 w-5 mr-2 text-primary" />
-                          我的笔记
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-3">
-                          <div className="p-3 bg-gray-50 rounded-lg">
-                            <div className="flex items-center justify-between mb-1">
-                              <h4 className="font-medium text-sm">民事法律行为的有效要件</h4>
-                              <Badge variant="outline">民法</Badge>
-                            </div>
-                            <p className="text-xs text-gray-500 mb-1">2025-05-10 更新</p>
-                            <p className="text-sm line-clamp-2">
-                              民事法律行为应当具备下列条件：1. 行为人具有相应的民事行为能力；2. 意思表示真实；3.
-                              不违反法律、行政法规的强制性规定，不违背公序良俗。
-                            </p>
-                          </div>
-                          <div className="p-3 bg-gray-50 rounded-lg">
-                            <div className="flex items-center justify-between mb-1">
-                              <h4 className="font-medium text-sm">刑法中的正当防卫</h4>
-                              <Badge variant="outline">刑法</Badge>
-                            </div>
-                            <p className="text-xs text-gray-500 mb-1">2025-05-09 更新</p>
-                            <p className="text-sm line-clamp-2">
-                              正当防卫的构成要件：1. 有不法侵害存在 2. 防卫行为针对不法侵害人 3.
-                              防卫行为没有明显超过必要限度
-                            </p>
-                          </div>
-                        </div>
-                      </CardContent>
-                      <CardFooter>
-                        <Button variant="outline" className="w-full">
-                          查看全部笔记
-                        </Button>
-                      </CardFooter>
-                    </Card>
-                  </div>
                 </TabsContent>
 
                 <TabsContent value="settings">

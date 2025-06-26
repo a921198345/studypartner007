@@ -230,7 +230,7 @@ export default function QuestionPage() {
   }, []);
 
   // 初始化导航的方法
-  const initializeNavigation = useCallback(() => {
+  const initializeNavigation = useCallback(async () => {
     if (navigationInitializedRef.current) return;
     
     try {
@@ -353,13 +353,39 @@ export default function QuestionPage() {
           }
         }
       } else {
-        console.log("没有筛选后的题目列表或列表为空，从API获取完整题目列表用于导航");
-        // 直接从API获取完整的题目列表用于导航
+        console.log("没有筛选后的题目列表或列表为空，从API获取题目列表用于导航");
+        // 尝试从URL参数恢复筛选条件
+        const yearFromUrl = searchParams.get('years');
+        const subjectFromUrl = searchParams.get('subject');
+        const typeFromUrl = searchParams.get('type');
+        
+        // 构建API请求参数
+        const apiParams: any = { 
+          fetchAllIdsAndCodes: true,
+          limit: 1000 // 确保能获取所有题目
+        };
+        
+        // 如果URL中有年份参数，添加到请求中
+        if (yearFromUrl && yearFromUrl !== 'all') {
+          apiParams.year = yearFromUrl;
+          console.log(`从URL恢复年份筛选: ${yearFromUrl}`);
+        }
+        
+        // 如果URL中有科目参数，添加到请求中
+        if (subjectFromUrl && subjectFromUrl !== 'all') {
+          apiParams.subject = subjectFromUrl;
+          console.log(`从URL恢复科目筛选: ${subjectFromUrl}`);
+        }
+        
+        // 如果URL中有题型参数，添加到请求中
+        if (typeFromUrl && typeFromUrl !== '全部题型') {
+          apiParams.question_type = typeFromUrl;
+          console.log(`从URL恢复题型筛选: ${typeFromUrl}`);
+        }
+        
+        // 直接从API获取筛选后的题目列表用于导航
         try {
-          const response = await questionApi.getQuestions({ 
-            fetchAllIdsAndCodes: true,
-            limit: 1000 // 确保能获取所有题目
-          });
+          const response = await questionApi.getQuestions(apiParams);
           
           if (response.success && response.data && response.data.questions) {
             console.log(`从API获取完整题目列表用于导航，共${response.data.questions.length}题`);
@@ -441,8 +467,16 @@ export default function QuestionPage() {
       }
       
       setFilteredQuestions(questionsToDisplay);
-      setFilteredTotalCount(questionsToDisplay.length); // 关键：确保显示的总数与实际列表长度一致
-      console.log(`导航初始化完成: 共 ${questionsToDisplay.length} 题可导航, 当前题目索引: ${currentIndex}`);
+      // 修复：优先使用filteredData中的actualTotal，如果没有则使用questions数组长度
+      let totalCount = questionsToDisplay.length;
+      if (filteredData && filteredData.actualTotal) {
+        totalCount = filteredData.actualTotal;
+      } else if (filteredData && filteredData.questions && filteredData.questions.length > 0) {
+        totalCount = filteredData.questions.length;
+      }
+      
+      setFilteredTotalCount(totalCount); // 使用实际总数
+      console.log(`导航初始化完成: 实际共 ${totalCount} 题, 可导航列表 ${questionsToDisplay.length} 题, 当前题目索引: ${currentIndex}`);
 
       if (currentIndex !== -1) {
         setCurrentQuestionIndex(currentIndex);
@@ -606,7 +640,7 @@ export default function QuestionPage() {
       }
       
       await fetchTotalQuestions(); // 先获取全局总数
-      initializeNavigation();     // 然后用这个总数（如果需要）初始化导航
+      await initializeNavigation();     // 然后用这个总数（如果需要）初始化导航
       
       fetchAnswerHistory().catch(err => {
         console.log("获取答题历史出错，但页面将继续加载", err);
@@ -1782,7 +1816,7 @@ export default function QuestionPage() {
   }, [searchParams]);
   
   // 添加一个通用的导航刷新函数，可以在任何地方调用
-  const refreshNavigation = useCallback(() => {
+  const refreshNavigation = useCallback(async () => {
     console.log("手动刷新导航组件");
     // 对于错题页面，只刷新导航按钮的渲染，不重新初始化（避免清空状态）
     const source = searchParams.get('source');
@@ -1793,7 +1827,7 @@ export default function QuestionPage() {
     } else {
       // 普通页面：完整的导航刷新
       navigationInitializedRef.current = false;
-      initializeNavigation();
+      await initializeNavigation();
       setNavigationRefreshTrigger(prev => prev + 1);
     }
   }, [initializeNavigation, searchParams]);

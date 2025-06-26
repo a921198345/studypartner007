@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
 import { isPreciseLegalTerm, filterRelevantQuestions, sortQuestionsByRelevance } from '@/lib/search-utils';
+import { getUserFromRequest } from '@/lib/auth-middleware';
 
 // 简单测试连接函数
 async function testConnection() {
@@ -28,6 +29,12 @@ export async function GET(request) {
         message: "无法连接到数据库，请检查数据库配置"
       }, { status: 500 });
     }
+    
+    // 获取用户信息
+    const user = getUserFromRequest(request);
+    const isAuthenticated = !!user;
+    const valid_member_types = ['active_member', 'premium', 'vip', 'paid'];
+    const isMember = valid_member_types.includes(user?.membership_type) || user?.membership_type === 'admin';
     
     // 获取查询参数
     const { searchParams } = new URL(request.url);
@@ -99,19 +106,39 @@ export async function GET(request) {
     
     // 处理年份参数
     if (yearParam) {
-      // 检查是否有多个年份（逗号分隔）
-      if (yearParam.includes(',')) {
-        const years = yearParam.split(',').map(y => y.trim()).filter(Boolean);
-        if (years.length > 0) {
-          const placeholders = years.map(() => '?').join(',');
-          conditions.push(`year IN (${placeholders})`);
-          params.push(...years);
-        }
+      console.log(`处理年份参数: ${yearParam}, 用户会员状态: ${isMember}, 用户信息:`, user);
+      
+      // 如果用户未登录或不是会员，只能查看2022年的题目
+      if (!isMember) {
+        // 非会员用户无论选择什么年份，都强制限制为2022年
+        console.log('非会员用户，强制查询2022年题目');
+        conditions.push('year = ?');
+        params.push('2022');
       } else {
-        // 单个年份
-      conditions.push('year = ?');
-        params.push(yearParam);
+        // 会员可以查看所有年份
+        console.log('会员用户，允许查询指定年份');
+        // 检查是否有多个年份（逗号分隔）
+        if (yearParam.includes(',')) {
+          const years = yearParam.split(',').map(y => y.trim()).filter(Boolean);
+          if (years.length > 0) {
+            const placeholders = years.map(() => '?').join(',');
+            conditions.push(`year IN (${placeholders})`);
+            params.push(...years);
+          }
+        } else {
+          // 单个年份
+          conditions.push('year = ?');
+          params.push(yearParam);
+        }
       }
+    } else {
+      // 如果没有指定年份参数
+      if (!isMember) {
+        // 非会员默认只能看2022年
+        conditions.push('year = ?');
+        params.push('2022');
+      }
+      // 会员不添加年份限制，可以看所有年份
     }
     
     // 处理题目类型参数

@@ -2,13 +2,22 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { pool } from '@/lib/db';
+import { getUserFromRequest } from '@/lib/auth-middleware';
 
 // 处理GET请求 - 获取单个题目详情
 export async function GET(request, { params }) {
-  console.log("获取题目详情");
+  console.log("获取题目详情，题目ID:", params.question_id);
 
   try {
     const questionId = params.question_id;
+    
+    // 获取用户信息进行权限检查
+    const user = getUserFromRequest(request);
+    const valid_member_types = ['active_member', 'premium', 'vip', 'paid'];
+    const isMember = valid_member_types.includes(user?.membership_type) || user?.membership_type === 'admin';
+    
+    console.log("权限检查 - 用户信息:", user ? {id: user.user_id, type: user.membership_type} : 'null');
+    console.log("权限检查 - 是否会员:", isMember);
     
     // 获取会话信息，用于检查收藏状态
     const session = await getServerSession(authOptions);
@@ -43,6 +52,18 @@ export async function GET(request, { params }) {
           { status: 404 }
         );
       }
+      
+      const questionData = question[0];
+      
+      // 检查权限：非会员只能查看2022年的题目
+      console.log("题目年份:", questionData.year, "用户是否会员:", isMember);
+      if (!isMember && questionData.year !== '2022') {
+        console.log("权限拒绝：非会员用户尝试访问非2022年题目");
+        return NextResponse.json(
+          { success: false, message: "需要升级会员才能查看此题目" },
+          { status: 403 }
+        );
+      }
 
       // 查询用户是否收藏了该题目
       let isFavorite = false;
@@ -57,7 +78,6 @@ export async function GET(request, { params }) {
       }
       
       // 处理选项
-      const questionData = question[0];
       let options = [];
 
       try {
