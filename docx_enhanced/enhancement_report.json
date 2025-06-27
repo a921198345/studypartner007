@@ -1,0 +1,25 @@
+{
+  "total_questions": 96,
+  "real_questions_extracted": 96,
+  "coverage_rate": "100.0%",
+  "subjects": {
+    "民法": 28,
+    "刑法": 12,
+    "商经知": 22,
+    "理论法": 13,
+    "民事诉讼法": 12,
+    "刑事诉讼法": 3,
+    "行政法": 4,
+    "三国法": 2
+  },
+  "enhanced_files": [
+    "民法.docx",
+    "刑法.docx",
+    "商经知.docx",
+    "理论法.docx",
+    "民事诉讼法.docx",
+    "刑事诉讼法.docx",
+    "行政法.docx",
+    "三国法.docx"
+  ]
+}
