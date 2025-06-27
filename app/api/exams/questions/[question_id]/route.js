@@ -55,15 +55,10 @@ export async function GET(request, { params }) {
       
       const questionData = question[0];
       
-      // 检查权限：非会员只能查看2022年的题目
+      // 检查权限和标记会员专属内容
       console.log("题目年份:", questionData.year, "用户是否会员:", isMember);
-      if (!isMember && questionData.year !== '2022') {
-        console.log("权限拒绝：非会员用户尝试访问非2022年题目");
-        return NextResponse.json(
-          { success: false, message: "需要升级会员才能查看此题目" },
-          { status: 403 }
-        );
-      }
+      const memberOnly = !isMember && questionData.year !== '2022' && questionData.year !== 2022;
+      const accessible = isMember || questionData.year === '2022' || questionData.year === 2022;
 
       // 查询用户是否收藏了该题目
       let isFavorite = false;
@@ -145,7 +140,10 @@ export async function GET(request, { params }) {
           options: options,
           correct_answer: questionData.correct_answer,
           explanation: questionData.explanation_text || "暂无解析",
-          is_favorite: isFavorite
+          is_favorite: isFavorite,
+          // 为非会员用户标记非2022年题目为会员专属
+          memberOnly: memberOnly,
+          accessible: accessible
         }
       });
     } catch (error) {

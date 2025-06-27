@@ -108,28 +108,18 @@ export async function GET(request) {
     if (yearParam) {
       console.log(`处理年份参数: ${yearParam}, 用户会员状态: ${isMember}, 用户信息:`, user);
       
-      // 如果用户未登录或不是会员，只能查看2022年的题目
-      if (!isMember) {
-        // 非会员用户无论选择什么年份，都强制限制为2022年
-        console.log('非会员用户，强制查询2022年题目');
-        conditions.push('year = ?');
-        params.push('2022');
-      } else {
-        // 会员可以查看所有年份
-        console.log('会员用户，允许查询指定年份');
-        // 检查是否有多个年份（逗号分隔）
-        if (yearParam.includes(',')) {
-          const years = yearParam.split(',').map(y => y.trim()).filter(Boolean);
-          if (years.length > 0) {
-            const placeholders = years.map(() => '?').join(',');
-            conditions.push(`year IN (${placeholders})`);
-            params.push(...years);
-          }
-        } else {
-          // 单个年份
-          conditions.push('year = ?');
-          params.push(yearParam);
+      // 检查是否有多个年份（逗号分隔）
+      if (yearParam.includes(',')) {
+        const years = yearParam.split(',').map(y => y.trim()).filter(Boolean);
+        if (years.length > 0) {
+          const placeholders = years.map(() => '?').join(',');
+          conditions.push(`year IN (${placeholders})`);
+          params.push(...years);
         }
+      } else {
+        // 单个年份
+        conditions.push('year = ?');
+        params.push(yearParam);
       }
     } else {
       // 如果没有指定年份参数
@@ -239,7 +229,8 @@ export async function GET(request) {
         const allIdsQuery = `
           SELECT 
             id, 
-            question_code
+            question_code,
+            year
           FROM questions 
           ${whereClause} 
           ORDER BY id
@@ -252,16 +243,23 @@ export async function GET(request) {
         
         console.log(`查询到 ${allQuestions.length} 条记录，共 ${total} 条记录`);
         
+        // 为题目添加会员专属标记
+        const questionsWithAccess = allQuestions.map(q => ({
+          ...q,
+          memberOnly: !isMember && q.year !== '2022' && q.year !== 2022,
+          accessible: isMember || q.year === '2022' || q.year === 2022
+        }));
+        
         // 返回所有题目的ID和题号
         return NextResponse.json({
           success: true,
           data: {
-            questions: allQuestions,
+            questions: questionsWithAccess,
             pagination: {
               total: total,
               actualTotal: total,
               page: 1,
-              limit: allQuestions.length,
+              limit: questionsWithAccess.length,
               totalPages: 1
             }
           }
@@ -306,7 +304,11 @@ export async function GET(request) {
             ? JSON.parse(q.options_json) 
             : q.options_json,
           correct_answer: q.correct_answer,
-          explanation: q.explanation_text || "暂无解析"
+          explanation: q.explanation_text || "暂无解析",
+          // 为非会员用户标记非2022年题目为会员专属
+          memberOnly: !isMember && q.year !== '2022' && q.year !== 2022,
+          // 添加题目是否可访问的标记
+          accessible: isMember || q.year === '2022' || q.year === 2022
         }));
         
         // 暂时禁用二次筛选，保持与多关键词搜索API一致

@@ -61,8 +61,8 @@ export async function POST(request) {
     
     try {
       // 基础查询条件
-      let baseConditions = ['year IN (?)'];
-      let baseParams = [allowed_year];
+      let baseConditions = [`year IN (${allowed_year.map(() => '?').join(',')})`];
+      let baseParams = [...allowed_year];
       
       if (subject && subject !== 'all') {
         baseConditions.push('subject = ?');
@@ -70,11 +70,9 @@ export async function POST(request) {
       }
       
       if (questionType) {
-        if (questionType === '单选题') {
-          baseConditions.push('JSON_LENGTH(options_json) <= 4');
-        } else if (questionType === '多选题') {
-          baseConditions.push('JSON_LENGTH(options_json) > 4');
-        }
+        // MySQL 5.7兼容性：使用question_type字段而不是JSON_LENGTH
+        baseConditions.push('question_type = ?');
+        baseParams.push(questionType);
       }
       
       // 构建关键词搜索条件
@@ -114,7 +112,7 @@ export async function POST(request) {
       // 查询总数
       const countQuery = `
         SELECT COUNT(*) as total 
-        FROM exam_questions 
+        FROM questions 
         WHERE ${whereClause}
       `;
       
@@ -129,9 +127,9 @@ export async function POST(request) {
       
       // 查询题目
       const query = `
-        SELECT * FROM exam_questions 
+        SELECT * FROM questions 
         WHERE ${whereClause}
-        ORDER BY question_number ASC
+        ORDER BY id ASC
         LIMIT ? OFFSET ?
       `;
       
@@ -175,10 +173,15 @@ export async function POST(request) {
     
   } catch (error) {
     console.error('公开搜索API错误:', error);
+    console.error('错误堆栈:', error.stack);
     return NextResponse.json({
       success: false,
       message: "搜索失败，请稍后再试",
-      error: error.message
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      debug: process.env.NODE_ENV === 'development' ? {
+        message: error.message,
+        stack: error.stack
+      } : undefined
     }, { status: 500 });
   }
 }

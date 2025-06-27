@@ -108,10 +108,10 @@ export default function QuestionBankPage() {
   const [isFromAiChat, setIsFromAiChat] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false) // 添加初始化标志
   
-  // 简化初始化逻辑 - 始终默认为"全部"
+  // 简化初始化逻辑 - 默认显示2022年全部题目
   const [selectedQuestionTypes, setSelectedQuestionTypes] = useState<string[]>(["全部题型"])
   const [selectedSubject, setSelectedSubject] = useState("all")
-  const [selectedYears, setSelectedYears] = useState<string[]>(["all"])
+  const [selectedYears, setSelectedYears] = useState<string[]>(["2022"])
   
   // 检查URL参数并设置初始学科
   useEffect(() => {
@@ -285,32 +285,43 @@ export default function QuestionBankPage() {
         duration: 4000,
       })
     } else if (typeof window !== 'undefined') {
-      // 尝试恢复之前的AI搜索关键词
-      const savedKeywords = sessionStorage.getItem('aiKeywords')
-      if (savedKeywords) {
-        try {
-          const keywords = JSON.parse(savedKeywords)
-          if (Array.isArray(keywords) && keywords.length > 0) {
-            // 清理关键词函数：去除序号、括号等格式标记（防止sessionStorage中有旧数据）
-            const cleanKeyword = (keyword: string) => {
-              return keyword
-                .replace(/[（）()【】\[\]]/g, '') // 去除括号
-                .replace(/[0-9]+[、\.]/g, '') // 去除序号
-                .replace(/第[一二三四五六七八九十\d]+[章节条]/g, '') // 去除章节号
-                .trim()
-            };
-            
-            // 清理恢复的关键词
-            const cleanedKeywords = keywords.map(cleanKeyword).filter(k => k.length > 0)
-            setAiKeywords(cleanedKeywords)
-            setIsFromAiChat(true)
-            
-            // 更新sessionStorage为清理后的关键词
-            sessionStorage.setItem('aiKeywords', JSON.stringify(cleanedKeywords))
+      // 只有当有明确的source参数时才恢复AI搜索关键词
+      // 直接访问页面时不应该恢复之前的搜索状态
+      const source = searchParams.get('source')
+      if (source === 'ai-chat' || source === 'knowledge-map') {
+        // 尝试恢复之前的AI搜索关键词
+        const savedKeywords = sessionStorage.getItem('aiKeywords')
+        if (savedKeywords) {
+          try {
+            const keywords = JSON.parse(savedKeywords)
+            if (Array.isArray(keywords) && keywords.length > 0) {
+              // 清理关键词函数：去除序号、括号等格式标记（防止sessionStorage中有旧数据）
+              const cleanKeyword = (keyword: string) => {
+                return keyword
+                  .replace(/[（）()【】\[\]]/g, '') // 去除括号
+                  .replace(/[0-9]+[、\.]/g, '') // 去除序号
+                  .replace(/第[一二三四五六七八九十\d]+[章节条]/g, '') // 去除章节号
+                  .trim()
+              };
+              
+              // 清理恢复的关键词
+              const cleanedKeywords = keywords.map(cleanKeyword).filter(k => k.length > 0)
+              setAiKeywords(cleanedKeywords)
+              setIsFromAiChat(true)
+              
+              // 更新sessionStorage为清理后的关键词
+              sessionStorage.setItem('aiKeywords', JSON.stringify(cleanedKeywords))
+            }
+          } catch (e) {
+            console.error('恢复AI关键词失败:', e)
           }
-        } catch (e) {
-          console.error('恢复AI关键词失败:', e)
         }
+      } else {
+        // 直接访问页面时，清除之前的AI搜索状态
+        console.log('直接访问页面，清除AI搜索状态')
+        sessionStorage.removeItem('aiKeywords')
+        setAiKeywords([])
+        setIsFromAiChat(false)
       }
     }
     
@@ -1846,10 +1857,19 @@ export default function QuestionBankPage() {
                       {questions.map((question) => (
                         <div 
                           key={question.id}
-                          className={`cursor-pointer ${isFetchingAllIds ? 'opacity-50 pointer-events-none' : ''}`}
+                          className={`cursor-pointer ${isFetchingAllIds ? 'opacity-50 pointer-events-none' : ''} ${question.memberOnly ? 'opacity-75' : ''}`}
                           onClick={() => {
                             if (!isFetchingAllIds) {
-                              handleQuestionClick(question.id)
+                              if (question.memberOnly) {
+                                // 显示升级会员提示
+                                toast({
+                                  title: "需要升级会员",
+                                  description: `查看${question.year}年真题需要升级为会员`,
+                                  duration: 3000,
+                                });
+                              } else {
+                                handleQuestionClick(question.id)
+                              }
                             }
                           }}
                         >
@@ -1861,7 +1881,7 @@ export default function QuestionBankPage() {
                                     <Badge variant="outline">{question.year}</Badge>
                                   )}
                                   
-                                  {question.year && !['2022'].includes(String(question.year)) && (
+                                  {question.memberOnly && (
                                     <Badge variant="outline" className="bg-yellow-50">
                                       <Lock className="h-3 w-3 mr-1" />
                                       会员
