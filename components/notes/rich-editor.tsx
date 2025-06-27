@@ -6,7 +6,7 @@ import Underline from '@tiptap/extension-underline'
 import TextStyle from '@tiptap/extension-text-style'
 import { Color } from '@tiptap/extension-color'
 import Placeholder from '@tiptap/extension-placeholder'
-import { Button } from "@/components/ui/button"
+import { Button } from "../ui/button"
 import {
   Bold,
   Italic,
@@ -24,14 +24,14 @@ import {
 import {
   ToggleGroup,
   ToggleGroupItem,
-} from "@/components/ui/toggle-group"
+} from "../ui/toggle-group"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "../ui/select"
 
 interface RichEditorProps {
   value: string

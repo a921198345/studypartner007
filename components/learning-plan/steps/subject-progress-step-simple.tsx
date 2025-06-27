@@ -1,11 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
+import { Button } from "../../ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../ui/card"
+import { RadioGroup, RadioGroupItem } from "../../ui/radio-group"
+import { Label } from "../../ui/label"
+import { Badge } from "../../ui/badge"
 import { CheckCircle2, Circle, PlayCircle, BookOpen } from "lucide-react"
 import { StudyPlanFormData, SUBJECTS } from "../study-plan-wizard-v2"
 

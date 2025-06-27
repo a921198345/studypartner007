@@ -1,12 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { Card, CardContent } from "../ui/card"
+import { Button } from "../ui/button"
+import { ScrollArea } from "../ui/scroll-area"
 import { Clock, RefreshCw, Play, ChevronRight, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { addClientSessionHeader } from "@/lib/client-session"
+import { addClientSessionHeader } from "../../lib/client-session"
 
 interface AnswerSession {
   sessionId: string
@@ -335,7 +335,7 @@ export function AnswerHistoryV2() {
       }))
     }
     
-    const { createAnswerSession } = require('@/lib/answer-sessions')
+    const { createAnswerSession } = require('../../lib/answer-sessions')
     createAnswerSession(session.filters)
     
     router.push(`/question-bank/1`)

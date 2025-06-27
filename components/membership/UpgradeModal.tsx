@@ -1,9 +1,9 @@
 'use client';
 
 import React from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
 import { X, Crown, Check, Zap, BookOpen, Globe, FileText, Clock } from 'lucide-react';
 
 interface UpgradeModalProps {

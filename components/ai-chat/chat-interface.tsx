@@ -3,11 +3,11 @@
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
+import { Button } from "../ui/button"
+import { Textarea } from "../ui/textarea"
 import { Send, ImageIcon, Loader2 } from "lucide-react"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar"
+import { Badge } from "../ui/badge"
 import { ChatMessage } from "./chat-message"
 import { RelatedResources } from "./related-resources"
 

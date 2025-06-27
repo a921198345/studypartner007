@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { useAuth } from '@/hooks/useAuth'
-import { Button } from '@/components/ui/button'
+import { useAuth } from '../../hooks/useAuth'
+import { Button } from '../ui/button'
 import {
   Dialog,
   DialogContent,
@@ -11,7 +11,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+} from "../ui/dialog"
 
 interface DelayedAuthGuardProps {
   children: (props: {

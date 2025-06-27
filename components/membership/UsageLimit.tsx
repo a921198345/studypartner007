@@ -1,9 +1,9 @@
 'use client';
 
 import React from 'react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription } from '../ui/alert';
+import { Button } from '../ui/button';
+import { Progress } from '../ui/progress';
 import { Crown, AlertTriangle, Zap, Clock } from 'lucide-react';
 
 interface UsageLimitProps {

@@ -4,11 +4,11 @@ import type React from "react"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { useAuth } from "@/hooks/useAuth"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
+import { useAuth } from "../../hooks/useAuth"
+import { Button } from "../ui/button"
+import { Input } from "../ui/input"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../ui/card"
+import { Label } from "../ui/label"
 import Link from "next/link"
 
 interface PhoneLoginProps {

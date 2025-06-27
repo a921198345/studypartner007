@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Modal } from 'antd';
 import { ExclamationCircleOutlined } from '@ant-design/icons';
-import { isAuthenticated } from '@/lib/auth-utils';
+import { isAuthenticated } from '../../lib/auth-utils';
 
 interface FirstUseAuthGuardProps {
   children: React.ReactNode;

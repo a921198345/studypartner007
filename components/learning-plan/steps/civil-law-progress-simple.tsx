@@ -1,11 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { Slider } from "@/components/ui/slider"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { Slider } from "../../ui/slider"
+import { Button } from "../../ui/button"
+import { Badge } from "../../ui/badge"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../ui/card"
+import { ScrollArea } from "../../ui/scroll-area"
 import { BookOpen, Target, ChevronDown, ChevronRight } from "lucide-react"
 
 // 简化的民法章节结构

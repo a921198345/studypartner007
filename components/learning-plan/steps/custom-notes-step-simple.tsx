@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../ui/card"
+import { Textarea } from "../../ui/textarea"
+import { Label } from "../../ui/label"
 import { PenTool } from "lucide-react"
 import { StudyPlanFormData } from "../study-plan-wizard-v2"
 

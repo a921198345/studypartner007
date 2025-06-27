@@ -3,12 +3,12 @@
 import type React from "react"
 
 import Link from "next/link"
-import { cn } from "@/lib/utils"
+import { cn } from "../lib/utils"
 import { usePathname } from "next/navigation"
 import { BookOpen, Brain, FileText, MessageCircle, User, Calendar } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { BookBuddyLogo5 } from "@/components/BookBuddyLogo5"
-import { useAuth } from "@/hooks/useAuth"
+import { Button } from "./ui/button"
+import { BookBuddyLogo5 } from "./BookBuddyLogo5"
+import { useAuth } from "../hooks/useAuth"
 
 export function MainNav({ className, ...props }: React.HTMLAttributes<HTMLElement>) {
   const pathname = usePathname()

@@ -1,12 +1,12 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { Slider } from "@/components/ui/slider"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Separator } from "@/components/ui/separator"
+import { Slider } from "../../ui/slider"
+import { Button } from "../../ui/button"
+import { Badge } from "../../ui/badge"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../ui/card"
+import { ScrollArea } from "../../ui/scroll-area"
+import { Separator } from "../../ui/separator"
 import { BookOpen, ChevronDown, ChevronRight, Target } from "lucide-react"
 import { CivilLawProgressUltimate } from "./civil-law-progress-ultimate"
 

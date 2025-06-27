@@ -7,12 +7,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+} from "../ui/dialog"
+import { Button } from "../ui/button"
+import { Badge } from "../ui/badge"
 import { Calendar, Edit, Printer, Share2 } from "lucide-react"
-import { useToast } from "@/components/ui/use-toast"
-import { Skeleton } from "@/components/ui/skeleton"
+import { useToast } from "../ui/use-toast"
+import { Skeleton } from "../ui/skeleton"
 
 interface Note {
   note_id: number

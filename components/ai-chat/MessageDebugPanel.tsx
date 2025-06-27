@@ -1,6 +1,6 @@
 "use client"
 
-import { useChatStore } from '@/hooks/useChatStore'
+import { useChatStore } from '../../hooks/useChatStore'
 import { useEffect, useState } from 'react'
 
 export function MessageDebugPanel({ 

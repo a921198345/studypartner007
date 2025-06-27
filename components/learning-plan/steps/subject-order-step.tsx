@@ -1,13 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Separator } from "@/components/ui/separator"
+import { Button } from "../../ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../ui/card"
+import { RadioGroup, RadioGroupItem } from "../../ui/radio-group"
+import { Label } from "../../ui/label"
+import { Badge } from "../../ui/badge"
+import { Alert, AlertDescription } from "../../ui/alert"
+import { Separator } from "../../ui/separator"
 import {
   DndContext,
   closestCenter,

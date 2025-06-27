@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-// import { useTypewriter } from '@/hooks/useTypewriter';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { cn } from "@/lib/utils";
+// import { useTypewriter } from '../../hooks/useTypewriter';
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import { cn } from "../../lib/utils";
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import remarkGfm from 'remark-gfm';

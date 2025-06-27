@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '../ui/badge';
 import { Clock } from 'lucide-react';
 
 interface RecentNode {

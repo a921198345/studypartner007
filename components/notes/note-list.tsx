@@ -1,11 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { Card, CardContent } from "../ui/card"
+import { Button } from "../ui/button"
+import { Badge } from "../ui/badge"
 import { Calendar, Edit, Trash2, AlertCircle } from "lucide-react"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "../ui/use-toast"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,8 +15,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Skeleton } from "@/components/ui/skeleton"
+} from "../ui/alert-dialog"
+import { Skeleton } from "../ui/skeleton"
 
 interface Note {
   note_id: number

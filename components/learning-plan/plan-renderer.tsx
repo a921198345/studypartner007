@@ -1,9 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Checkbox } from "../ui/checkbox"
+import { Button } from "../ui/button"
+import { Input } from "../ui/input"
 import { Trash2, Plus, Edit2, Save, X } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"

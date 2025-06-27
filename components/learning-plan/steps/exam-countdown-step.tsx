@@ -1,12 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Slider } from "@/components/ui/slider"
-import { Badge } from "@/components/ui/badge"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
+import { Button } from "../../ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../ui/card"
+import { Slider } from "../../ui/slider"
+import { Badge } from "../../ui/badge"
+import { Label } from "../../ui/label"
+import { Input } from "../../ui/input"
 import { Calendar, Clock, Target, AlertTriangle } from "lucide-react"
 import { StudyPlanFormData } from "../study-plan-wizard-v2"
 

@@ -1,10 +1,10 @@
 "use client"
 
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Progress } from "@/components/ui/progress"
+import { Button } from "../../ui/button"
+import { Badge } from "../../ui/badge"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../ui/card"
+import { ScrollArea } from "../../ui/scroll-area"
+import { Progress } from "../../ui/progress"
 import { BookOpen, Target, ChevronDown, ChevronRight, Clock, Award, BarChart3 } from "lucide-react"
 import { useState } from "react"
 import { 
@@ -15,7 +15,7 @@ import {
   getPartCompletionStatus,
   type Part,
   type Topic
-} from "@/lib/constants/civil-law-detailed"
+} from "../../../lib/constants/civil-law-detailed"
 
 interface CivilLawProgressDetailedProps {
   progress: number

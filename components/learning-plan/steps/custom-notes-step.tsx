@@ -1,14 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Separator } from "@/components/ui/separator"
+import { Button } from "../../ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../ui/card"
+import { Textarea } from "../../ui/textarea"
+import { Badge } from "../../ui/badge"
+import { Label } from "../../ui/label"
+import { Checkbox } from "../../ui/checkbox"
+import { RadioGroup, RadioGroupItem } from "../../ui/radio-group"
+import { Separator } from "../../ui/separator"
 import { 
   PenTool, 
   Target, 

@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Card } from "@/components/ui/card"
+import { Button } from "../ui/button"
+import { ScrollArea } from "../ui/scroll-area"
+import { Card } from "../ui/card"
 import { PlusCircle, MessageCircle, Trash2, Clock, AlertCircle } from "lucide-react"
 import { format } from "date-fns"
 import { zhCN } from "date-fns/locale"
@@ -16,7 +16,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+} from "../ui/alert-dialog"
 
 interface ConversationSidebarProps {
   currentConversationId?: string | null

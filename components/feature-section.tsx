@@ -1,6 +1,6 @@
 "use client"
 
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent } from "../ui/card"
 import { Brain, BookOpen, MessageCircle, Calendar, FileText, Zap } from "lucide-react"
 import { motion } from "framer-motion"
 

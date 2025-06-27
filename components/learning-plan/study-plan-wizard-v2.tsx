@@ -1,18 +1,18 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
+import { Button } from "../ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card"
+import { Progress } from "../ui/progress"
 import { ArrowRight, ArrowLeft, CheckCircle, AlertCircle, Loader2, RefreshCw } from "lucide-react"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Alert, AlertDescription } from "../ui/alert"
 import { SubjectProgressStep } from "./steps/subject-progress-step"
 import { SubjectOrderStep } from "./steps/subject-order-step"
 import { ExamCountdownStep } from "./steps/exam-countdown-step"
 import { CustomNotesStepSimple } from "./steps/custom-notes-step-simple"
 import { PlanPreviewSimple } from "./plan-preview-simple"
-import { useToast } from "@/components/ui/use-toast"
-// import { useStudyPlanPreferences } from "@/hooks/useStudyPlanPreferences" // 暂时注释掉，使用简化版本
+import { useToast } from "../ui/use-toast"
+// import { useStudyPlanPreferences } from "../../../hooks/useStudyPlanPreferences" // 暂时注释掉，使用简化版本
 
 // 步骤配置
 const STEPS = [

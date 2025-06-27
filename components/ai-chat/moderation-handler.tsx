@@ -6,7 +6,7 @@
 
 import React from "react";
 import { AlertCircle, Info } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 
 /**
  * 审核消息类型定义

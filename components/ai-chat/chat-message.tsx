@@ -1,6 +1,6 @@
 "use client"
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar"
 import type { Message } from "./chat-interface"
 import { ThumbsUp, ThumbsDown, MessageSquare } from "lucide-react"
 import { useState } from "react"

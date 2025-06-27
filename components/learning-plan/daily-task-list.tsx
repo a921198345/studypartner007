@@ -1,10 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Card, CardContent } from "../ui/card"
+import { Badge } from "../ui/badge"
+import { Button } from "../ui/button"
+import { Checkbox } from "../ui/checkbox"
 import { BookOpen, Brain, FileText, Calendar, Clock, CheckCircle } from "lucide-react"
 import Link from "next/link"
 

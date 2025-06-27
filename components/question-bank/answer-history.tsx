@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { Card, CardContent } from "../ui/card"
+import { Button } from "../ui/button"
+import { ScrollArea } from "../ui/scroll-area"
 import { Clock, RefreshCw, Play, ChevronRight } from "lucide-react"
 import { useRouter } from "next/navigation"
 
@@ -104,7 +104,7 @@ export function AnswerHistory() {
       
       if (sessions.length > 0 || currentSession || answerHistory) {
         // 调用迁移API
-        const { addClientSessionHeader } = await import('@/lib/client-session')
+        const { addClientSessionHeader } = await import('../../lib/client-session')
         const response = await fetch('/api/exams/sessions/migrate', {
           method: 'POST',
           headers: addClientSessionHeader({
@@ -135,7 +135,7 @@ export function AnswerHistory() {
     try {
       // 优先从数据库加载
       try {
-        const { addClientSessionHeader } = await import('@/lib/client-session')
+        const { addClientSessionHeader } = await import('../../lib/client-session')
         const response = await fetch('/api/exams/sessions', {
           headers: addClientSessionHeader()
         })
@@ -352,7 +352,7 @@ export function AnswerHistory() {
     }
     
     // 创建新会话
-    const { createAnswerSession } = require('@/lib/answer-sessions')
+    const { createAnswerSession } = require('../../lib/answer-sessions')
     const newSessionId = await createAnswerSession(session.filters)
     
     // 如果有筛选条件，传递到目标页面让其重新加载题目

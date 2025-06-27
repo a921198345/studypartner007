@@ -2,14 +2,14 @@
 
 import React from "react"
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { Button } from "../ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card"
+import { Badge } from "../ui/badge"
 import { Star, Brain, ArrowLeft, ArrowRight, Lock, CheckCircle, XCircle } from "lucide-react"
 import Link from "next/link"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "../ui/radio-group"
+import { Checkbox } from "../ui/checkbox"
+import { Label } from "../ui/label"
 
 interface QuestionDetailProps {
   question: {

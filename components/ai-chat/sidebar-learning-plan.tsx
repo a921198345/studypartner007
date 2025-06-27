@@ -1,13 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card"
+import { Badge } from "../ui/badge"
+import { Button } from "../ui/button"
 import { Calendar, Clock, Edit2, Plus } from "lucide-react"
 import Link from "next/link"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { EditPlanForm } from "@/components/learning-plan/edit-plan-form"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog"
+import { EditPlanForm } from "../../learning-plan/edit-plan-form"
 
 interface Task {
   id: string

@@ -1,13 +1,13 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Slider } from "@/components/ui/slider"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Separator } from "@/components/ui/separator"
-// import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Slider } from "../../ui/slider"
+import { Button } from "../../ui/button"
+import { Badge } from "../../ui/badge"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../ui/card"
+import { ScrollArea } from "../../ui/scroll-area"
+import { Separator } from "../../ui/separator"
+// import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../ui/collapsible"
 // 使用简化的展开收起逻辑替代 Collapsible 组件
 import { BookOpen, ChevronDown, ChevronRight, Target, CheckCircle2, Circle, PlayCircle } from "lucide-react"
 import { 
@@ -17,7 +17,7 @@ import {
   getCompletedSectionsByProgress,
   type Chapter,
   type Section 
-} from "@/lib/constants/civil-law-chapters"
+} from "../../../lib/constants/civil-law-chapters"
 
 interface CivilLawProgressSliderProps {
   progress: number

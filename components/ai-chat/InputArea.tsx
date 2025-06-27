@@ -2,9 +2,9 @@
 
 import React, { useState } from 'react';
 import { SendHorizontal, Loader2, Square } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/components/ui/use-toast';
+import { Button } from '../ui/button';
+import { Textarea } from '../ui/textarea';
+import { useToast } from '../ui/use-toast';
 
 interface InputAreaProps {
   onSendMessage: (text: string) => void;
