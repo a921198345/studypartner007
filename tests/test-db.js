@@ -2,7 +2,7 @@
  * 数据库和Question模型测试脚本
  */
 
-import { testConnection } from '../lib/db.js';
+import { testConnection } from '../lib/db';
 import Question from '../models/Question.js';
 
 async function testDatabase() {

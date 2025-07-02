@@ -71,6 +71,80 @@ wheels/
 .installed.cfg
 *.egg
 venv/
-venv_*/
+venv*/
 .venv data/vector_store.db
 data/vector_store.db
+
+# Environments
+.env
+.env*.local
+.venv
+venv/
+venv*/
+*.pyc
+__pycache__/
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Temporary files and scripts
+*.tmp
+*.temp
+*_temp.*
+*_tmp.*
+debug_*
+test_*
+temp_*
+tmp_*
+
+# Analysis and report files
+*_analysis.*
+*_report.*
+*_debug.*
+*_check.*
+*_summary.*
+*classification*.json
+*report*.html
+*report*.md
+*analysis*.md
+*debug*.md
+*fix*.md
+*solution*.md
+
+# Archived and backup files
+_archived_*/
+_backup_*/
+_temp_*/
+_old_*/
+backup_*/
+archived_*/
+
+# Document processing files
+docx_*/
+*.docx_*
+*_extracted_*
+*_processed_*
+merge_report*.json
+
+# Python temporary files
+*.py~
+*_temp.py
+*_test.py
+analyze_*.py
+classify_*.py
+debug_*.py
+check_*.py
+merge_*.py
+parse_*.py
+extract_*.py
+enhance_*.py
+verify_*.py

@@ -1,4 +1,4 @@
-import { query, queryOne, transaction } from '../lib/db.js';
+import { query, queryOne, transaction } from '../lib/db';
 
 class Question {
   /**

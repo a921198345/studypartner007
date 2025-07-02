@@ -1,3 +1,5 @@
+"use client"
+
 // 定义AI服务相关的接口和函数
 import { getAuthHeaders } from '@/lib/auth-utils'
 

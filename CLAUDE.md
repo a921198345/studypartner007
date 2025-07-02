@@ -2,159 +2,162 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+## 项目概述
 
-This is a Law Exam Assistant application (法考助手) built with Next.js 14, designed to help Chinese law students prepare for their legal qualification exams. The application uses AI-powered features to provide intelligent Q&A, knowledge maps, and exam practice.
+这是一个基于Next.js 14的法考助手应用，提供AI问答、知识导图、真题库、学习计划等功能。主要服务于法律职业资格考试的学习者。
 
-## Key Architecture
-
-### Tech Stack
-- **Frontend**: Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS
-- **UI Components**: Radix UI, Shadcn/ui components, Ant Design
-- **State Management**: Zustand for chat state, Redux for legacy features
-- **Backend**: Next.js API routes
-- **Database**: MySQL (via mysql2)
-- **AI Integration**: DeepSeek API for embeddings and chat
-- **Authentication**: NextAuth.js with JWT
-- **Deployment**: Configured for Baota Panel (宝塔面板) deployment
-
-### Project Structure
-- `/app` - Next.js 14 App Router pages and API routes
-- `/components` - Reusable UI components organized by feature
-- `/lib` - Core utilities, database connections, and API services
-- `/hooks` - Custom React hooks
-- `/public` - Static assets
-- `/scripts` - Database initialization and utility scripts
-
-## Development Commands
+## 开发命令
 
 ```bash
-# Install dependencies
-npm install
-
-# Start development server with API key
+# 开发模式
 npm run dev
 
-# Build for production
+# 构建生产版本  
 npm run build
 
-# Start production server
-npm start
+# 启动生产服务
+npm run start
 
-# Initialize database
-npm run init-db
+# 类型检查（如果有TypeScript）
+npm run type-check
 
-# Run database migrations
-npm run migrate
-
-# Seed test data
-npm run seed-data
-
-# Test authentication
-npm run test-auth
-
-# Lint code (errors ignored in build)
+# 代码检查
 npm run lint
 ```
 
-## Environment Configuration
+## 部署命令
 
-Create a `.env.local` file with:
-```env
-# DeepSeek API (required for AI features)
-DEEPSEEK_API_KEY=your_api_key_here
-DEEPSEEK_API_URL=https://api.openai.com/v1/embeddings
+```bash
+# 使用部署脚本
+bash deploy.sh
 
-# Database
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=law_user
-DB_PASSWORD=your_password
-DB_NAME=law_exam_assistant
-
-# NextAuth (for authentication)
-NEXTAUTH_SECRET=your_secret_here
-NEXTAUTH_URL=http://localhost:3000
+# 或手动部署
+npm run build
+pm2 restart law-exam-assistant
 ```
 
-## Critical Implementation Notes
+## 技术架构
 
-### MySQL 5.7.18 Compatibility
-- Avoid MySQL 8.0+ specific JSON functions
-- Handle JSON data in JavaScript, not database queries
-- Ensure binary data is properly converted to Buffer types
+### 核心技术栈
+- **前端**: Next.js 14 (App Router) + React 18
+- **UI**: shadcn/ui + Tailwind CSS + Ant Design  
+- **状态管理**: Redux Toolkit + Zustand
+- **数据库**: MySQL + SQLite (混合使用)
+- **AI服务**: DeepSeek API
+- **认证**: NextAuth.js + 阿里云短信验证
 
-### Cross-Origin & Deployment
-- All features must work both locally and on Baota Panel
-- Ensure CORS is properly configured for all API routes
-- Use absolute paths in production deployments
+### 关键目录结构
+```
+app/
+├── api/              # API路由层
+│   ├── admin/        # 管理员功能
+│   ├── ai/          # AI问答接口
+│   ├── auth/        # 认证相关
+│   ├── exams/       # 题库系统
+│   ├── mindmaps/    # 知识导图
+│   └── study-plan/  # 学习计划
+├── ai-chat/         # AI问答页面
+├── knowledge-map/   # 知识导图页面
+├── question-bank/   # 题库页面
+└── learning-plan/   # 学习计划页面
 
-### Coding Standards
-- Variable naming: Use underscore_case for variables
-- Path naming: Use lowercase with hyphens for routes
-- Always handle errors gracefully with user-friendly messages
-- Follow existing patterns in the codebase
+components/          # 共享组件
+lib/                # 工具库和配置
+db/                 # 数据库迁移文件
+data/               # 数据备份文件
+```
 
-### AI Chat Implementation
-The AI chat feature (`/app/ai-chat`) uses:
-- Streaming responses via Server-Sent Events
-- Message history stored in Zustand store
-- Keyword extraction for knowledge map integration
-- Save to notes functionality
+## 数据库架构
 
-### Question Bank System
-- Questions stored in MySQL with proper indexing
-- Support for multiple subjects (民法, 刑法, 行政法, etc.)
-- Answer history tracking per user session
-- Favorite questions functionality
+### 主要数据表
+- `questions` - 题目表，包含历年真题数据
+- `users` - 用户表，支持手机号注册
+- `mindmaps` - 知识导图数据表
+- `user_wrong_answers` - 用户错题记录
+- `user_favorites` - 用户收藏题目
+- `notes` - 学习笔记
+- `study_plans` - 个性化学习计划
 
-### Knowledge Map Integration
-- Mind maps use D3.js for visualization
-- Searchable nodes with keyword highlighting
-- Dynamic loading based on user permissions
-- Integration with AI chat for context-aware responses
+### 数据库连接
+- **统一使用MySQL数据库** (生产和开发环境)
+- 连接配置在`lib/db`，使用连接池管理
+- 环境变量配置：`DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_PORT`
 
-## Common Tasks
+## API设计模式
 
-### Adding a New API Route
-1. Create route file in `/app/api/[feature]/route.js`
-2. Use consistent error handling pattern
-3. Implement proper authentication checks
-4. Add CORS headers if needed
+### 认证中间件
+所有需要登录的API都应使用认证中间件：
+```javascript
+import { verifyToken } from '@/lib/auth';
+```
 
-### Working with the Database
-- Use connection pool from `/lib/db.js`
-- Always use parameterized queries
-- Handle connection errors gracefully
-- Use transactions for multi-step operations
+### 错误处理
+API应该返回统一的错误格式：
+```javascript
+return NextResponse.json({ error: 'Error message' }, { status: 400 });
+```
 
-### Debugging AI Features
-- Check DeepSeek API key is valid
-- Monitor API rate limits
-- Use mock embeddings for testing (see env.example)
-- Check `/lib/deepseek.js` for API integration
+## 开发注意事项
 
-### Deployment Checklist
-1. Update environment variables for production
-2. Run database migrations
-3. Build the application
-4. Test all features work cross-origin
-5. Verify Baota Panel nginx configuration
+### 状态管理策略
+- **统一使用Zustand进行状态管理**
+- 状态按功能模块拆分：
+  - `stores/user-store.ts` - 用户认证和会员信息
+  - `stores/study-plan-store.ts` - 学习计划管理
+  - `stores/study-session-store.ts` - 学习会话和进度跟踪
+  - `hooks/useChatStore.ts` - AI聊天对话状态
+- **已移除Redux依赖** - 项目不再使用Redux Toolkit
 
-## Known Issues & Solutions
+### 组件开发规范
+- **统一使用shadcn/ui组件库** + Tailwind CSS
+- **已移除Ant Design依赖** - 避免UI风格冲突
+- 自定义组件放在`components/`对应子目录
+- 页面级组件直接在app路由中定义
+- **Logo组件已统一** - 使用`StudyBuddyLogoSimple.tsx`
 
-### Streaming Response Issues
-- The app uses custom streaming implementation in `/app/api/ai/ask/stream/route.ts`
-- Ensure proper cleanup of event streams
-- Handle connection timeouts gracefully
+### 数据库操作
+- 使用预处理语句防止SQL注入
+- 错误查询应该有适当的错误处理
+- 注意MySQL和SQLite语法差异
 
-### Database Connection Timeouts
-- Connection timeout set to 30 seconds
-- Use connection pooling with limit of 10
-- Implement retry logic for critical operations
+### AI功能集成
+- AI问答使用DeepSeek API
+- API调用需要错误重试机制
+- 注意API调用频率限制
 
-### File Upload Handling
-- Question uploads support .docx format
-- Files are parsed using Python scripts
-- Temporary files stored in `/uploads` directory
-- Clean up temporary files after processing
+## 常见问题解决
+
+### 构建问题
+- 如果遇到路径别名问题，检查`next.config.mjs`配置
+- TypeScript错误优先检查`tsconfig.json`
+
+### 数据库连接问题
+- 检查环境变量配置
+- 确认数据库服务状态
+- 注意生产和开发环境数据库差异
+
+### 部署问题  
+- 确保PM2配置正确
+- 检查服务器权限和端口配置
+- 宝塔面板部署需要检查反向代理设置
+
+## 环境变量
+
+确保以下环境变量正确配置：
+- `DATABASE_URL` - 数据库连接字符串
+- `DEEPSEEK_API_KEY` - DeepSeek AI API密钥
+- `NEXTAUTH_SECRET` - NextAuth加密密钥
+- `ALIYUN_SMS_*` - 阿里云短信服务配置
+
+## 项目维护
+
+### 代码清理
+项目中存在大量临时文件和脚本，开发时应：
+- 定期清理`_archived_scripts/`目录
+- 删除不必要的调试文件
+- 统一文件命名规范（避免中文文件名）
+
+### 性能优化
+- 定期检查Bundle大小
+- 优化数据库查询
+- 实现适当的缓存策略

@@ -1,4 +1,4 @@
-import '../styles/globals.css';
+import './globals.css';
 import type { Metadata } from 'next';
 import { Toaster } from "@/components/ui/toaster";
 import { Providers } from './providers';

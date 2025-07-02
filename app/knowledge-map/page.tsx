@@ -15,7 +15,8 @@ import { Footer } from "@/components/footer"
 import { useFirstUseAuth } from '@/components/auth/first-use-auth-guard'
 import { useToast } from "@/components/ui/use-toast"
 import { SaveNoteButton } from "@/components/ai-chat/SaveNoteButton"
-import { useStudyPlan, useStudySession } from '@/stores/study-plan-store'
+import { useStudyPlanStore } from '@/stores/study-plan-store'
+import { useStudySessionStore } from '@/stores/study-session-store'
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 // 使用 dynamic import 避免 SSR 相关问题
@@ -67,8 +68,9 @@ export default function KnowledgeMapPage() {
   const [selectedSubjectName, setSelectedSubjectName] = useState(getSubjectName(urlSubject))
   
   // 学习计划集成
-  const { plan } = useStudyPlan()
-  const { isActive: isStudySessionActive, session, start: startStudySession, end: endStudySession } = useStudySession()
+  const { currentPlan: plan } = useStudyPlanStore()
+  const { activeSession: session, startStudySession, endStudySession } = useStudySessionStore()
+  const isStudySessionActive = !!session
   const [zoomLevel, setZoomLevel] = useState(1.0); // 添加缩放级别状态
   const [searchTerm, setSearchTerm] = useState(urlSearch); // 添加搜索词状态
   const [inputValue, setInputValue] = useState(''); // 从AI聊天跳转时不显示在搜索框

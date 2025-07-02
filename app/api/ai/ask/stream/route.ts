@@ -1,9 +1,9 @@
 import { NextRequest } from 'next/server';
-import { generateAnswerStream, buildPrompt } from '@/lib/deepseek.js';
-import { getTextEmbedding } from '@/lib/embeddings.js';
-import { searchVectorChunks, searchByKeywords } from '@/lib/vector-search.js';
-import { withAuth } from '@/lib/api-auth.js';
-import { checkAIUsageLimit, incrementAIUsage, logFeatureUsage } from '@/lib/membership-middleware.js';
+import { generateAnswerStream, buildPrompt } from '@/lib/deepseek';
+import { getTextEmbedding } from '@/lib/embeddings';
+import { searchVectorChunks, searchByKeywords } from '@/lib/vector-search';
+import { withAuth } from '@/lib/api-auth';
+import { checkAIUsageLimit, incrementAIUsage, logFeatureUsage } from '@/lib/membership-middleware';
 import { verifyAuth } from '@/lib/auth-middleware';
 
 // 设置能够流式响应的headers

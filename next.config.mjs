@@ -13,6 +13,9 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
   
+  // 禁用静态优化，避免预渲染问题
+  output: 'standalone',
+  
   experimental: {
     esmExternals: 'loose',
   },

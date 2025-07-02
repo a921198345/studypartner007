@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { generateAnswerStream, buildPrompt } from '@/lib/deepseek.js';
+import { generateAnswerStream, buildPrompt } from '@/lib/deepseek';
 
 export async function POST(req: NextRequest) {
   try {

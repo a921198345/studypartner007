@@ -17,7 +17,9 @@ import { AnswerHistoryV2 as AnswerHistory } from "@/components/question-bank/ans
 import { createAnswerSession } from "@/lib/answer-sessions"
 import { useToast } from "@/components/ui/use-toast"
 import { useFirstUseAuth } from '@/components/auth/first-use-auth-guard'
-import { useStudyPlan, useTodayProgress } from '@/stores/study-plan-store'
+import { useStudyPlanStore } from '@/stores/study-plan-store'
+import { useStudySessionStore } from '@/stores/study-session-store'
+import { useUserStore } from '@/stores/user-store'
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 // 辅助函数：比较两个数组是否内容相同（忽略顺序）
@@ -98,8 +100,11 @@ export default function QuestionBankPage() {
   const { toast } = useToast()
   
   // 学习计划集成
-  const { plan } = useStudyPlan()
-  const { progress, updateProgress } = useTodayProgress()
+  const { currentPlan: plan } = useStudyPlanStore()
+  const { todayProgress: progress, updateTodayProgress } = useStudySessionStore()
+  
+  // 用户状态管理
+  const { isPremiumUser } = useUserStore()
   
   // 从URL参数初始化状态
   const [searchQuery, setSearchQuery] = useState("")
@@ -1232,9 +1237,8 @@ export default function QuestionBankPage() {
     if (!yearObj) return true;
     // 如果是免费年份，可以访问
     if (yearObj.free) return true;
-    // 这里可以添加会员检查逻辑
-    const isMember = false; // 假设用户不是会员
-    return isMember;
+    // 检查用户会员状态
+    return isPremiumUser();
   };
 
   // 处理点击题目进入详情页的函数
@@ -1252,7 +1256,7 @@ export default function QuestionBankPage() {
     
     // 记录到学习计划进度
     if (plan && selectedSubject) {
-      updateProgress({
+      updateTodayProgress({
         questions_practiced: progress.questions_practiced + 1,
         subjects_studied: progress.subjects_studied.includes(selectedSubject) 
           ? progress.subjects_studied 
@@ -1873,7 +1877,7 @@ export default function QuestionBankPage() {
                             }
                           }}
                         >
-                          <Card className="h-full">
+                          <Card className="h-full relative">
                         <CardContent className="p-4">
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center space-x-2">
@@ -1929,6 +1933,17 @@ export default function QuestionBankPage() {
                                 })()}
                               </p>
                             </CardContent>
+                            
+                            {/* 会员蒙版 */}
+                            {question.memberOnly && !isPremiumUser() && (
+                              <div className="absolute inset-0 bg-white bg-opacity-95 flex items-center justify-center z-10 rounded-lg">
+                                <div className="text-center">
+                                  <Lock className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                                  <p className="text-gray-600 text-sm font-medium">需要会员功能才能解锁</p>
+                                  <p className="text-gray-500 text-xs mt-1">升级会员查看{question.year}年真题</p>
+                                </div>
+                              </div>
+                            )}
                           </Card>
                         </div>
                       ))}

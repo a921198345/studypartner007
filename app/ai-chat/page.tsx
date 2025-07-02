@@ -24,7 +24,8 @@ import { useToast } from "@/components/ui/use-toast"
 import { useChatStore } from '@/hooks/useChatStore'
 import { getAuthHeaders } from '@/lib/auth-utils'
 import { useFirstUseAuth } from '@/components/auth/first-use-auth-guard'
-import { useStudyPlan, useStudySession } from '@/stores/study-plan-store'
+import { useStudyPlanStore } from '@/stores/study-plan-store'
+import { useStudySessionStore } from '@/stores/study-session-store'
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 // 扩展消息类型，添加流式相关属性
@@ -55,8 +56,9 @@ export default function AIChat() {
   } = useChatStore();
   
   // 学习计划集成
-  const { plan } = useStudyPlan();
-  const { isActive: isStudySessionActive, session, start: startStudySession, end: endStudySession } = useStudySession();
+  const { currentPlan: plan } = useStudyPlanStore();
+  const { activeSession: session, startStudySession, endStudySession } = useStudySessionStore();
+  const isStudySessionActive = !!session;
   const [isStreaming, setIsStreaming] = useState(false);
   const [currentStreamingMessageId, setCurrentStreamingMessageId] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);

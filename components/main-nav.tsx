@@ -7,7 +7,7 @@ import { cn } from "../lib/utils"
 import { usePathname } from "next/navigation"
 import { BookOpen, Brain, FileText, MessageCircle, User, Calendar } from "lucide-react"
 import { Button } from "./ui/button"
-import { BookBuddyLogo5 } from "./BookBuddyLogo5"
+import { StudyBuddyLogoSimple } from "./StudyBuddyLogoSimple"
 import { useAuth } from "../hooks/useAuth"
 
 export function MainNav({ className, ...props }: React.HTMLAttributes<HTMLElement>) {
@@ -56,7 +56,7 @@ export function MainNav({ className, ...props }: React.HTMLAttributes<HTMLElemen
   return (
     <div className="flex w-full items-center justify-between">
       <Link href="/" className="flex items-center space-x-2 font-bold text-xl">
-        <BookBuddyLogo5 className="text-primary" size={32} />
+        <StudyBuddyLogoSimple className="text-primary" size={32} />
         <span>学习搭子</span>
       </Link>
       <nav className={cn("flex items-center justify-end space-x-6", className)} {...props}>
