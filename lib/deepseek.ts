@@ -1,11 +1,14 @@
 // DeepSeek API 集成
 export class DeepSeekAPI {
-  constructor(apiKey) {
+  private apiKey: string;
+  private baseURL: string;
+
+  constructor(apiKey: string) {
     this.apiKey = apiKey;
     this.baseURL = 'https://api.deepseek.com/v1';
   }
 
-  async chat(messages, options = {}) {
+  async chat(messages: any[], options: any = {}) {
     const response = await fetch(`${this.baseURL}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -29,7 +32,7 @@ export class DeepSeekAPI {
     return response;
   }
 
-  async streamChat(messages, onChunk) {
+  async streamChat(messages: any[], onChunk: (chunk: string) => void) {
     const response = await this.chat(messages, { stream: true });
     
     if (!response.body) {
@@ -163,6 +166,85 @@ export async function generateAnswerStream(prompt: string): Promise<ReadableStre
 }
 
 // 创建模拟流响应（用于开发或API不可用时）
+// 添加缺失的导出函数
+export async function generateAnswer(prompt: string): Promise<string> {
+  try {
+    const stream = await generateAnswerStream(prompt);
+    if (!stream) {
+      throw new Error('无法获取响应流');
+    }
+
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    let fullResponse = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\n');
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6);
+          if (data === '[DONE]') continue;
+          
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.choices?.[0]?.delta?.content) {
+              fullResponse += parsed.choices[0].delta.content;
+            }
+          } catch (e) {
+            // 忽略解析错误
+          }
+        }
+      }
+    }
+
+    return fullResponse;
+  } catch (error) {
+    console.error('generateAnswer 错误:', error);
+    throw error;
+  }
+}
+
+export async function getDeepSeekCompletion(messages: any[], options: any = {}): Promise<any> {
+  try {
+    const apiKey = process.env.DEEPSEEK_API_KEY;
+    if (!apiKey) {
+      throw new Error('API密钥未配置');
+    }
+
+    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages,
+        stream: false,
+        temperature: options.temperature || 0.7,
+        max_tokens: options.max_tokens || 4000,
+        ...options
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('DeepSeek API 调用失败:', response.status, response.statusText, errorText);
+      throw new Error(`DeepSeek API 错误: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('getDeepSeekCompletion 错误:', error);
+    throw error;
+  }
+}
+
 function createMockStream(prompt: string): ReadableStream {
   const mockResponse = `我是法律学习助手，很抱歉，当前AI服务暂时不可用。
 
