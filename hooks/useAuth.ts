@@ -31,6 +31,17 @@ export function useAuth() {
 
   const checkAuthStatus = () => {
     try {
+      // 确保只在客户端执行
+      if (typeof window === 'undefined') {
+        setAuthState({
+          isAuthenticated: false,
+          user: null,
+          token: null,
+          loading: false,
+        });
+        return;
+      }
+
       const token = getAuthToken();
       const user = getUserInfo();
 

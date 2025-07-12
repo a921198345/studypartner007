@@ -52,9 +52,11 @@ export function DelayedAuthGuard({
 
   const handleLogin = () => {
     // 保存当前路径和待执行的回调
-    sessionStorage.setItem('redirectAfterLogin', pathname)
-    if (pendingCallback) {
-      sessionStorage.setItem('pendingAction', 'true')
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('redirectAfterLogin', pathname)
+      if (pendingCallback) {
+        sessionStorage.setItem('pendingAction', 'true')
+      }
     }
     router.push('/login')
   }

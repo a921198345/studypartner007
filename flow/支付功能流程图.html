@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>支付功能流程图 - 法考助手</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2196F3 0%, #21CBF3 100%);
+            color: white;
+            padding: 30px 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 32px;
+            font-weight: 600;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            margin: 10px 0 0;
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .flow-section {
+            margin-bottom: 50px;
+        }
+
+        .section-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 20px;
+            padding-left: 20px;
+            border-left: 4px solid #2196F3;
+        }
+
+        .mermaid {
+            background: #fafafa;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid #e0e0e0;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .feature-card {
+            background: #f8f9ff;
+            border: 1px solid #e3f2fd;
+            border-radius: 12px;
+            padding: 20px;
+            transition: transform 0.2s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(33, 150, 243, 0.1);
+        }
+
+        .feature-card h3 {
+            color: #2196F3;
+            margin: 0 0 10px;
+            font-size: 18px;
+        }
+
+        .feature-card p {
+            color: #666;
+            margin: 0;
+            line-height: 1.5;
+        }
+
+        .api-section {
+            background: #f5f5f5;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .api-endpoint {
+            background: #fff;
+            border-left: 4px solid #4CAF50;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 0 8px 8px 0;
+            font-family: 'Courier New', monospace;
+        }
+
+        .api-endpoint .method {
+            color: #4CAF50;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .api-endpoint .path {
+            color: #333;
+        }
+
+        .status-flow {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(90deg, #e3f2fd 0%, #fff3e0 50%, #e8f5e8 100%);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .status-item {
+            text-align: center;
+            flex: 1;
+            position: relative;
+        }
+
+        .status-item::after {
+            content: '→';
+            position: absolute;
+            right: -20px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #2196F3;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .status-item:last-child::after {
+            display: none;
+        }
+
+        .status-circle {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            margin: 0 auto 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .status-pending .status-circle { background: #FF9800; }
+        .status-reviewing .status-circle { background: #2196F3; }
+        .status-approved .status-circle { background: #4CAF50; }
+
+        .risk-warnings {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .risk-warnings h3 {
+            color: #856404;
+            margin: 0 0 15px;
+        }
+
+        .risk-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .risk-item::before {
+            content: '⚠️';
+            margin-right: 10px;
+            flex-shrink: 0;
+        }
+
+        .footer {
+            background: #f5f5f5;
+            padding: 20px 40px;
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                padding: 20px;
+            }
+            
+            .header {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 24px;
+            }
+            
+            .status-flow {
+                flex-direction: column;
+                gap: 20px;
+            }
+            
+            .status-item::after {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💳 支付功能流程图</h1>
+            <p>法考助手会员支付系统 - 爱发电支付方案详细设计</p>
+        </div>
+
+        <div class="content">
+            <!-- 整体支付流程 -->
+            <div class="flow-section">
+                <h2 class="section-title">🔄 整体支付流程</h2>
+                <div class="mermaid">
+                    graph TD
+                        A[用户触发升级] --> B{用户是否登录?}
+                        B -->|否| C[显示登录页面]
+                        C --> D[用户完成登录]
+                        D --> E[显示会员套餐选择]
+                        B -->|是| E
+                        
+                        E --> F[用户选择套餐类型]
+                        F --> G[显示爱发电支付指引]
+                        G --> H[用户跳转到爱发电]
+                        H --> I[完成支付获得凭证]
+                        I --> J[返回应用上传凭证]
+                        
+                        J --> K[系统创建待审核订单]
+                        K --> L[显示审核等待提示]
+                        L --> M[管理员审核订单]
+                        
+                        M --> N{审核结果}
+                        N -->|通过| O[激活会员权限]
+                        N -->|拒绝| P[发送拒绝通知]
+                        
+                        O --> Q[发送激活成功通知]
+                        Q --> R[用户享受会员功能]
+                        P --> S[用户可重新提交]
+                        
+                        style A fill:#e3f2fd
+                        style R fill:#e8f5e8
+                        style P fill:#ffebee
+                        style O fill:#e8f5e8
+                </div>
+            </div>
+
+            <!-- 会员权限对比 -->
+            <div class="flow-section">
+                <h2 class="section-title">⚖️ 会员权限对比</h2>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h3>🤖 AI问答功能</h3>
+                        <p><strong>免费用户：</strong>每日3次限制<br>
+                        <strong>会员用户：</strong>无限次使用</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>🗺️ 知识导图</h3>
+                        <p><strong>免费用户：</strong>仅民法学科<br>
+                        <strong>会员用户：</strong>全部8大学科</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>📚 真题库</h3>
+                        <p><strong>免费用户：</strong>仅2022年真题<br>
+                        <strong>会员用户：</strong>历年全部真题</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>📝 学习笔记</h3>
+                        <p><strong>免费用户：</strong>最多10条笔记<br>
+                        <strong>会员用户：</strong>无限制创建</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 支付凭证处理流程 -->
+            <div class="flow-section">
+                <h2 class="section-title">📷 支付凭证处理流程</h2>
+                <div class="mermaid">
+                    graph LR
+                        A[用户上传支付截图] --> B[前端图片验证]
+                        B --> C{图片格式/大小检查}
+                        C -->|失败| D[显示错误提示]
+                        C -->|通过| E[转换为Base64]
+                        
+                        E --> F[调用创建订单API]
+                        F --> G[后端保存订单记录]
+                        G --> H[返回订单ID]
+                        H --> I[显示提交成功页面]
+                        
+                        I --> J[管理员收到审核通知]
+                        J --> K[管理员查看支付凭证]
+                        K --> L{验证支付真实性}
+                        
+                        L -->|真实| M[批准订单]
+                        L -->|虚假| N[拒绝订单]
+                        
+                        M --> O[更新用户会员状态]
+                        N --> P[记录拒绝原因]
+                        
+                        style A fill:#e3f2fd
+                        style O fill:#e8f5e8
+                        style P fill:#ffebee
+                        style D fill:#ffebee
+                </div>
+            </div>
+
+            <!-- 订单状态流转 -->
+            <div class="flow-section">
+                <h2 class="section-title">📊 订单状态流转</h2>
+                <div class="status-flow">
+                    <div class="status-item status-pending">
+                        <div class="status-circle">1</div>
+                        <h4>待审核</h4>
+                        <p>用户提交支付凭证<br>系统创建订单记录</p>
+                    </div>
+                    <div class="status-item status-reviewing">
+                        <div class="status-circle">2</div>
+                        <h4>审核中</h4>
+                        <p>管理员验证支付真实性<br>1-3小时内处理</p>
+                    </div>
+                    <div class="status-item status-approved">
+                        <div class="status-circle">3</div>
+                        <h4>已生效</h4>
+                        <p>会员权限激活<br>用户收到通知</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- API接口设计 -->
+            <div class="flow-section">
+                <h2 class="section-title">🔌 API接口设计</h2>
+                <div class="api-section">
+                    <div class="api-endpoint">
+                        <span class="method">POST</span>
+                        <span class="path">/api/member/create-order</span>
+                        <div style="margin-top: 10px; color: #666; font-size: 14px;">创建会员订单，上传支付凭证</div>
+                    </div>
+                    <div class="api-endpoint">
+                        <span class="method">GET</span>
+                        <span class="path">/api/member/orders</span>
+                        <div style="margin-top: 10px; color: #666; font-size: 14px;">获取用户订单历史记录</div>
+                    </div>
+                    <div class="api-endpoint">
+                        <span class="method">GET</span>
+                        <span class="path">/api/member/status</span>
+                        <div style="margin-top: 10px; color: #666; font-size: 14px;">检查用户会员状态和到期时间</div>
+                    </div>
+                    <div class="api-endpoint">
+                        <span class="method">POST</span>
+                        <span class="path">/api/admin/member/approve-order</span>
+                        <div style="margin-top: 10px; color: #666; font-size: 14px;">管理员审核订单接口</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 数据库设计流程 -->
+            <div class="flow-section">
+                <h2 class="section-title">💾 数据库设计流程</h2>
+                <div class="mermaid">
+                    graph TD
+                        A[member_orders表] --> B[存储订单信息]
+                        B --> C[user_id: 用户ID]
+                        B --> D[order_type: 订单类型]
+                        B --> E[amount: 支付金额]
+                        B --> F[proof_image: 支付凭证]
+                        B --> G[status: 订单状态]
+                        
+                        H[users表扩展] --> I[会员相关字段]
+                        I --> J[is_member: 是否会员]
+                        I --> K[member_expires_at: 到期时间]
+                        I --> L[member_type: 会员类型]
+                        
+                        M[关联关系] --> N[orders.user_id -> users.id]
+                        N --> O[支持订单历史查询]
+                        O --> P[支持会员状态验证]
+                        
+                        style A fill:#e3f2fd
+                        style H fill:#e8f5e8
+                        style M fill:#fff3e0
+                </div>
+            </div>
+
+            <!-- 用户体验优化 -->
+            <div class="flow-section">
+                <h2 class="section-title">✨ 用户体验优化</h2>
+                <div class="mermaid">
+                    graph LR
+                        A[触发升级提醒] --> B[非侵入式提示]
+                        B --> C[清晰的价值说明]
+                        C --> D[简化支付流程]
+                        
+                        D --> E[详细支付指引]
+                        E --> F[实时状态反馈]
+                        F --> G[客服支持渠道]
+                        
+                        H[防滥用机制] --> I[订单数量限制]
+                        I --> J[冷却期设置]
+                        J --> K[图片格式验证]
+                        
+                        style A fill:#e3f2fd
+                        style G fill:#e8f5e8
+                        style H fill:#fff3e0
+                </div>
+            </div>
+
+            <!-- 风险控制措施 -->
+            <div class="flow-section">
+                <h2 class="section-title">🛡️ 风险控制措施</h2>
+                <div class="risk-warnings">
+                    <h3>合规性风险控制</h3>
+                    <div class="risk-item">明确标识为"创作者支持"而非商品销售</div>
+                    <div class="risk-item">强调提供学习支持服务的性质</div>
+                    <div class="risk-item">制定明确的退款政策和流程</div>
+                    <div class="risk-item">更新用户协议说明支付模式</div>
+                </div>
+                
+                <div class="mermaid">
+                    graph TD
+                        A[技术风险控制] --> B[订单重复提交检测]
+                        A --> C[支付凭证真实性验证]
+                        A --> D[用户行为异常监控]
+                        
+                        E[业务风险控制] --> F[人工审核机制]
+                        E --> G[分级审核权限]
+                        E --> H[审核记录留存]
+                        
+                        I[法律风险控制] --> J[合规性标识]
+                        I --> K[服务性质说明]
+                        I --> L[过渡方案准备]
+                        
+                        style A fill:#ffebee
+                        style E fill:#fff3e0
+                        style I fill:#e8f5e8
+                </div>
+            </div>
+
+            <!-- 管理员审核流程 -->
+            <div class="flow-section">
+                <h2 class="section-title">👨‍💼 管理员审核流程</h2>
+                <div class="mermaid">
+                    graph TD
+                        A[新订单通知] --> B[管理员登录后台]
+                        B --> C[查看待审核订单列表]
+                        C --> D[点击查看订单详情]
+                        
+                        D --> E[验证用户信息]
+                        E --> F[查看支付凭证图片]
+                        F --> G[验证支付时间和金额]
+                        
+                        G --> H{支付凭证真实性判断}
+                        H -->|真实有效| I[点击通过按钮]
+                        H -->|存疑或虚假| J[点击拒绝按钮]
+                        
+                        I --> K[填写审核备注]
+                        J --> L[填写拒绝原因]
+                        
+                        K --> M[确认通过审核]
+                        L --> N[确认拒绝申请]
+                        
+                        M --> O[系统自动激活会员]
+                        N --> P[系统发送拒绝通知]
+                        
+                        O --> Q[发送激活成功消息]
+                        P --> R[用户可重新申请]
+                        
+                        style A fill:#e3f2fd
+                        style O fill:#e8f5e8
+                        style P fill:#ffebee
+                        style Q fill:#e8f5e8
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>© 2025 法考助手 | 支付功能流程图 v1.1 | 基于爱发电支付方案设计</p>
+        </div>
+    </div>
+
+    <script>
+        // 初始化 Mermaid
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+
+        // 添加交互效果
+        document.addEventListener('DOMContentLoaded', function() {
+            const cards = document.querySelectorAll('.feature-card');
+            cards.forEach(card => {
+                card.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateY(-5px) scale(1.02)';
+                });
+                
+                card.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateY(0) scale(1)';
+                });
+            });
+        });
+    </script>
+</body>
+</html>

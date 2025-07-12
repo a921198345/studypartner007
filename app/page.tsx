@@ -10,6 +10,7 @@ import { MainNav } from "@/components/main-nav"
 import { Footer } from "@/components/footer"
 import { ImageCarousel } from "@/components/image-carousel"
 import { DelayedAuthGuard } from "@/components/auth/delayed-auth-guard"
+import { ClientOnly } from "@/components/client-only"
 import { useRouter } from "next/navigation"
 
 export default function Home() {
@@ -60,20 +61,30 @@ export default function Home() {
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.5, duration: 0.5 }}
                 >
-                  <DelayedAuthGuard
-                    authTitle="开始法考学习"
-                    authMessage="请先登录以开始您的个性化学习计划"
-                  >
-                    {({ requireAuth }) => (
-                      <Button 
-                        size="lg" 
-                        className="gap-2 text-base px-8 py-6"
-                        onClick={() => requireAuth(() => router.push('/learning-plan'))}
-                      >
-                        立即开始 <ArrowRight className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </DelayedAuthGuard>
+                  <ClientOnly fallback={
+                    <Button 
+                      size="lg" 
+                      className="gap-2 text-base px-8 py-6"
+                      disabled
+                    >
+                      立即开始 <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  }>
+                    <DelayedAuthGuard
+                      authTitle="开始法考学习"
+                      authMessage="请先登录以开始您的个性化学习计划"
+                    >
+                      {({ requireAuth }) => (
+                        <Button 
+                          size="lg" 
+                          className="gap-2 text-base px-8 py-6"
+                          onClick={() => requireAuth(() => router.push('/learning-plan'))}
+                        >
+                          立即开始 <ArrowRight className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </DelayedAuthGuard>
+                  </ClientOnly>
                 </motion.div>
                 <motion.div
                   className="grid grid-cols-3 gap-8 pt-8"
@@ -102,7 +113,13 @@ export default function Home() {
                 transition={{ duration: 0.7 }}
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-primary/10 rounded-2xl blur-3xl" />
-                <ImageCarousel />
+                <ClientOnly fallback={
+                  <div className="bg-card rounded-2xl border shadow-2xl h-[500px] flex items-center justify-center">
+                    <div className="text-muted-foreground">加载中...</div>
+                  </div>
+                }>
+                  <ImageCarousel />
+                </ClientOnly>
               </motion.div>
             </div>
           </div>

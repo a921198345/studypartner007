@@ -148,3 +148,8 @@ parse_*.py
 extract_*.py
 enhance_*.py
 verify_*.py
+
+# 自动备份系统
+.backups/
+.auto-save.pid
+.quick-save.pid
