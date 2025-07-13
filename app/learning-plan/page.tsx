@@ -51,6 +51,7 @@ export default function LearningPlanPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'daily' | 'weekly' | 'overall'>('daily')
   const [completedTasks, setCompletedTasks] = useState<Record<string, boolean>>({})
+  const [showBasicManager, setShowBasicManager] = useState(false)
   const { toast } = useToast()
 
   // 加载当前学习计划和完成状态
@@ -129,6 +130,12 @@ export default function LearningPlanPage() {
   const createNewPlan = () => {
     checkAuthOnAction()
     setShowPlanWizard(true)
+  }
+
+  // 使用基础计划管理
+  const useBasicManager = () => {
+    checkAuthOnAction()
+    setShowBasicManager(true)
   }
 
   // 处理计划生成完成（简化版）
@@ -230,43 +237,85 @@ export default function LearningPlanPage() {
 
 
             {/* 如果没有计划，显示欢迎界面 */}
-            {!currentPlan && (
-              <Card className="border-blue-200 bg-blue-50/30">
-                <CardHeader className="text-center">
-                  <CardTitle className="text-2xl flex items-center justify-center gap-2">
-                    <Target className="h-6 w-6 text-blue-600" />
-                    开始制定您的学习计划
-                  </CardTitle>
-                  <CardDescription className="text-base">
-                    通过简单的问卷设置，快速生成适合您的基础学习计划
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="text-center">
-                  <div className="mb-6">
-                    <div className="flex justify-center gap-4 text-sm text-gray-600 mb-4">
-                      <div className="flex items-center gap-2">
-                        <Check className="h-4 w-4 text-green-600" />
-                        简单问卷设置
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Check className="h-4 w-4 text-green-600" />
-                        基础计划生成
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Check className="h-4 w-4 text-green-600" />
-                        日周计划管理
+            {!currentPlan && !showBasicManager && (
+              <div className="space-y-6">
+                {/* 简化版AI计划 */}
+                <Card className="border-blue-200 bg-blue-50/30">
+                  <CardHeader className="text-center">
+                    <CardTitle className="text-xl flex items-center justify-center gap-2">
+                      <Target className="h-6 w-6 text-blue-600" />
+                      简化版学习计划
+                    </CardTitle>
+                    <CardDescription className="text-base">
+                      通过简单的问卷设置，快速生成适合您的基础学习计划
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="text-center">
+                    <div className="mb-6">
+                      <div className="flex justify-center gap-4 text-sm text-gray-600 mb-4">
+                        <div className="flex items-center gap-2">
+                          <Check className="h-4 w-4 text-green-600" />
+                          简单问卷设置
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Check className="h-4 w-4 text-green-600" />
+                          基础计划生成
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Check className="h-4 w-4 text-green-600" />
+                          日周计划管理
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <Button size="lg" onClick={createNewPlan} className="bg-blue-600 hover:bg-blue-700">
-                    开始制定计划
-                  </Button>
-                </CardContent>
-              </Card>
+                    <Button size="lg" onClick={createNewPlan} className="bg-blue-600 hover:bg-blue-700">
+                      开始制定计划
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* 基础版手动管理 */}
+                <Card className="border-green-200 bg-green-50/30">
+                  <CardHeader className="text-center">
+                    <CardTitle className="text-xl flex items-center justify-center gap-2">
+                      <BookOpen className="h-6 w-6 text-green-600" />
+                      基础手动管理
+                    </CardTitle>
+                    <CardDescription className="text-base">
+                      完全手动创建和管理学习任务，不依赖AI生成
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="text-center">
+                    <div className="mb-6">
+                      <div className="flex justify-center gap-4 text-sm text-gray-600 mb-4">
+                        <div className="flex items-center gap-2">
+                          <Check className="h-4 w-4 text-green-600" />
+                          手动添加任务
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Check className="h-4 w-4 text-green-600" />
+                          自由编辑管理
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Check className="h-4 w-4 text-green-600" />
+                          完全自主控制
+                        </div>
+                      </div>
+                    </div>
+                    <Button size="lg" onClick={useBasicManager} className="bg-green-600 hover:bg-green-700" variant="default">
+                      基础管理模式
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* 基础计划管理器 */}
+            {showBasicManager && (
+              <BasicPlanManager onBack={() => setShowBasicManager(false)} />
             )}
 
             {/* 如果有计划，显示计划内容 */}
-            {currentPlan ? (
+            {currentPlan && !showBasicManager ? (
               <div className="space-y-6">
                 {/* 切换按钮和法考倒计时 */}
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
@@ -392,17 +441,26 @@ export default function LearningPlanPage() {
               </div>
             ) : null}
 
-            {/* 重新制定计划按钮 - 只有在有计划时显示 */}
-            {currentPlan && (
-              <div className="mt-8 text-center">
+            {/* 重新制定计划按钮 - 只有在有AI计划时显示 */}
+            {currentPlan && !showBasicManager && (
+              <div className="mt-8 text-center space-y-4">
                 <Button 
                   size="lg" 
                   onClick={createNewPlan} 
                   variant="outline"
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 mr-4"
                 >
                   <RefreshCw className="h-5 w-5" />
                   重新制定计划
+                </Button>
+                <Button 
+                  size="lg" 
+                  onClick={useBasicManager} 
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  <BookOpen className="h-5 w-5" />
+                  使用基础管理
                 </Button>
               </div>
             )}

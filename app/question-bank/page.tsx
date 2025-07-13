@@ -1033,7 +1033,8 @@ export default function QuestionBankPage() {
               subject: question.subject || '未分类',
               question_type: question.question_type || 1,
               question_text: question.question_text || '题目内容未加载',
-              is_favorite: true
+              is_favorite: true,
+              memberOnly: !canAccessYear(question.year?.toString())
             }));
             
             setFavoriteQuestions(formattedFavorites);
@@ -1086,7 +1087,8 @@ export default function QuestionBankPage() {
               subject: question.subject || '未分类',
               question_type: question.question_type || 1,
               question_text: question.question_text || '题目内容未加载',
-              is_favorite: true
+              is_favorite: true,
+              memberOnly: !canAccessYear(question.year?.toString())
             }));
             setFavoriteQuestions(formattedFavorites);
             saveFavoriteListToLocalStorage(formattedFavorites);
