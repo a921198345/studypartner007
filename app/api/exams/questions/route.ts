@@ -105,7 +105,7 @@ export async function GET(request) {
     }
     
     // 处理年份参数
-    if (yearParam) {
+    if (yearParam && yearParam !== 'all') {
       console.log(`处理年份参数: ${yearParam}, 用户会员状态: ${isMember}, 用户信息:`, user);
       
       // 检查是否有多个年份（逗号分隔）
@@ -121,15 +121,9 @@ export async function GET(request) {
         conditions.push('year = ?');
         params.push(yearParam);
       }
-    } else {
-      // 如果没有指定年份参数
-      if (!isMember) {
-        // 非会员默认只能看2022年
-        conditions.push('year = ?');
-        params.push('2022');
-      }
-      // 会员不添加年份限制，可以看所有年份
     }
+    // 当yearParam为'all'或为空时，不添加年份筛选条件，显示所有年份题目
+    // 前端会通过memberOnly属性控制会员蒙版显示
     
     // 处理题目类型参数
     if (questionType) {

@@ -122,9 +122,9 @@ export default function QuestionBankPage() {
   const [isFromAiChat, setIsFromAiChat] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false) // 添加初始化标志
   
-  // 简化初始化逻辑 - 默认显示2022年全部题目
+  // 简化初始化逻辑 - 默认显示全部年份题目
   const [selectedQuestionTypes, setSelectedQuestionTypes] = useState<string[]>(["全部题型"])
-  const [selectedYears, setSelectedYears] = useState<string[]>(["2022"])
+  const [selectedYears, setSelectedYears] = useState<string[]>(["all"])
   const [questions, setQuestions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
