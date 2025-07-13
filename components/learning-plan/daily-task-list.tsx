@@ -26,7 +26,7 @@ interface DailyTaskListProps {
   onTaskEdit?: (task: Task) => void
 }
 
-export function DailyTaskList({ date, tasks, onTaskComplete }: DailyTaskListProps) {
+export function DailyTaskList({ date, tasks, onTaskComplete, onTaskEdit }: DailyTaskListProps) {
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
 
   // 格式化日期
@@ -113,7 +113,19 @@ export function DailyTaskList({ date, tasks, onTaskComplete }: DailyTaskListProp
                     {task.title}
                   </label>
                 </div>
-                <Badge className="badge">{task.duration}分钟</Badge>
+                <div className="flex items-center gap-2">
+                  <Badge className="badge">{task.duration}分钟</Badge>
+                  {onTaskEdit && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => onTaskEdit(task)}
+                      className="h-7 w-7 p-0"
+                    >
+                      <Edit2 className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
               </div>
 
               <div className={`overflow-hidden transition-all ${expandedTasks.has(task.id) ? "max-h-40" : "max-h-0"}`}>
