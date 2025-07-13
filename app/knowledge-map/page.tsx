@@ -839,13 +839,6 @@ export default function KnowledgeMapPage() {
                               >
                                 📝 查看相关真题
                               </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => handleGoToQuestions(selectedKnowledgePoint.name, selectedSubjectName)}
-                              >
-                                🎯 限定{selectedSubjectName}题目
-                              </Button>
                             </div>
                           </div>
                         </CardContent>

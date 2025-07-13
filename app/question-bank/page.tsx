@@ -159,10 +159,6 @@ export default function QuestionBankPage() {
     { id: "2016", name: "2016年", free: false },
     { id: "2015", name: "2015年", free: false },
     { id: "2014", name: "2014年", free: false },
-    { id: "2013", name: "2013年", free: false },
-    { id: "2012", name: "2012年", free: false },
-    { id: "2011", name: "2011年", free: false },
-    { id: "2010", name: "2010年", free: false },
   ]
 
   // 创建错题列表（为了保留"我的错题"标签页功能，但不显示错题标签）
