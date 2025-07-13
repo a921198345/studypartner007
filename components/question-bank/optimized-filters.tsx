@@ -11,7 +11,7 @@ import { Search, Filter } from "lucide-react"
 import { useDebounce } from '@/hooks/useDebounce'
 
 interface FilterOptions {
-  // selectedSubject: string // 科目筛选已移除 - 数据库中没有科目字段
+  selectedSubject: string
   selectedYears: string[]
   selectedQuestionTypes: string[]
   searchQuery: string
@@ -34,18 +34,17 @@ const QuestionFilters = memo<FilterProps>(({
   isPremiumUser = false 
 }) => {
   // 🚀 优化：记忆化静态数据，避免每次渲染重新创建
-  // 科目筛选已移除 - 数据库中没有科目字段
-  // const subjects = useMemo(() => [
-  //   { id: "all", name: "全部科目" },
-  //   { id: "刑法", name: "刑法" },
-  //   { id: "民法", name: "民法" },
-  //   { id: "刑事诉讼法", name: "刑事诉讼法" },
-  //   { id: "民事诉讼法", name: "民事诉讼法" },
-  //   { id: "行政法", name: "行政法" },
-  //   { id: "商经知", name: "商经知" },
-  //   { id: "三国法", name: "三国法" },
-  //   { id: "理论法", name: "理论法" },
-  // ], [])
+  const subjects = useMemo(() => [
+    { id: "all", name: "全部科目" },
+    { id: "民法", name: "民法" },
+    { id: "刑法", name: "刑法" },
+    { id: "行政法", name: "行政法" },
+    { id: "刑事诉讼法", name: "刑事诉讼法" },
+    { id: "民事诉讼法", name: "民事诉讼法" },
+    { id: "商经知", name: "商经知" },
+    { id: "三国法", name: "三国法" },
+    { id: "理论法", name: "理论法" },
+  ], [])
 
   const years = useMemo(() => [
     { id: "all", name: "全部年份" },
