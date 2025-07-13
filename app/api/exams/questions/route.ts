@@ -237,11 +237,11 @@ export async function GET(request) {
         
         console.log(`查询到 ${allQuestions.length} 条记录，共 ${total} 条记录`);
         
-        // 为题目添加会员专属标记 - 2024年和2023年为会员专属，2022年及以前为免费
+        // 为题目添加会员专属标记 - 只有2022年对非会员免费，其他所有年份都是会员专属
         const questionsWithAccess = allQuestions.map(q => ({
           ...q,
-          memberOnly: !isMember && (q.year === '2024' || q.year === 2024 || q.year === '2023' || q.year === 2023),
-          accessible: isMember || (parseInt(q.year) <= 2022)
+          memberOnly: !isMember && (q.year !== '2022' && q.year !== 2022),
+          accessible: isMember || (q.year === '2022' || q.year === 2022)
         }));
         
         // 返回所有题目的ID和题号
@@ -299,10 +299,10 @@ export async function GET(request) {
             : q.options_json,
           correct_answer: q.correct_answer,
           explanation: q.explanation_text || "暂无解析",
-          // 2024年和2023年为会员专属，2022年及以前为免费
-          memberOnly: !isMember && (q.year === '2024' || q.year === 2024 || q.year === '2023' || q.year === 2023),
-          // 添加题目是否可访问的标记 - 2022年及以前的年份都是免费的
-          accessible: isMember || (parseInt(q.year) <= 2022)
+          // 只有2022年对非会员免费，其他所有年份都是会员专属
+          memberOnly: !isMember && (q.year !== '2022' && q.year !== 2022),
+          // 添加题目是否可访问的标记 - 只有2022年对非会员免费
+          accessible: isMember || (q.year === '2022' || q.year === 2022)
         }));
         
         // 暂时禁用二次筛选，保持与多关键词搜索API一致
