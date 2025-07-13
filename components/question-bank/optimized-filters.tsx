@@ -63,10 +63,9 @@ const QuestionFilters = memo<FilterProps>(({
   const debouncedSearchQuery = useDebounce(filters.searchQuery, 300)
 
   // 🎯 优化：使用useCallback防止子组件重渲染
-  // 科目筛选已移除 - 数据库中没有科目字段
-  // const handleSubjectChange = useCallback((value: string) => {
-  //   onFiltersChange({ selectedSubject: value })
-  // }, [onFiltersChange])
+  const handleSubjectChange = useCallback((value: string) => {
+    onFiltersChange({ selectedSubject: value })
+  }, [onFiltersChange])
 
   const handleYearChange = useCallback((value: string) => {
     const newYears = value === 'all' ? ['all'] : [value]
@@ -90,7 +89,7 @@ const QuestionFilters = memo<FilterProps>(({
 
   const handleClearFilters = useCallback(() => {
     onFiltersChange({
-      // selectedSubject: 'all', // 科目筛选已移除
+      selectedSubject: 'all',
       selectedYears: ['all'],
       selectedQuestionTypes: ['全部题型'],
       searchQuery: '',
@@ -101,7 +100,7 @@ const QuestionFilters = memo<FilterProps>(({
 
   // 🎯 优化：记忆化计算是否有活动筛选
   const hasActiveFilters = useMemo(() => {
-    return // filters.selectedSubject !== 'all' || // 科目筛选已移除
+    return filters.selectedSubject !== 'all' ||
            !filters.selectedYears.includes('all') ||
            !filters.selectedQuestionTypes.includes('全部题型') ||
            filters.searchQuery ||
