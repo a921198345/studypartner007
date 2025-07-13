@@ -34,14 +34,7 @@ export default function Home() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 py-24">
               <ClientOnly fallback={
                 <div className="space-y-10">
-              }>
-                <motion.div
-                  className="space-y-10"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5 }}
-                >
-                <div className="space-y-8">
+                  <div className="space-y-8">
                   <h1 className="text-5xl font-bold tracking-tighter sm:text-6xl md:text-7xl lg:text-8xl">
                     让法考学习{" "}
                     <motion.span
