@@ -126,26 +126,8 @@ export async function POST(request) {
       }, { status: 400 });
     }
     
-    // 检查年份限制：非会员只能查询2022年真题
-    if (!is_member && year && year.length > 0 && !year.includes('all')) {
-      const restricted_years = year.filter(y => y !== '2022');
-      if (restricted_years.length > 0) {
-        return NextResponse.json({
-          success: false,
-          message: `查看${restricted_years.join('、')}年真题需要升级会员`,
-          upgradeRequired: true,
-          availableYears: ['2022'],
-          requestedYears: year
-        }, { status: 403 });
-      }
-    }
-    
-    // 如果非会员没有指定年份，默认只查询2022年
+    // 使用与普通API一致的年份处理逻辑 - 不强制限制年份，由前端控制会员蒙版显示
     let filtered_year = year;
-    if (!is_member && (!year || year.includes('all'))) {
-      filtered_year = ['2022'];
-      console.log('非会员用户，限制查询年份为:', filtered_year);
-    }
 
     const connection = await pool.getConnection();
     
@@ -318,7 +300,10 @@ export async function POST(request) {
             correct_answer: q.correct_answer,
             explanation: q.explanation_text || "暂无解析",
             matched_keyword: q.matched_keyword,
-            relevance_score: q.relevance_score
+            relevance_score: q.relevance_score,
+            // 添加会员标记 - 只有2022年对非会员免费，其他所有年份都是会员专属
+            memberOnly: !is_member && (q.year !== '2022' && q.year !== 2022),
+            accessible: is_member || (q.year === '2022' || q.year === 2022)
           })),
           pagination: {
             total: allQuestions.length,

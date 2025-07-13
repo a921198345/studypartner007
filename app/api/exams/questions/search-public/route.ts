@@ -144,7 +144,10 @@ export async function POST(request) {
         options: JSON.parse(q.options_json || '[]'),
         tags: JSON.parse(q.tags_json || '[]'),
         knowledgePoints: JSON.parse(q.knowledge_points_json || '[]'),
-        relatedLaws: JSON.parse(q.related_laws_json || '[]')
+        relatedLaws: JSON.parse(q.related_laws_json || '[]'),
+        // 公开搜索只返回2022年题目，这些都是免费的
+        memberOnly: false,
+        accessible: true
       }));
       
       console.log(`公开搜索找到 ${total} 道题目，返回第 ${page} 页`);

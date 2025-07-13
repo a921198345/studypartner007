@@ -4,169 +4,180 @@ import { useState, useEffect } from "react"
 import { MainNav } from "@/components/main-nav"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Calendar, Clock, BookOpen, Plus, Edit2, FileText, Brain } from "lucide-react"
+import { Calendar, Clock, BookOpen, Plus, Edit2, Trash2, Check } from "lucide-react"
 import { Footer } from "@/components/footer"
 import { useToast } from "@/hooks/use-toast"
 import { useFirstUseAuth } from '@/components/auth/first-use-auth-guard'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { EditPlanForm } from '@/components/learning-plan/edit-plan-form'
-import { DailyTaskList } from '@/components/learning-plan/daily-task-list'
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 
-interface Task {
+interface Note {
   id: string
-  title: string
-  description: string
-  duration: number // 分钟
-  progress: number // 百分比
-  subject: string
+  content: string
   completed: boolean
-  type: "reading" | "knowledge_map" | "practice"
-  link?: string
+  createdAt: string
   planType: "daily" | "weekly" | "overall"
-  date: string // YYYY-MM-DD 格式
 }
 
 export default function LearningPlanPage() {
   const { checkAuthOnAction } = useFirstUseAuth('learning-plan')
-  const [tasks, setTasks] = useState<Task[]>([])
+  const [notes, setNotes] = useState<Note[]>([])
   const [activeTab, setActiveTab] = useState<"daily" | "weekly" | "overall">("daily")
   const [showEditDialog, setShowEditDialog] = useState(false)
-  const [editingTask, setEditingTask] = useState<Task | null>(null)
-  const [selectedDate, setSelectedDate] = useState(new Date())
+  const [editingNote, setEditingNote] = useState<Note | null>(null)
+  const [noteContent, setNoteContent] = useState("")
   const { toast } = useToast()
 
-  // 加载保存的任务
+  // 加载保存的笔记
   useEffect(() => {
-    const savedTasks = localStorage.getItem('simple-study-tasks')
-    if (savedTasks) {
+    const savedNotes = localStorage.getItem('simple-study-notes')
+    if (savedNotes) {
       try {
-        setTasks(JSON.parse(savedTasks))
+        setNotes(JSON.parse(savedNotes))
       } catch (error) {
-        console.error('加载任务失败:', error)
+        console.error('加载笔记失败:', error)
       }
     }
   }, [])
 
-  // 保存任务到本地存储
-  const saveTasks = (newTasks: Task[]) => {
-    setTasks(newTasks)
-    localStorage.setItem('simple-study-tasks', JSON.stringify(newTasks))
+  // 保存笔记到本地存储
+  const saveNotes = (newNotes: Note[]) => {
+    setNotes(newNotes)
+    localStorage.setItem('simple-study-notes', JSON.stringify(newNotes))
   }
 
-  // 添加新任务
-  const handleAddTask = () => {
+  // 添加新笔记
+  const handleAddNote = () => {
     checkAuthOnAction()
-    setEditingTask(null)
+    setEditingNote(null)
+    setNoteContent("")
     setShowEditDialog(true)
   }
 
-  // 编辑任务
-  const handleEditTask = (task: Task) => {
-    setEditingTask(task)
+  // 编辑笔记
+  const handleEditNote = (note: Note) => {
+    setEditingNote(note)
+    setNoteContent(note.content)
     setShowEditDialog(true)
   }
 
-  // 保存任务
-  const handleSaveTask = (taskData: Omit<Task, 'id' | 'completed' | 'type' | 'planType' | 'date'>) => {
-    const today = new Date().toISOString().split('T')[0]
-    
-    if (editingTask) {
-      // 更新现有任务
-      const updatedTasks = tasks.map(task =>
-        task.id === editingTask.id
-          ? { ...task, ...taskData }
-          : task
-      )
-      saveTasks(updatedTasks)
+  // 保存笔记
+  const handleSaveNote = () => {
+    if (!noteContent.trim()) {
       toast({
-        title: "任务更新成功",
-        description: "学习任务已保存"
+        variant: "destructive",
+        title: "内容不能为空",
+        description: "请输入笔记内容"
+      })
+      return
+    }
+
+    if (editingNote) {
+      // 更新现有笔记
+      const updatedNotes = notes.map(note =>
+        note.id === editingNote.id
+          ? { ...note, content: noteContent.trim() }
+          : note
+      )
+      saveNotes(updatedNotes)
+      toast({
+        title: "笔记更新成功",
+        description: "您的学习笔记已保存"
       })
     } else {
-      // 添加新任务
-      const newTask: Task = {
-        ...taskData,
+      // 添加新笔记
+      const newNote: Note = {
         id: Date.now().toString(),
+        content: noteContent.trim(),
         completed: false,
-        type: "reading", // 默认类型
-        planType: activeTab,
-        date: today
+        createdAt: new Date().toISOString(),
+        planType: activeTab
       }
-      saveTasks([...tasks, newTask])
+      saveNotes([...notes, newNote])
       toast({
-        title: "任务添加成功",
-        description: "新的学习任务已创建"
+        title: "笔记添加成功",
+        description: "新的学习笔记已创建"
       })
     }
     
     setShowEditDialog(false)
-    setEditingTask(null)
+    setEditingNote(null)
+    setNoteContent("")
   }
 
-  // 删除任务
-  const handleDeleteTask = () => {
-    if (editingTask) {
-      const updatedTasks = tasks.filter(task => task.id !== editingTask.id)
-      saveTasks(updatedTasks)
-      setShowEditDialog(false)
-      setEditingTask(null)
-      toast({
-        title: "任务删除成功",
-        description: "学习任务已从计划中移除"
-      })
-    }
+  // 删除笔记
+  const handleDeleteNote = (noteId: string) => {
+    const updatedNotes = notes.filter(note => note.id !== noteId)
+    saveNotes(updatedNotes)
+    toast({
+      title: "笔记删除成功",
+      description: "学习笔记已从计划中移除"
+    })
   }
 
-  // 切换任务完成状态
-  const handleTaskComplete = (taskId: string, completed: boolean) => {
-    const updatedTasks = tasks.map(task =>
-      task.id === taskId ? { ...task, completed } : task
+  // 切换笔记完成状态
+  const handleToggleComplete = (noteId: string) => {
+    const updatedNotes = notes.map(note =>
+      note.id === noteId ? { ...note, completed: !note.completed } : note
     )
-    saveTasks(updatedTasks)
+    saveNotes(updatedNotes)
   }
 
-  // 获取当前选中日期的任务
-  const getTasksForDate = (date: Date) => {
-    const dateStr = date.toISOString().split('T')[0]
-    return tasks.filter(task => 
-      task.planType === activeTab && 
-      task.date === dateStr
-    ).map(task => ({
-      ...task,
-      link: task.type === "knowledge_map" ? "/knowledge-map" : 
-            task.type === "practice" ? "/question-bank" : undefined
-    }))
+  // 获取当前标签页的笔记
+  const getCurrentNotes = () => {
+    return notes.filter(note => note.planType === activeTab)
   }
 
   // 获取计划统计
   const getPlanStats = () => {
-    const planTasks = tasks.filter(task => task.planType === activeTab)
-    const totalTasks = planTasks.length
-    const completedTasks = planTasks.filter(task => task.completed).length
-    const totalDuration = planTasks.reduce((sum, task) => sum + task.duration, 0)
-    const completedDuration = planTasks.filter(task => task.completed).reduce((sum, task) => sum + task.duration, 0)
+    const planNotes = getCurrentNotes()
+    const totalNotes = planNotes.length
+    const completedNotes = planNotes.filter(note => note.completed).length
+    const completionRate = totalNotes > 0 ? Math.round((completedNotes / totalNotes) * 100) : 0
 
     return {
-      totalTasks,
-      completedTasks,
-      totalDuration: Math.round(totalDuration / 60), // 转换为小时
-      completedDuration: Math.round(completedDuration / 60),
-      completionRate: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
+      totalNotes,
+      completedNotes,
+      completionRate
     }
   }
 
   const stats = getPlanStats()
-  const todayTasks = getTasksForDate(selectedDate)
+  const currentNotes = getCurrentNotes()
 
-  // 格式化日期显示
-  const formatDateDisplay = (date: Date) => {
-    const month = date.getMonth() + 1
-    const day = date.getDate()
-    const weekdays = ["日", "一", "二", "三", "四", "五", "六"]
-    const weekday = weekdays[date.getDay()]
-    return `${month}月${day}日 周${weekday}`
+  // 获取标签页主题色
+  const getTabTheme = (tab: string) => {
+    switch (tab) {
+      case 'daily':
+        return {
+          bg: 'border-green-200 bg-green-50/30',
+          icon: 'text-green-600',
+          name: '日计划'
+        }
+      case 'weekly':
+        return {
+          bg: 'border-purple-200 bg-purple-50/30',
+          icon: 'text-purple-600',
+          name: '周计划'
+        }
+      case 'overall':
+        return {
+          bg: 'border-blue-200 bg-blue-50/30',
+          icon: 'text-blue-600',
+          name: '总体规划'
+        }
+      default:
+        return {
+          bg: 'border-gray-200 bg-gray-50/30',
+          icon: 'text-gray-600',
+          name: '计划'
+        }
+    }
   }
+
+  const theme = getTabTheme(activeTab)
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -182,7 +193,7 @@ export default function LearningPlanPage() {
             {/* 顶部标题 */}
             <div className="text-center">
               <h1 className="text-3xl font-bold mb-2">学习计划管理</h1>
-              <p className="text-muted-foreground">手动创建和管理您的个性化学习计划</p>
+              <p className="text-muted-foreground">创建和管理您的个性化学习笔记</p>
             </div>
 
             {/* 计划类型选择 */}
@@ -202,23 +213,23 @@ export default function LearningPlanPage() {
                 </TabsTrigger>
               </TabsList>
 
-              {/* 统计卡片 */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+              {/* 统计信息 */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
                 <Card>
                   <CardContent className="flex items-center p-4">
-                    <FileText className="h-8 w-8 text-blue-600 mr-3" />
+                    <BookOpen className="h-8 w-8 text-blue-600 mr-3" />
                     <div>
-                      <p className="text-2xl font-bold">{stats.totalTasks}</p>
-                      <p className="text-xs text-muted-foreground">总任务数</p>
+                      <p className="text-2xl font-bold">{stats.totalNotes}</p>
+                      <p className="text-xs text-muted-foreground">总笔记数</p>
                     </div>
                   </CardContent>
                 </Card>
                 
                 <Card>
                   <CardContent className="flex items-center p-4">
-                    <Calendar className="h-8 w-8 text-green-600 mr-3" />
+                    <Check className="h-8 w-8 text-green-600 mr-3" />
                     <div>
-                      <p className="text-2xl font-bold">{stats.completedTasks}</p>
+                      <p className="text-2xl font-bold">{stats.completedNotes}</p>
                       <p className="text-xs text-muted-foreground">已完成</p>
                     </div>
                   </CardContent>
@@ -226,17 +237,7 @@ export default function LearningPlanPage() {
                 
                 <Card>
                   <CardContent className="flex items-center p-4">
-                    <Clock className="h-8 w-8 text-purple-600 mr-3" />
-                    <div>
-                      <p className="text-2xl font-bold">{stats.completedDuration}h</p>
-                      <p className="text-xs text-muted-foreground">已学习时长</p>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardContent className="flex items-center p-4">
-                    <Brain className="h-8 w-8 text-orange-600 mr-3" />
+                    <Calendar className="h-8 w-8 text-purple-600 mr-3" />
                     <div>
                       <p className="text-2xl font-bold">{stats.completionRate}%</p>
                       <p className="text-xs text-muted-foreground">完成率</p>
@@ -247,76 +248,208 @@ export default function LearningPlanPage() {
 
               {/* 计划内容区域 */}
               <TabsContent value="daily" className="space-y-4">
-                <Card className="border-green-200 bg-green-50/30">
+                <Card className={theme.bg}>
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
-                        <Calendar className="h-5 w-5 text-green-600" />
-                        今日学习计划 - {formatDateDisplay(selectedDate)}
+                        <Calendar className={`h-5 w-5 ${theme.icon}`} />
+                        {theme.name}
                       </CardTitle>
-                      <Button onClick={handleAddTask} size="sm">
+                      <Button onClick={handleAddNote} size="sm">
                         <Plus className="h-4 w-4 mr-2" />
-                        添加任务
+                        添加笔记
                       </Button>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <DailyTaskList
-                      date={selectedDate}
-                      tasks={todayTasks}
-                      onTaskComplete={handleTaskComplete}
-                      onTaskEdit={handleEditTask}
-                    />
+                  <CardContent className="space-y-3">
+                    {currentNotes.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>暂无学习笔记</p>
+                        <p className="text-sm">点击上方按钮添加您的第一条笔记</p>
+                      </div>
+                    ) : (
+                      currentNotes.map((note) => (
+                        <Card key={note.id} className="border-l-4 border-l-primary">
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-start space-x-3 flex-1">
+                                <input
+                                  type="checkbox"
+                                  checked={note.completed}
+                                  onChange={() => handleToggleComplete(note.id)}
+                                  className="mt-1 rounded"
+                                />
+                                <div className="flex-1">
+                                  <p className={`whitespace-pre-wrap ${note.completed ? 'line-through text-gray-500' : ''}`}>
+                                    {note.content}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-2">
+                                    创建于 {new Date(note.createdAt).toLocaleString()}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2 ml-4">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEditNote(note)}
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteNote(note.id)}
+                                  className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
 
               <TabsContent value="weekly" className="space-y-4">
-                <Card className="border-purple-200 bg-purple-50/30">
+                <Card className={theme.bg}>
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
-                        <Clock className="h-5 w-5 text-purple-600" />
-                        本周学习计划
+                        <Clock className={`h-5 w-5 ${theme.icon}`} />
+                        {theme.name}
                       </CardTitle>
-                      <Button onClick={handleAddTask} size="sm">
+                      <Button onClick={handleAddNote} size="sm">
                         <Plus className="h-4 w-4 mr-2" />
-                        添加任务
+                        添加笔记
                       </Button>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <DailyTaskList
-                      date={selectedDate}
-                      tasks={tasks.filter(task => task.planType === 'weekly')}
-                      onTaskComplete={handleTaskComplete}
-                      onTaskEdit={handleEditTask}
-                    />
+                  <CardContent className="space-y-3">
+                    {currentNotes.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>暂无学习笔记</p>
+                        <p className="text-sm">点击上方按钮添加您的第一条笔记</p>
+                      </div>
+                    ) : (
+                      currentNotes.map((note) => (
+                        <Card key={note.id} className="border-l-4 border-l-primary">
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-start space-x-3 flex-1">
+                                <input
+                                  type="checkbox"
+                                  checked={note.completed}
+                                  onChange={() => handleToggleComplete(note.id)}
+                                  className="mt-1 rounded"
+                                />
+                                <div className="flex-1">
+                                  <p className={`whitespace-pre-wrap ${note.completed ? 'line-through text-gray-500' : ''}`}>
+                                    {note.content}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-2">
+                                    创建于 {new Date(note.createdAt).toLocaleString()}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2 ml-4">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEditNote(note)}
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteNote(note.id)}
+                                  className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
 
               <TabsContent value="overall" className="space-y-4">
-                <Card className="border-blue-200 bg-blue-50/30">
+                <Card className={theme.bg}>
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
-                        <BookOpen className="h-5 w-5 text-blue-600" />
-                        总体规划
+                        <BookOpen className={`h-5 w-5 ${theme.icon}`} />
+                        {theme.name}
                       </CardTitle>
-                      <Button onClick={handleAddTask} size="sm">
+                      <Button onClick={handleAddNote} size="sm">
                         <Plus className="h-4 w-4 mr-2" />
-                        添加任务
+                        添加笔记
                       </Button>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <DailyTaskList
-                      date={selectedDate}
-                      tasks={tasks.filter(task => task.planType === 'overall')}
-                      onTaskComplete={handleTaskComplete}
-                      onTaskEdit={handleEditTask}
-                    />
+                  <CardContent className="space-y-3">
+                    {currentNotes.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>暂无学习笔记</p>
+                        <p className="text-sm">点击上方按钮添加您的第一条笔记</p>
+                      </div>
+                    ) : (
+                      currentNotes.map((note) => (
+                        <Card key={note.id} className="border-l-4 border-l-primary">
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-start space-x-3 flex-1">
+                                <input
+                                  type="checkbox"
+                                  checked={note.completed}
+                                  onChange={() => handleToggleComplete(note.id)}
+                                  className="mt-1 rounded"
+                                />
+                                <div className="flex-1">
+                                  <p className={`whitespace-pre-wrap ${note.completed ? 'line-through text-gray-500' : ''}`}>
+                                    {note.content}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-2">
+                                    创建于 {new Date(note.createdAt).toLocaleString()}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2 ml-4">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEditNote(note)}
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteNote(note.id)}
+                                  className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -327,20 +460,34 @@ export default function LearningPlanPage() {
       
       <Footer />
       
-      {/* 编辑任务对话框 */}
+      {/* 编辑笔记对话框 */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              {editingTask ? "编辑学习任务" : "添加学习任务"}
+              {editingNote ? "编辑学习笔记" : "添加学习笔记"}
             </DialogTitle>
           </DialogHeader>
-          <EditPlanForm
-            task={editingTask}
-            onSave={handleSaveTask}
-            onDelete={editingTask ? handleDeleteTask : undefined}
-            onCancel={() => setShowEditDialog(false)}
-          />
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">笔记内容</label>
+              <Textarea
+                placeholder="在这里输入您的学习笔记..."
+                value={noteContent}
+                onChange={(e) => setNoteContent(e.target.value)}
+                rows={8}
+                className="mt-1"
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+                取消
+              </Button>
+              <Button onClick={handleSaveNote}>
+                保存
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
