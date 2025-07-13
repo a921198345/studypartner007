@@ -21,11 +21,9 @@ import { useStudyPlanStore } from '@/stores/study-plan-store'
 import { useStudySessionStore } from '@/stores/study-session-store'
 import { useUserStore } from '@/stores/user-store'
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import QuestionFilters from "@/components/question-bank/optimized-filters"
 
 // 筛选选项接口
 interface FilterOptions {
-  selectedSubject: string
   selectedYears: string[]
   selectedQuestionTypes: string[]
   searchQuery: string
@@ -185,9 +183,7 @@ export default function QuestionBankPage() {
         console.log('从答题历史重新答题，恢复筛选条件:', filters)
         
         // 恢复筛选条件
-        if (filters.subject && filters.subject !== 'all') {
-          setSelectedSubject(filters.subject)
-        }
+        // 科目筛选已移除
         if (filters.years && Array.isArray(filters.years)) {
           setSelectedYears(filters.years)
         }
@@ -243,27 +239,8 @@ export default function QuestionBankPage() {
       setAiKeywords(cleanedKeywordArray)
       setIsFromAiChat(true)
       
-      // 处理从知识导图跳转时的学科筛选
-      if (source === 'knowledge-map') {
-        const subjectParam = searchParams.get('subject')
-        const fromParam = searchParams.get('from')
-        
-        // 优先使用subject参数，如果没有则使用from参数
-        const targetSubject = subjectParam || fromParam
-        
-        if (targetSubject && targetSubject !== 'all') {
-          console.log('从知识导图跳转，设置学科筛选为:', targetSubject)
-          
-          // 验证目标学科是否在支持的学科列表中
-          const validSubjects = ["刑法", "民法", "刑事诉讼法", "民事诉讼法", "行政法", "商经知", "三国法", "理论法"]
-          if (validSubjects.includes(targetSubject)) {
-            setSelectedSubject(targetSubject)
-            console.log('学科筛选已设置为:', targetSubject)
-          } else {
-            console.warn('无效的学科名称:', targetSubject)
-          }
-        }
-      }
+      // 从知识导图跳转的学科筛选功能已移除
+      // 但保留关键词搜索功能
       
       // 简单保存搜索状态
       if (typeof window !== 'undefined') {
@@ -274,10 +251,8 @@ export default function QuestionBankPage() {
       
       // 根据来源显示不同的提示
       const sourceText = source === 'knowledge-map' ? '知识导图' : 'AI问答'
-      const subjectInfo = source === 'knowledge-map' && searchParams.get('subject') ? 
-        `，限定${searchParams.get('subject')}学科` : ''
       toast({
-        description: `从${sourceText}跳转，正在搜索包含"${cleanedKeywordArray.join('、')}"的题目${subjectInfo}`,
+        description: `从${sourceText}跳转，正在搜索包含"${cleanedKeywordArray.join('、')}"的题目`,
         duration: 4000,
       })
     } else if (typeof window !== 'undefined') {
@@ -348,9 +323,7 @@ export default function QuestionBankPage() {
       // 构建跳转URL，保留筛选条件
       const queryParams = new URLSearchParams()
       
-      if (selectedSubject !== 'all') {
-        queryParams.append('subject', selectedSubject)
-      }
+      // 科目筛选已移除
       if (!selectedYears.includes('all')) {
         queryParams.append('years', selectedYears.join(','))
       }
@@ -375,7 +348,7 @@ export default function QuestionBankPage() {
       console.log('重新答题跳转URL:', url)
       router.push(url)
     }
-  }, [questions, isNavigationReady, selectedSubject, selectedYears, selectedQuestionTypes, debouncedSearchQuery, aiKeywords, router, searchParams])
+  }, [questions, isNavigationReady, selectedYears, selectedQuestionTypes, debouncedSearchQuery, aiKeywords, router, searchParams])
 
   // 搜索防抖
   useEffect(() => {
@@ -419,7 +392,6 @@ export default function QuestionBankPage() {
       const currentRequestId = ++requestIdRef.current;
       console.log(`开始新的请求 #${currentRequestId}，筛选条件:`, {
         selectedYears,
-        selectedSubject,
         selectedQuestionTypes,
         debouncedSearchQuery
       });
@@ -442,7 +414,6 @@ export default function QuestionBankPage() {
             
             const searchResponse = await questionApi.searchWithMultipleKeywords({
               keywords: aiKeywords,
-              subject: selectedSubject !== 'all' ? selectedSubject : undefined,
               year: selectedYears,
               questionType: !selectedQuestionTypes.includes('全部题型') ? 
                 (selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题') : undefined,
@@ -455,46 +426,18 @@ export default function QuestionBankPage() {
               console.log(`多关键词搜索结果: 找到 ${searchResponse.data?.pagination?.total || 0} 道题目`);
               console.log('搜索调试信息:', searchResponse.data?.debug);
               
-              // 如果指定科目没有结果，尝试搜索所有科目
-              if (searchResponse.data?.pagination?.total === 0 && selectedSubject !== 'all') {
-                console.log(`${selectedSubject}科目未找到结果，扩展到所有科目搜索`);
+              // 如果没有搜索结果，提供智能建议
+              if (searchResponse.data?.pagination?.total === 0) {
+                console.log('未找到相关题目，提供智能建议');
                 
-                const allSubjectsResponse = await questionApi.searchWithMultipleKeywords({
-                  keywords: aiKeywords,
-                  subject: undefined, // 不限制科目
-                  year: selectedYears,
-                  questionType: !selectedQuestionTypes.includes('全部题型') ? 
-                    (selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题') : undefined,
-                  page: pagination.currentPage,
-                  limit: pagination.perPage
+                // 生成搜索建议
+                const suggestions = generateSearchSuggestions(aiKeywords);
+                
+                toast({
+                  title: "未找到相关题目",
+                  description: `建议尝试搜索: ${suggestions.slice(0, 3).join('、')}`,
+                  duration: 8000,
                 });
-                
-                if (allSubjectsResponse.success && allSubjectsResponse.data?.pagination?.total > 0) {
-                  questionsData = allSubjectsResponse;
-                  console.log(`扩展搜索找到 ${allSubjectsResponse.data.pagination.total} 道题目`);
-                  
-                  // 提示用户已扩展搜索范围
-                  toast({
-                    title: "搜索范围已扩展",
-                    description: `${selectedSubject}科目中未找到相关题目，已显示所有科目的搜索结果`,
-                    duration: 5000,
-                  });
-                  
-                  // 重置科目筛选为"全部"
-                  setSelectedSubject('all');
-                } else {
-                  // 如果扩展搜索仍无结果，提供智能建议
-                  console.log('扩展搜索仍无结果，提供智能建议');
-                  
-                  // 生成搜索建议
-                  const suggestions = generateSearchSuggestions(aiKeywords);
-                  
-                  toast({
-                    title: "未找到相关题目",
-                    description: `建议尝试搜索: ${suggestions.slice(0, 3).join('、')}`,
-                    duration: 8000,
-                  });
-                }
               }
             } else {
               console.error('多关键词搜索失败:', searchResponse.message);
@@ -532,7 +475,6 @@ export default function QuestionBankPage() {
             });
             
             const response = await questionApi.getQuestions({
-              subject: selectedSubject !== 'all' ? selectedSubject : undefined,
               year: yearParam,
               question_type: !selectedQuestionTypes.includes('全部题型') ? selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题' : undefined,
               search: debouncedSearchQuery || undefined,
@@ -596,7 +538,6 @@ export default function QuestionBankPage() {
               if (isFromAiChat && aiKeywords.length > 0) {
                 // AI搜索模式
                 fetchAllFilteredQuestionInfoAndSave(newTotal, {
-                  subject: selectedSubject !== 'all' ? selectedSubject : undefined,
                   year: selectedYears.includes('all') ? undefined : selectedYears,
                   question_type: !selectedQuestionTypes.includes('全部题型') ? (selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题') : undefined,
                   aiKeywords: aiKeywords,
@@ -604,7 +545,6 @@ export default function QuestionBankPage() {
               } else if (debouncedSearchQuery) {
                 // 普通搜索模式
                 fetchAllFilteredQuestionInfoAndSave(newTotal, {
-                  subject: selectedSubject !== 'all' ? selectedSubject : undefined,
                   year: selectedYears.includes('all') ? undefined : selectedYears,
                   question_type: !selectedQuestionTypes.includes('全部题型') ? (selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题') : undefined,
                   search: debouncedSearchQuery,
@@ -613,7 +553,6 @@ export default function QuestionBankPage() {
                 // 无搜索条件的普通浏览模式，题目数量不太多时获取完整列表
                 // 提高阈值到200以覆盖更多筛选场景
                 fetchAllFilteredQuestionInfoAndSave(newTotal, {
-                  subject: selectedSubject !== 'all' ? selectedSubject : undefined,
                   year: selectedYears.includes('all') ? undefined : selectedYears,
                   question_type: !selectedQuestionTypes.includes('全部题型') ? (selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题') : undefined,
                 }, questionsData.data.questions, newTotal);
@@ -623,7 +562,6 @@ export default function QuestionBankPage() {
                 localStorage.setItem('filteredQuestionsList', JSON.stringify({
                   questions: [], // 空列表，导航将使用备用方案
                   filters: {
-                    subject: selectedSubject,
                     years: selectedYears,
                     types: selectedQuestionTypes,
                     search: debouncedSearchQuery || '',
@@ -639,7 +577,6 @@ export default function QuestionBankPage() {
               localStorage.setItem('filteredQuestionsList', JSON.stringify({
                 questions: [],
                 filters: {
-                  subject: selectedSubject,
                   years: selectedYears,
                   types: selectedQuestionTypes,
                   search: debouncedSearchQuery || '',
@@ -710,7 +647,6 @@ export default function QuestionBankPage() {
           
           // 尝试从服务器获取最近答题进度
           const progressResponse = await questionApi.getLastPracticeProgress({
-            subject: selectedSubject !== 'all' ? selectedSubject : undefined,
             year: selectedYears.includes('all') ? undefined : selectedYears.length === 1 ? selectedYears[0] : undefined,
             question_type: !selectedQuestionTypes.includes('全部题型') ? selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题' : undefined
           });
@@ -979,7 +915,7 @@ export default function QuestionBankPage() {
     };
 
     fetchQuestions();
-  }, [selectedSubject, selectedYears, selectedQuestionTypes, pagination.currentPage, pagination.perPage, debouncedSearchQuery, isFromAiChat, aiKeywords, isInitialized]);
+  }, [selectedYears, selectedQuestionTypes, pagination.currentPage, pagination.perPage, debouncedSearchQuery, isFromAiChat, aiKeywords, isInitialized]);
 
   // 加载错题集函数
   const loadWrongQuestions = async () => {
@@ -1181,12 +1117,7 @@ export default function QuestionBankPage() {
   //   loadFavoriteQuestions();
   // }, []);
 
-  // 处理学科选择变化
-  const handleSubjectChange = (value: string) => {
-    setSelectedSubject(value);
-    // 重置分页
-    setPagination(prev => ({ ...prev, currentPage: 1 }));
-  };
+  // 学科筛选功能已移除
 
   // 处理年份选择变化
   const handleYearChange = (yearId: string, checked: boolean) => {
@@ -1246,12 +1177,10 @@ export default function QuestionBankPage() {
     }
     
     // 记录到学习计划进度
-    if (plan && selectedSubject) {
+    if (plan) {
       updateTodayProgress({
         questions_practiced: progress.questions_practiced + 1,
-        subjects_studied: progress.subjects_studied.includes(selectedSubject) 
-          ? progress.subjects_studied 
-          : [...progress.subjects_studied, selectedSubject]
+        subjects_studied: progress.subjects_studied // 不再跟踪学科
       });
     }
     
@@ -1260,7 +1189,6 @@ export default function QuestionBankPage() {
     const createSessionAsync = async () => {
       if (!fromTab || fromTab === 'all') {
         const currentFilters = {
-          subject: selectedSubject,
           years: selectedYears,
           types: selectedQuestionTypes,
           search: debouncedSearchQuery || ''
@@ -1296,7 +1224,6 @@ export default function QuestionBankPage() {
             existingFilteredData.timestamp && 
             (Date.now() - existingFilteredData.timestamp < 3600000) &&
             // 检查筛选条件是否匹配当前条件
-            existingFilteredData.filters.subject === selectedSubject &&
             arraysEqual(existingFilteredData.filters.years, selectedYears) &&
             arraysEqual(existingFilteredData.filters.types, selectedQuestionTypes) &&
             // 检查搜索条件：要么都是AI搜索，要么都是普通搜索
@@ -1337,7 +1264,6 @@ export default function QuestionBankPage() {
           question_code: q.question_code || null
         })),
         filters: {
-          subject: selectedSubject,
           years: selectedYears,
           types: selectedQuestionTypes,
           search: debouncedSearchQuery || ''
@@ -1356,10 +1282,7 @@ export default function QuestionBankPage() {
     // 创建查询参数，用于通过URL传递关键筛选条件
     const queryParams = new URLSearchParams();
     
-    // 添加基本筛选参数
-    if (selectedSubject !== 'all') {
-      queryParams.append('subject', selectedSubject);
-    }
+    // 基本筛选参数（科目筛选已移除）
     
     // 年份参数（如果不是"全部"）
     if (!selectedYears.includes('all')) {
@@ -1539,20 +1462,7 @@ export default function QuestionBankPage() {
                     </span>
                   </div>
                   <div className="flex items-center gap-3">
-                    {selectedSubject !== plan.subjects_order[0] && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setSelectedSubject(plan.subjects_order[0]);
-                          toast({
-                            description: `已切换到${plan.subjects_order[0]}科目`,
-                          });
-                        }}
-                      >
-                        切换到推荐科目
-                      </Button>
-                    )}
+                    {/* 科目切换功能已移除 */}
                     <Badge variant="secondary">
                       今日已练习 {progress.questions_practiced} 题
                     </Badge>
