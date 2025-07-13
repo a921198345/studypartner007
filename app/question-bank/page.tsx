@@ -133,7 +133,7 @@ export default function QuestionBankPage() {
     total: 0,
     currentPage: 1,
     totalPages: 1,
-    perPage: 10
+    perPage: 50
   })
   const [hasLastProgress, setHasLastProgress] = useState(false)
   const [lastQuestionId, setLastQuestionId] = useState<number | null>(null)
@@ -491,7 +491,12 @@ export default function QuestionBankPage() {
               return;
             }
             
-            setQuestions(questionsData.data.questions);
+            // 为会员年份题目添加memberOnly属性
+            const questionsWithMemberFlag = questionsData.data.questions.map(question => ({
+              ...question,
+              memberOnly: !canAccessYear(question.year?.toString())
+            }));
+            setQuestions(questionsWithMemberFlag);
             
             // 更新分页信息和题目总数
             const newTotal = questionsData.data.pagination.total;
@@ -760,7 +765,12 @@ export default function QuestionBankPage() {
           try {
             const cached = JSON.parse(cachedQuestionsStr);
             if (cached && cached.data && cached.data.success && cached.data.data && cached.data.data.questions) {
-              setQuestions(cached.data.data.questions);
+              // 为缓存的题目添加memberOnly属性
+              const cachedQuestionsWithMemberFlag = cached.data.data.questions.map(question => ({
+                ...question,
+                memberOnly: !canAccessYear(question.year?.toString())
+              }));
+              setQuestions(cachedQuestionsWithMemberFlag);
               // 更新分页信息
               if (cached.data.data.pagination) {
                 setPagination(prev => ({
@@ -924,7 +934,12 @@ export default function QuestionBankPage() {
       // 从本地存储获取错题集
       const wrongQs = getWrongQuestions();
       console.log("获取到错题集:", wrongQs.length, "题");
-      setWrongQuestions(wrongQs);
+      // 为错题添加memberOnly属性
+      const wrongQsWithMemberFlag = wrongQs.map(question => ({
+        ...question,
+        memberOnly: !canAccessYear(question.year?.toString())
+      }));
+      setWrongQuestions(wrongQsWithMemberFlag);
     } catch (error) {
       console.error("加载错题集失败:", error);
     } finally {

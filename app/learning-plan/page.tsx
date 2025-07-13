@@ -11,6 +11,7 @@ import { Footer } from "@/components/footer"
 import { useToast } from "@/hooks/use-toast"
 import { useFirstUseAuth } from '@/components/auth/first-use-auth-guard'
 import { StudyPlanWizardSimple } from '@/components/learning-plan/study-plan-wizard-simple'
+import { BasicPlanManager } from '@/components/learning-plan/basic-plan-manager'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
