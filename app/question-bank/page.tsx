@@ -126,20 +126,7 @@ export default function QuestionBankPage() {
   
   // 简化初始化逻辑 - 默认显示2022年全部题目
   const [selectedQuestionTypes, setSelectedQuestionTypes] = useState<string[]>(["全部题型"])
-  const [selectedSubject, setSelectedSubject] = useState("all")
   const [selectedYears, setSelectedYears] = useState<string[]>(["2022"])
-  
-  // 检查URL参数并设置初始学科
-  useEffect(() => {
-    const subjectParam = searchParams.get('subject')
-    if (subjectParam && subjectParam !== 'all') {
-      const validSubjects = ["刑法", "民法", "刑事诉讼法", "民事诉讼法", "行政法", "商经知", "三国法", "理论法"]
-      if (validSubjects.includes(subjectParam)) {
-        console.log('从URL参数设置学科筛选:', subjectParam)
-        setSelectedSubject(subjectParam)
-      }
-    }
-  }, [searchParams])
   const [questions, setQuestions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -161,22 +148,10 @@ export default function QuestionBankPage() {
   const [isNavigationReady, setIsNavigationReady] = useState(false) // 添加导航数据准备状态
   const requestIdRef = useRef(0) // 添加请求ID来防止竞态条件
 
-  const subjects = [
-    { id: "all", name: "全部科目" },
-    { id: "刑法", name: "刑法" },
-    { id: "民法", name: "民法" },
-    { id: "刑事诉讼法", name: "刑事诉讼法" },
-    { id: "民事诉讼法", name: "民事诉讼法" },
-    { id: "行政法", name: "行政法" },
-    { id: "商经知", name: "商经知" },
-    { id: "三国法", name: "三国法" },
-    { id: "理论法", name: "理论法" },
-  ]
-
   const years = [
     { id: "all", name: "全部年份" },
-    // { id: "2024", name: "2024年", free: false }, // 暂无数据
-    // { id: "2023", name: "2023年", free: false }, // 暂无数据
+    { id: "2024", name: "2024年", free: true },
+    { id: "2023", name: "2023年", free: true },
     { id: "2022", name: "2022年", free: true },
     { id: "2021", name: "2021年", free: false },
     { id: "2020", name: "2020年", free: false },
@@ -185,6 +160,11 @@ export default function QuestionBankPage() {
     { id: "2017", name: "2017年", free: false },
     { id: "2016", name: "2016年", free: false },
     { id: "2015", name: "2015年", free: false },
+    { id: "2014", name: "2014年", free: false },
+    { id: "2013", name: "2013年", free: false },
+    { id: "2012", name: "2012年", free: false },
+    { id: "2011", name: "2011年", free: false },
+    { id: "2010", name: "2010年", free: false },
   ]
 
   // 创建错题列表（为了保留"我的错题"标签页功能，但不显示错题标签）
@@ -1586,21 +1566,6 @@ export default function QuestionBankPage() {
             <div className="md:col-span-1 space-y-6">
               <Card>
                 <CardContent className="p-4 space-y-4">
-                  <div>
-                    <h3 className="font-medium mb-2">学科筛选</h3>
-                    <Select value={selectedSubject} onValueChange={handleSubjectChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="选择学科" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {subjects.map((subject) => (
-                          <SelectItem key={subject.id} value={subject.id}>
-                            {subject.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
 
                   <div>
                     <h3 className="font-medium mb-2">年份筛选</h3>

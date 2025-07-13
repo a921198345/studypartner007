@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Footer } from "@/components/footer"
 import { useToast } from "@/hooks/use-toast"
 import { useFirstUseAuth } from '@/components/auth/first-use-auth-guard'
-import { StudyPlanWizardV2 } from '@/components/learning-plan/study-plan-wizard-v2'
+import { StudyPlanWizardSimple } from '@/components/learning-plan/study-plan-wizard-simple'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -130,49 +130,48 @@ export default function LearningPlanPage() {
     setShowPlanWizard(true)
   }
 
-  // 处理计划生成完成
+  // 处理计划生成完成（简化版）
   const handlePlanGenerated = async (planData: any) => {
     try {
-      console.log('收到的计划数据:', planData) // 调试日志
+      console.log('收到的简化计划数据:', planData)
       
-      // 从表单数据中获取科目信息
-      const activeSubjects = planData.subjects || Object.keys(planData.subject_progress || {}).filter(
-        subject => planData.subject_progress[subject]?.status !== 'completed'
+      // 从简化表单数据中获取科目信息
+      const activeSubjects = Object.keys(planData.subjectProgress || {}).filter(
+        subject => planData.subjectProgress[subject]?.status !== '已完成'
       )
       
-      // 验证生成的内容是否存在
-      if (!planData.generatedContent) {
-        console.error('错误：计划数据中缺少generatedContent字段')
-        toast({
-          variant: "destructive",
-          title: "计划数据不完整",
-          description: "请重新生成计划"
-        })
-        return
+      // 创建简化的学习计划内容
+      const generatedContent = {
+        overallStrategy: planData.plan?.overallStrategy || `🎯 学习计划总体策略\n\n📊 当前学习状况分析：\n• 总计科目：${activeSubjects.length}个待学习科目\n• 每日学习时间：${planData.dailyHours}小时\n• 每周学习天数：${planData.weeklyDays}天\n${planData.customNotes ? `• 个人需求：${planData.customNotes}` : ''}\n\n🎯 学习目标：\n• 系统掌握法考核心知识点\n• 通过题库练习提升答题技能\n• 建立完整的法律知识框架\n\n📚 学习策略：\n• 教材学习 + 题库练习相结合\n• 重点科目优先，循序渐进\n• 及时复习，巩固记忆\n• 利用知识导图理清脉络`,
+        dailyPlan: planData.plan?.dailyPlan || `📅 每日学习计划（总时长${planData.dailyHours}小时）\n\n📚 核心学习时间（${Math.ceil(planData.dailyHours * 0.6)}小时）\n• 主要科目：${activeSubjects.slice(0, 2).join('、')}\n• 学习方式：教材阅读 + 笔记整理\n• 重点掌握：基本概念、法条理解、案例分析\n\n💻 题库练习时间（${Math.ceil(planData.dailyHours * 0.3)}小时）\n• 每日练题：20-30道选择题\n• 真题演练：历年法考题目\n• 错题整理：收藏重点错题\n\n📝 复习总结时间（${Math.ceil(planData.dailyHours * 0.1)}小时）\n• 知识点梳理：回顾今日学习内容\n• 明日预习：简要了解明日学习计划\n• 学习笔记：记录重要知识点和疑问`,
+        weeklyPlan: planData.plan?.weeklyPlan || `🗓️ 本周学习计划\n\n📊 本周学习目标\n• 完成科目：${activeSubjects[0] || '主要科目'}的核心章节\n• 学习时间：每周${planData.weeklyDays}天，总计${planData.dailyHours * planData.weeklyDays}小时\n• 练题数量：${planData.weeklyDays * 25}道题目\n\n📚 具体学习安排：\n${Array.from({length: planData.weeklyDays}, (_, i) => {
+          const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+          const subject = activeSubjects[i % activeSubjects.length] || '复习巩固'
+          return `${days[i]}：${subject}（${planData.dailyHours}h） + 题库练习（20-25题）`
+        }).join('\n')}\n\n📝 周末复习安排：\n• 周末总结：回顾本周学习内容\n• 错题专练：集中处理本周错题\n• 知识梳理：使用知识导图整理知识点`,
+        generatedAt: new Date().toISOString(),
+        settings: {
+          dailyHours: planData.dailyHours || 3,
+          weeklyDays: planData.weeklyDays || 5,
+          subjects: activeSubjects
+        }
       }
-      
-      console.log('生成的内容:', planData.generatedContent) // 调试日志
       
       // 保存生成的计划
       const newPlan: StudyPlan = {
         id: Date.now().toString(),
         title: "我的学习计划",
-        description: "AI智能生成的个性化学习计划",
+        description: "简化版个性化学习计划",
         subjects: activeSubjects,
-        totalWeeks: planData.stats?.estimatedWeeks || 12,
+        totalWeeks: 12,
         currentWeek: 1,
         progressPercentage: 0,
-        generatedContent: planData.generatedContent, // 直接使用传递过来的generatedContent
+        generatedContent: generatedContent,
         createdAt: new Date().toISOString(),
         lastUpdated: new Date().toISOString()
       }
       
-      console.log('最终保存的计划:', newPlan) // 调试日志
-      
-      // 验证计划数据完整性
-      if (!newPlan.generatedContent.dailyPlan || !newPlan.generatedContent.weeklyPlan || !newPlan.generatedContent.overallStrategy) {
-        console.warn('警告：部分计划内容为空')
-      }
+      console.log('最终保存的简化计划:', newPlan)
       
       // 保存到状态和本地存储
       setCurrentPlan(newPlan)
@@ -183,11 +182,11 @@ export default function LearningPlanPage() {
       
       toast({
         title: "学习计划创建成功！",
-        description: "您的个性化学习计划已生成，开始学习之旅吧！"
+        description: "您的简化学习计划已生成，开始学习之旅吧！"
       })
       
     } catch (error) {
-      console.error('保存计划失败:', error)
+      console.error('保存简化计划失败:', error)
       toast({
         variant: "destructive",
         title: "保存计划失败",
@@ -238,7 +237,7 @@ export default function LearningPlanPage() {
                     开始制定您的学习计划
                   </CardTitle>
                   <CardDescription className="text-base">
-                    根据您的学习基础和时间安排，AI将为您生成最适合的个性化学习方案
+                    通过简单的问卷设置，快速生成适合您的基础学习计划
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="text-center">
@@ -246,15 +245,15 @@ export default function LearningPlanPage() {
                     <div className="flex justify-center gap-4 text-sm text-gray-600 mb-4">
                       <div className="flex items-center gap-2">
                         <Check className="h-4 w-4 text-green-600" />
-                        智能分析学习进度
+                        简单问卷设置
                       </div>
                       <div className="flex items-center gap-2">
                         <Check className="h-4 w-4 text-green-600" />
-                        个性化时间安排
+                        基础计划生成
                       </div>
                       <div className="flex items-center gap-2">
                         <Check className="h-4 w-4 text-green-600" />
-                        三级计划体系
+                        日周计划管理
                       </div>
                     </div>
                   </div>
@@ -418,10 +417,10 @@ export default function LearningPlanPage() {
           <DialogHeader>
             <DialogTitle>制定个性化学习计划</DialogTitle>
             <DialogDescription>
-              根据您的学习基础和时间安排，AI将为您生成最适合的学习计划
+              通过简化的问卷流程，快速制定适合您的学习计划
             </DialogDescription>
           </DialogHeader>
-          <StudyPlanWizardV2 
+          <StudyPlanWizardSimple 
             onComplete={handlePlanGenerated}
             onCancel={() => setShowPlanWizard(false)}
           />
