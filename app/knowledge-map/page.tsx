@@ -19,31 +19,9 @@ import { useStudyPlanStore } from '@/stores/study-plan-store'
 import { useStudySessionStore } from '@/stores/study-session-store'
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
-// 使用 dynamic import 避免 SSR 相关问题
-const MindMapViewer = dynamic(
-  () => import('@/components/knowledge-map/MindMapViewer'),
-  { 
-    ssr: false, // 禁用服务器端渲染
-    loading: () => (
-      <div className="flex flex-col items-center justify-center p-10 space-y-4">
-        <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-500 rounded-full animate-spin"></div>
-        <div className="text-gray-600">正在加载知识导图...</div>
-      </div>
-    )
-  }
-);
-
-const MindMapQuickNav = dynamic(
-  () => import('@/components/knowledge-map/MindMapQuickNav'),
-  { 
-    ssr: false,
-    loading: () => (
-      <div className="flex items-center space-x-2 mb-3">
-        <div className="text-sm text-gray-500 animate-pulse">加载导航中...</div>
-      </div>
-    )
-  }
-);
+// 直接导入组件避免动态加载问题
+import MindMapViewer from '@/components/knowledge-map/MindMapViewer'
+import MindMapQuickNav from '@/components/knowledge-map/MindMapQuickNav'
 
 export default function KnowledgeMapPage() {
   const searchParams = useSearchParams()

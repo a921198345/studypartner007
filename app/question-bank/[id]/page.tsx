@@ -799,7 +799,7 @@ export default function QuestionPage() {
           setAnsweredQuestions(history.answered || {});
           setCorrectAnswers(history.correct || {});
           setTotalAnswered(Object.keys(history.answered || {}).length);
-          setTotalCorrect(Object.keys(history.correct || {}).length);
+          setTotalCorrect(Object.keys(history.correct || {}).filter(qId => history.correct[qId]).length);
           
             // 如果没有重置状态，且有当前题目的答题记录，恢复答题状态
             if (!shouldResetState && history.results && history.results[questionId]) {
