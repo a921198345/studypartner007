@@ -48,11 +48,15 @@ const QuestionFilters = memo<FilterProps>(({
 
   const years = useMemo(() => [
     { id: "all", name: "全部年份" },
+    { id: "2024", name: "2024年", free: true },
+    { id: "2023", name: "2023年", free: true },
     { id: "2022", name: "2022年", free: true },
     { id: "2021", name: "2021年", free: false },
     { id: "2020", name: "2020年", free: false },
     { id: "2019", name: "2019年", free: false },
     { id: "2018", name: "2018年", free: false },
+    { id: "2017", name: "2017年", free: false },
+    { id: "2016", name: "2016年", free: false },
   ], [])
 
   const questionTypes = useMemo(() => [
