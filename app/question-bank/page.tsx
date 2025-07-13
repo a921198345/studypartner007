@@ -21,6 +21,17 @@ import { useStudyPlanStore } from '@/stores/study-plan-store'
 import { useStudySessionStore } from '@/stores/study-session-store'
 import { useUserStore } from '@/stores/user-store'
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import QuestionFilters from "@/components/question-bank/optimized-filters"
+
+// 筛选选项接口
+interface FilterOptions {
+  selectedSubject: string
+  selectedYears: string[]
+  selectedQuestionTypes: string[]
+  searchQuery: string
+  aiKeywords: string[]
+  isFromAiChat: boolean
+}
 
 // 辅助函数：比较两个数组是否内容相同（忽略顺序）
 function arraysEqual(a: any[], b: any[]): boolean {
