@@ -459,7 +459,6 @@ export default function QuestionBankPage() {
           } else {
             // 普通搜索
             console.log('调用API时的筛选参数:', {
-              selectedSubject,
               selectedYears,
               selectedQuestionTypes,
               debouncedSearchQuery,
@@ -1571,7 +1570,6 @@ export default function QuestionBankPage() {
                         if (questions.length > 0) {
                           // 创建新会话并传入总题数
                           const currentFilters = {
-                            subject: selectedSubject,
                             years: selectedYears,
                             types: selectedQuestionTypes,
                             search: debouncedSearchQuery || ''
