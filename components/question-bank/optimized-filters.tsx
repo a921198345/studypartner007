@@ -163,9 +163,8 @@ const QuestionFilters = memo<FilterProps>(({
       </div>
 
       {/* 筛选选项 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* 科目选择已移除 - 数据库中没有科目字段 */}
-        {/* 
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* 科目选择 */}
         <div>
           <label className="text-sm font-medium mb-2 block">科目</label>
           <Select
@@ -185,7 +184,6 @@ const QuestionFilters = memo<FilterProps>(({
             </SelectContent>
           </Select>
         </div>
-        */}
 
         {/* 年份选择 */}
         <div>
