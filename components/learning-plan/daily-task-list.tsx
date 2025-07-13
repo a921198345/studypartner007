@@ -5,7 +5,7 @@ import { Card, CardContent } from "../ui/card"
 import { Badge } from "../ui/badge"
 import { Button } from "../ui/button"
 import { Checkbox } from "../ui/checkbox"
-import { BookOpen, Brain, FileText, Calendar, Clock, CheckCircle } from "lucide-react"
+import { BookOpen, Brain, FileText, Calendar, Clock, CheckCircle, Edit2 } from "lucide-react"
 import Link from "next/link"
 
 interface Task {
@@ -23,6 +23,7 @@ interface DailyTaskListProps {
   date: Date
   tasks: Task[]
   onTaskComplete: (taskId: string, completed: boolean) => void
+  onTaskEdit?: (task: Task) => void
 }
 
 export function DailyTaskList({ date, tasks, onTaskComplete }: DailyTaskListProps) {
