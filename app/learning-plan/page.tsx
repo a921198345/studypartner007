@@ -130,21 +130,6 @@ export default function LearningPlanPage() {
     return notes.filter(note => note.planType === activeTab)
   }
 
-  // 获取计划统计
-  const getPlanStats = () => {
-    const planNotes = getCurrentNotes()
-    const totalNotes = planNotes.length
-    const completedNotes = planNotes.filter(note => note.completed).length
-    const completionRate = totalNotes > 0 ? Math.round((completedNotes / totalNotes) * 100) : 0
-
-    return {
-      totalNotes,
-      completedNotes,
-      completionRate
-    }
-  }
-
-  const stats = getPlanStats()
   const currentNotes = getCurrentNotes()
 
   // 获取标签页主题色
@@ -190,11 +175,6 @@ export default function LearningPlanPage() {
       <main className="flex-1">
         <div className="container mx-auto py-6">
           <div className="max-w-4xl mx-auto space-y-6">
-            {/* 顶部标题 */}
-            <div className="text-center">
-              <h1 className="text-3xl font-bold mb-2">学习计划管理</h1>
-              <p className="text-muted-foreground">创建和管理您的个性化学习笔记</p>
-            </div>
 
             {/* 计划类型选择 */}
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)}>
@@ -213,38 +193,6 @@ export default function LearningPlanPage() {
                 </TabsTrigger>
               </TabsList>
 
-              {/* 统计信息 */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                <Card>
-                  <CardContent className="flex items-center p-4">
-                    <BookOpen className="h-8 w-8 text-blue-600 mr-3" />
-                    <div>
-                      <p className="text-2xl font-bold">{stats.totalNotes}</p>
-                      <p className="text-xs text-muted-foreground">总笔记数</p>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardContent className="flex items-center p-4">
-                    <Check className="h-8 w-8 text-green-600 mr-3" />
-                    <div>
-                      <p className="text-2xl font-bold">{stats.completedNotes}</p>
-                      <p className="text-xs text-muted-foreground">已完成</p>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardContent className="flex items-center p-4">
-                    <Calendar className="h-8 w-8 text-purple-600 mr-3" />
-                    <div>
-                      <p className="text-2xl font-bold">{stats.completionRate}%</p>
-                      <p className="text-xs text-muted-foreground">完成率</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
 
               {/* 计划内容区域 */}
               <TabsContent value="daily" className="space-y-4">
