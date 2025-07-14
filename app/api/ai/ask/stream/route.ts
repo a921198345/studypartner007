@@ -5,6 +5,7 @@ import { searchVectorChunks, searchByKeywords } from '@/lib/vector-search';
 import { withAuth } from '@/lib/api-auth';
 import { checkAIUsageLimit, incrementAIUsage, logFeatureUsage } from '@/lib/membership-middleware';
 import { verifyAuth } from '@/lib/auth-middleware';
+import { checkGuestUsageLimit, incrementGuestUsage } from '@/lib/guest-usage';
 
 // 设置能够流式响应的headers
 export const headers = {
@@ -188,11 +189,17 @@ async function handlePost(req: NextRequest) {
         
         try {
           // 增加AI使用次数
-          await incrementAIUsage(user_id);
-          await logFeatureUsage(user_id, 'ai_chat', 'ask_question', sessionId);
+          if (is_guest) {
+            await incrementGuestUsage(req);
+          } else {
+            await incrementAIUsage(user_id);
+            await logFeatureUsage(user_id, 'ai_chat', 'ask_question', sessionId);
+          }
           
           // 获取更新后的使用情况
-          const updated_usage = await checkAIUsageLimit(user_id);
+          const updated_usage = is_guest ? 
+            await checkGuestUsageLimit(req) : 
+            await checkAIUsageLimit(user_id);
           
           // 立即发送一个初始响应，包含使用情况信息
           safeEnqueue(`data: {"type": "init", "content": "", "usage": ${JSON.stringify({
