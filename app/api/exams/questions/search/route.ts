@@ -164,13 +164,16 @@ export async function POST(request) {
       // 使用AI提取核心关键词
       const processedResults = [];
       for (const keyword of keywords) {
+        console.log(`开始处理关键词: "${keyword}"`);
         const processed = AIKeywordProcessor.processKeyword(keyword);
+        console.log(`处理结果:`, processed);
         processedResults.push(processed);
       }
       
       // 收集所有核心关键词
       const allCoreKeywords = new Set();
       processedResults.forEach(result => {
+        console.log(`从处理结果中添加关键词:`, result.keywords);
         result.keywords.forEach(kw => allCoreKeywords.add(kw));
       });
       
@@ -202,11 +205,13 @@ export async function POST(request) {
       
       // 对每个核心关键词进行模糊匹配搜索
       for (const keyword of finalKeywords) {
+        console.log(`\n搜索关键词: "${keyword}"`);
         const conditions = [...baseConditions];
         const params = [...baseParams];
         
         // 使用改进的模糊搜索条件
         const searchResult = buildPreciseSearchCondition(keyword);
+        console.log(`搜索条件构建结果:`, searchResult);
         
         // 如果搜索条件为假（比如1=0），跳过这个关键词
         if (searchResult.condition === '1=0' || searchResult.params.length === 0) {
@@ -253,7 +258,9 @@ export async function POST(request) {
           200 // 每个关键词最多返回200条
         ];
         
-        console.log(`搜索关键词 "${keyword}"`);
+        console.log(`执行SQL查询，关键词 "${keyword}"`);
+        console.log(`SQL: ${query}`);
+        console.log(`参数: ${JSON.stringify(queryParams)}`);
         const [questions] = await connection.execute(query, queryParams);
         console.log(`关键词 "${keyword}" 找到 ${questions.length} 条结果`);
         
