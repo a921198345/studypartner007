@@ -13,7 +13,6 @@ import { Footer } from "@/components/footer"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Link from "next/link"
 import { questionApi, getWrongQuestions, getFavoriteQuestions } from "@/lib/api/questions"
-import { AnswerHistoryV2 as AnswerHistory } from "@/components/question-bank/answer-history-v2"
 import { createAnswerSession } from "@/lib/answer-sessions"
 import { useToast } from "@/components/ui/use-toast"
 import { useFirstUseAuth } from '@/components/auth/first-use-auth-guard'
@@ -1488,8 +1487,6 @@ export default function QuestionBankPage() {
                   </div>
                 </CardContent>
               </Card>
-
-              <AnswerHistory />
             </div>
 
             <div className="md:col-span-3">
