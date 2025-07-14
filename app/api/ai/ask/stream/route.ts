@@ -69,45 +69,70 @@ async function handlePost(req: NextRequest) {
   console.log("接收到AI问答请求");
   
   try {
-    // 验证用户身份
+    // 先尝试验证用户身份（允许失败）
     const auth_result = await verifyAuth(req);
-    if (!auth_result.success) {
-      return new Response(JSON.stringify({ 
-        success: false, 
-        message: '请先登录',
-        requireAuth: true
-      }), {
-        status: 401,
-        headers: { 
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        }
-      });
+    let user_id = null;
+    let is_guest = false;
+    
+    if (auth_result.success) {
+      // 用户已登录
+      user_id = auth_result.user.user_id;
+      console.log('用户已登录，user_id:', user_id);
+    } else {
+      // 用户未登录，作为访客处理
+      is_guest = true;
+      console.log('访客用户，允许试用');
     }
     
-    const user_id = auth_result.user.user_id;
-    
     // 检查AI使用限制
-    const usage_limit = await checkAIUsageLimit(user_id);
-    console.log('AI使用限制检查:', usage_limit);
+    let usage_limit;
     
-    if (!usage_limit.canUse) {
-      return new Response(JSON.stringify({ 
-        success: false, 
-        message: '今日免费提问次数已用完',
-        upgradeRequired: true,
-        usage: {
-          limit: usage_limit.limit,
-          used: usage_limit.used,
-          remainingToday: usage_limit.remainingToday
-        }
-      }), {
-        status: 403,
-        headers: { 
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        }
-      });
+    if (is_guest) {
+      // 访客用户：检查IP或session的使用次数
+      usage_limit = await checkGuestUsageLimit(req);
+      console.log('访客使用限制检查:', usage_limit);
+      
+      if (!usage_limit.canUse) {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          message: '试用次数已用完，请登录继续使用',
+          requireAuth: true,
+          usage: {
+            limit: usage_limit.limit,
+            used: usage_limit.used,
+            remainingToday: usage_limit.remainingToday
+          }
+        }), {
+          status: 403,
+          headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+      }
+    } else {
+      // 登录用户：正常检查
+      usage_limit = await checkAIUsageLimit(user_id);
+      console.log('登录用户使用限制检查:', usage_limit);
+      
+      if (!usage_limit.canUse) {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          message: '今日免费提问次数已用完',
+          upgradeRequired: true,
+          usage: {
+            limit: usage_limit.limit,
+            used: usage_limit.used,
+            remainingToday: usage_limit.remainingToday
+          }
+        }), {
+          status: 403,
+          headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+      }
     }
     
     // 解析请求体
