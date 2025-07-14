@@ -327,7 +327,65 @@ export default function AIChat() {
       });
       
       if (!response.ok) {
-        throw new Error('API 请求失败');
+        // 尝试解析错误响应
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          errorData = {};
+        }
+        
+        // 根据状态码处理不同的错误
+        switch (response.status) {
+          case 401:
+            // 认证失败
+            toast({
+              title: "认证失败",
+              description: "您的登录状态已过期，请重新登录",
+              variant: "destructive",
+            });
+            // 可以在这里添加重定向到登录页的逻辑
+            updateMessage(aiMessageId, { 
+              content: '❌ 认证失败，请重新登录后再试。' 
+            });
+            // 重置流式状态
+            setIsStreaming(false);
+            setCurrentStreamingMessageId(null);
+            return;
+            
+          case 403:
+            // 权限不足或使用限制
+            if (errorData.requireAuth) {
+              toast({
+                title: "试用次数用完",
+                description: "您已使用完2次免费试用，请登录继续使用",
+                variant: "destructive",
+              });
+              updateMessage(aiMessageId, { 
+                content: '🔒 试用次数已用完，请登录继续使用更多功能。' 
+              });
+            } else if (errorData.upgradeRequired) {
+              toast({
+                title: "今日免费次数用完",
+                description: "请升级会员或明天再试",
+                variant: "destructive",
+              });
+              updateMessage(aiMessageId, { 
+                content: '📈 今日免费提问次数已用完，请升级会员或明天再试。' 
+              });
+            } else {
+              updateMessage(aiMessageId, { 
+                content: '❌ 权限不足，请检查您的使用权限。' 
+              });
+            }
+            // 重置流式状态
+            setIsStreaming(false);
+            setCurrentStreamingMessageId(null);
+            return;
+            
+          default:
+            throw new Error(`API 请求失败: ${response.status}`);
+        }
       }
       
       const reader = response.body?.getReader();
