@@ -402,57 +402,8 @@ export default function QuestionBankPage() {
           let finalQuestions = [];
           let totalCount = 0;
           
-          if (isFromAiChat && aiKeywords.length > 0) {
-            console.log('使用AI关键词进行搜索:', aiKeywords);
-            
-            // 统一使用多关键词搜索API
-            console.log(`调用多关键词搜索API: ${aiKeywords.join(', ')}`);
-            
-            const searchResponse = await questionApi.searchWithMultipleKeywords({
-              keywords: aiKeywords,
-              year: selectedYears,
-              questionType: !selectedQuestionTypes.includes('全部题型') ? 
-                (selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题') : undefined,
-              page: pagination.currentPage,
-              limit: pagination.perPage
-            });
-            
-            if (searchResponse.success) {
-              questionsData = searchResponse;
-              console.log(`多关键词搜索结果: 找到 ${searchResponse.data?.pagination?.total || 0} 道题目`);
-              console.log('搜索调试信息:', searchResponse.data?.debug);
-              
-              // 如果没有搜索结果，提供智能建议
-              if (searchResponse.data?.pagination?.total === 0) {
-                console.log('未找到相关题目，提供智能建议');
-                
-                // 生成搜索建议
-                const suggestions = generateSearchSuggestions(aiKeywords);
-                
-                toast({
-                  title: "未找到相关题目",
-                  description: `建议尝试搜索: ${suggestions.slice(0, 3).join('、')}`,
-                  duration: 8000,
-                });
-              }
-            } else {
-              console.error('多关键词搜索失败:', searchResponse.message);
-              // 使用空结果
-              questionsData = {
-                success: false,
-                message: searchResponse.message || '搜索失败',
-                data: {
-                  questions: [],
-                  pagination: {
-                    total: 0,
-                    totalPages: 0,
-                    currentPage: pagination.currentPage,
-                    perPage: pagination.perPage
-                  }
-                }
-              };
-            }
-          } else {
+          // 统一使用相同的搜索逻辑，不管是从哪里跳转过来的
+          {
             // 普通搜索
             console.log('调用API时的筛选参数:', {
               selectedYears,
