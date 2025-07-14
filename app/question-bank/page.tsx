@@ -404,13 +404,20 @@ export default function QuestionBankPage() {
           
           // 统一使用相同的搜索逻辑，不管是从哪里跳转过来的
           {
-            // 普通搜索
+            // 统一搜索逻辑：如果有AI关键词，转换为搜索查询，否则使用搜索框内容
+            let searchQuery = debouncedSearchQuery;
+            if (isFromAiChat && aiKeywords.length > 0 && !debouncedSearchQuery) {
+              // 将AI关键词连接为搜索查询
+              searchQuery = aiKeywords.join(' ');
+              console.log('将AI关键词转换为搜索查询:', searchQuery);
+            }
+            
             console.log('调用API时的筛选参数:', {
               selectedYears,
               selectedQuestionTypes,
-              debouncedSearchQuery,
               searchQuery,
-              hasSearch: !!debouncedSearchQuery
+              isFromAiChat,
+              aiKeywords
             });
             
             const yearParam = selectedYears.includes('all') ? undefined : selectedYears;
@@ -423,12 +430,26 @@ export default function QuestionBankPage() {
             const response = await questionApi.getQuestions({
               year: yearParam,
               question_type: !selectedQuestionTypes.includes('全部题型') ? selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题' : undefined,
-              search: debouncedSearchQuery || undefined,
+              search: searchQuery || undefined,
               page: pagination.currentPage,
               limit: pagination.perPage
             });
             
             questionsData = response;
+            
+            // 如果没有搜索结果且是从AI/知识导图跳转，提供智能建议
+            if (questionsData.success && questionsData.data?.pagination?.total === 0 && isFromAiChat && aiKeywords.length > 0) {
+              console.log('未找到相关题目，提供智能建议');
+              
+              // 生成搜索建议
+              const suggestions = generateSearchSuggestions(aiKeywords);
+              
+              toast({
+                title: "未找到相关题目",
+                description: `建议尝试搜索: ${suggestions.slice(0, 3).join('、')}`,
+                duration: 8000,
+              });
+            }
           }
           
           if (questionsData.success) {
@@ -453,8 +474,7 @@ export default function QuestionBankPage() {
               totalPages: questionsData.data.pagination.totalPages
             }));
             
-            // 更新实际题目总数
-            // 确保AI搜索的结果总数正确显示
+            // 更新实际题目总数  
             setActualTotalQuestions(prevTotal => {
               if (prevTotal !== newTotal) {
                 console.log(`请求 #${currentRequestId} 更新题目总数: ${prevTotal} -> ${newTotal}`);
@@ -463,17 +483,15 @@ export default function QuestionBankPage() {
             });
             
             // 添加调试日志
-            if (isFromAiChat && aiKeywords.length > 0) {
-              console.log(`AI搜索结果总数: ${newTotal}, 关键词: ${aiKeywords.join(', ')}`);
-            } else if (debouncedSearchQuery) {
-              console.log(`普通搜索结果总数: ${newTotal}, 搜索词: ${debouncedSearchQuery}`);
+            if (searchQuery) {
+              console.log(`搜索结果总数: ${newTotal}, 搜索词: ${searchQuery}`);
             } else {
               console.log(`全部题目总数: ${newTotal}`);
             }
             
             // 调试日志
             console.log('搜索响应:', {
-              searchQuery: debouncedSearchQuery,
+              searchQuery: searchQuery,
               total: newTotal,
               questions: questionsData.data.questions.length
             });
@@ -484,25 +502,15 @@ export default function QuestionBankPage() {
             // --- 修改开始: 获取并保存所有筛选后的题目信息 ---
             // 只在第一页时获取完整的题目列表，避免重复请求
             if (newTotal > 0 && pagination.currentPage === 1) {
-              // 只在有搜索条件或AI关键词时才获取完整列表
-              // 否则使用已经返回的分页数据即可
-              if (isFromAiChat && aiKeywords.length > 0) {
-                // AI搜索模式
+              if (searchQuery) {
+                // 有搜索条件时获取完整列表
                 fetchAllFilteredQuestionInfoAndSave(newTotal, {
                   year: selectedYears.includes('all') ? undefined : selectedYears,
                   question_type: !selectedQuestionTypes.includes('全部题型') ? (selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题') : undefined,
-                  aiKeywords: aiKeywords,
-                }, questionsData.data.questions, newTotal);
-              } else if (debouncedSearchQuery) {
-                // 普通搜索模式
-                fetchAllFilteredQuestionInfoAndSave(newTotal, {
-                  year: selectedYears.includes('all') ? undefined : selectedYears,
-                  question_type: !selectedQuestionTypes.includes('全部题型') ? (selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题') : undefined,
-                  search: debouncedSearchQuery,
+                  search: searchQuery,
                 }, questionsData.data.questions, newTotal);
               } else if (newTotal <= 200) {
                 // 无搜索条件的普通浏览模式，题目数量不太多时获取完整列表
-                // 提高阈值到200以覆盖更多筛选场景
                 fetchAllFilteredQuestionInfoAndSave(newTotal, {
                   year: selectedYears.includes('all') ? undefined : selectedYears,
                   question_type: !selectedQuestionTypes.includes('全部题型') ? (selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题') : undefined,
@@ -515,8 +523,7 @@ export default function QuestionBankPage() {
                   filters: {
                     years: selectedYears,
                     types: selectedQuestionTypes,
-                    search: debouncedSearchQuery || '',
-                    aiKeywords: []
+                    search: searchQuery || ''
                   },
                   actualTotal: newTotal, // 保存实际总数
                   timestamp: Date.now(),
@@ -530,8 +537,7 @@ export default function QuestionBankPage() {
                 filters: {
                   years: selectedYears,
                   types: selectedQuestionTypes,
-                  search: debouncedSearchQuery || '',
-                  aiKeywords: isFromAiChat ? aiKeywords : []
+                  search: searchQuery || ''
                 },
                 timestamp: Date.now()
               }));
@@ -754,32 +760,35 @@ export default function QuestionBankPage() {
       
       try {
         setIsFetchingAllIds(true);
-        // 如果有AI关键词，使用多关键词搜索API获取完整结果
+        
+        // 统一搜索逻辑：无论是否有AI关键词，都使用同一个getQuestions API
+        let searchFilters = { ...filters };
+        
+        // 如果有AI关键词，转换为搜索查询字符串
         if (filters.aiKeywords && filters.aiKeywords.length > 0) {
-          console.log('使用多关键词搜索API获取完整结果，关键词:', filters.aiKeywords);
-          
-          // 调用多关键词搜索API，获取所有结果（不分页）
-          const response = await questionApi.searchWithMultipleKeywords({
-            keywords: filters.aiKeywords,
-            subject: filters.subject && filters.subject !== 'all' ? filters.subject : undefined,
-            year: filters.year || ['all'],
-            questionType: filters.question_type,
-            page: 1,
-            limit: 1000 // 获取所有结果
-          });
-          
-          if (response.success && response.data && response.data.questions) {
-            console.log('多关键词搜索API响应:', {
-              returnedCount: response.data.questions.length,
-              total: response.data.pagination?.total,
-              page: response.data.pagination?.currentPage,
-              perPage: response.data.pagination?.perPage
-            });
-            
+          console.log('将AI关键词转换为搜索查询，关键词:', filters.aiKeywords);
+          searchFilters.search = filters.aiKeywords.join(' ');
+          // 移除aiKeywords属性，因为getQuestions API不需要它
+          delete searchFilters.aiKeywords;
+        }
+        
+        console.log('使用统一的getQuestions API获取完整结果，筛选条件:', searchFilters);
+        
+        // 统一使用getQuestions API
+        const response = await questionApi.getQuestions({
+          ...searchFilters,
+          fetchAllIdsAndCodes: true
+        });
+
+        if (response.success && response.data && response.data.questions) {
             const allFilteredQuestionInfo = response.data.questions.map((q: any) => ({
               id: q.id,
               question_code: q.question_code || null
             }));
+
+            // 保存搜索信息，优先使用转换后的搜索查询
+            const searchQuery = searchFilters.search || filters.search || '';
+            const aiKeywords = filters.aiKeywords || [];
             
             const dataToSave = {
               questions: allFilteredQuestionInfo,
@@ -787,79 +796,51 @@ export default function QuestionBankPage() {
                 subject: filters.subject || 'all',
                 years: filters.year || ['all'],
                 types: filters.question_type ? [filters.question_type] : ['全部题型'],
-                search: filters.aiKeywords.join(', '),
-                aiKeywords: filters.aiKeywords
+                search: searchQuery,
+                ...(aiKeywords.length > 0 && { aiKeywords })
               },
               actualTotal: actualFilteredTotal || allFilteredQuestionInfo.length,
               timestamp: Date.now()
             };
-            localStorage.setItem('filteredQuestionsList', JSON.stringify(dataToSave));
-            console.log(`成功保存 ${allFilteredQuestionInfo.length} 条多关键词搜索结果到localStorage`);
-            console.log(`实际筛选总数: ${actualFilteredTotal || allFilteredQuestionInfo.length}`);
-            console.log('保存的前10个题目ID:', allFilteredQuestionInfo.slice(0, 10).map(q => q.id));
-            console.log('保存的数据结构:', {
-              questionsLength: dataToSave.questions.length,
-              actualTotal: dataToSave.actualTotal,
-              filters: dataToSave.filters
-            });
             
-            // 标记导航数据已准备好
-            setIsNavigationReady(true);
-          }
-        } else {
-          // 普通搜索
-          const response = await questionApi.getQuestions({
-            ...filters,
-            fetchAllIdsAndCodes: true
-          });
-
-          if (response.success && response.data && response.data.questions) {
-            const allFilteredQuestionInfo = response.data.questions.map((q: any) => ({
-              id: q.id,
-              question_code: q.question_code || null
-            }));
-
-            localStorage.setItem('filteredQuestionsList', JSON.stringify({
-              questions: allFilteredQuestionInfo,
-              filters: {
-                subject: filters.subject || 'all',
-                years: filters.year || ['all'],
-                types: filters.question_type ? [filters.question_type] : ['全部题型'],
-                search: filters.search || ''
-              },
-              timestamp: Date.now()
-            }));
+            localStorage.setItem('filteredQuestionsList', JSON.stringify(dataToSave));
             console.log(`成功保存 ${allFilteredQuestionInfo.length} 条筛选后的题目信息到localStorage`);
             setIsNavigationReady(true);
           } else {
             console.warn("获取所有筛选题目ID和题号失败，将使用当前页数据作为导航降级。", response.message);
             // 降级：只保存当前页的题目信息
             const currentFilteredQuestions = currentPageData.map((q: any) => ({ id: q.id, question_code: q.question_code || null }));
+            const searchQuery = searchFilters.search || filters.search || '';
+            const aiKeywords = filters.aiKeywords || [];
+            
             localStorage.setItem('filteredQuestionsList', JSON.stringify({
               questions: currentFilteredQuestions,
               filters: {
                 subject: filters.subject || 'all',
                 years: filters.year || ['all'],
                 types: filters.question_type ? [filters.question_type] : ['全部题型'],
-                search: filters.search || ''
+                search: searchQuery,
+                ...(aiKeywords.length > 0 && { aiKeywords })
               },
               page: pagination.currentPage, // 保留当前页信息，因为列表不完整
               timestamp: Date.now()
             }));
           }
-        }
       } catch (error) {
         console.error("请求所有筛选题目ID和题号时出错:", error);
         // 降级：只保存当前页的题目信息
         const currentFilteredQuestions = currentPageData.map((q: any) => ({ id: q.id, question_code: q.question_code || null }));
+        const searchQuery = filters.search || '';
+        const aiKeywords = filters.aiKeywords || [];
+        
         localStorage.setItem('filteredQuestionsList', JSON.stringify({
           questions: currentFilteredQuestions,
           filters: {
             subject: filters.subject || 'all',
             years: filters.year || ['all'],
             types: filters.question_type ? [filters.question_type] : ['全部题型'],
-            search: filters.search || '',
-            aiKeywords: filters.aiKeywords || []
+            search: searchQuery,
+            ...(aiKeywords.length > 0 && { aiKeywords })
           },
           page: pagination.currentPage, // 保留当前页信息，因为列表不完整
           timestamp: Date.now()

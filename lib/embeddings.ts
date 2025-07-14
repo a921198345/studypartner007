@@ -85,4 +85,24 @@ export class EmbeddingService {
   }
 }
 
+// 简化的单函数导出，与API兼容
+export async function getTextEmbedding(text, useDeepSeek = true) {
+  try {
+    if (!process.env.DEEPSEEK_API_KEY && useDeepSeek) {
+      console.warn('DeepSeek API密钥未配置，跳过向量嵌入');
+      return null;
+    }
+
+    const service = new EmbeddingService(
+      process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY,
+      useDeepSeek ? 'deepseek' : 'openai'
+    );
+    
+    return await service.createEmbedding(text);
+  } catch (error) {
+    console.error('获取文本嵌入失败:', error);
+    return null;
+  }
+}
+
 export default EmbeddingService;

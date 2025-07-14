@@ -546,88 +546,41 @@ export default function QuestionPage() {
           const filters = JSON.parse(decodeURIComponent(filtersParam));
           console.log('从URL参数恢复筛选条件:', filters);
           
-          // 根据筛选条件重新获取题目列表
+          // 统一搜索逻辑：根据筛选条件重新获取题目列表
+          let searchFilters = { ...filters };
+          
+          // 如果有AI关键词，转换为搜索查询字符串
           if (filters.aiKeywords && filters.aiKeywords.length > 0) {
-            // AI关键词搜索
-            console.log('使用AI关键词重新获取题目列表:', filters.aiKeywords);
-            const response = await questionApi.searchWithMultipleKeywords({
-              keywords: filters.aiKeywords,
-              subject: filters.subject,
-              year: filters.year,
-              questionType: filters.question_type,
-              page: 1,
-              limit: 1000
-            });
-            
-            if (response.success && response.data && response.data.questions) {
-              const questions = response.data.questions.map(q => ({
-                id: q.id,
-                question_code: q.question_code || `Q${q.id}`
-              }));
-              
-              // 保存到localStorage供导航使用
-              localStorage.setItem('filteredQuestionsList', JSON.stringify({
-                questions: questions,
-                filters: filters,
-                actualTotal: questions.length,
-                timestamp: Date.now()
-              }));
-              console.log(`恢复了${questions.length}道筛选题目到localStorage`);
-            }
-          } else if (filters.search) {
-            // 普通搜索
-            console.log('使用搜索关键词重新获取题目列表:', filters.search);
-            const response = await questionApi.searchQuestions({
-              keyword: filters.search,
-              subject: filters.subject,
-              year: filters.year,
-              questionType: filters.question_type,
-              page: 1,
-              limit: 1000
-            });
-            
-            if (response.success && response.data && response.data.questions) {
-              const questions = response.data.questions.map(q => ({
-                id: q.id,
-                question_code: q.question_code || `Q${q.id}`
-              }));
-              
-              // 保存到localStorage供导航使用
-              localStorage.setItem('filteredQuestionsList', JSON.stringify({
-                questions: questions,
-                filters: filters,
-                actualTotal: questions.length,
-                timestamp: Date.now()
-              }));
-              console.log(`恢复了${questions.length}道筛选题目到localStorage`);
-            }
-          } else {
-            // 其他筛选条件
-            console.log('使用普通筛选条件重新获取题目列表:', filters);
-            const response = await questionApi.getQuestions({
-              page: 1,
-              limit: 1000,
-              subject: filters.subject,
-              year: filters.year,
-              questionType: filters.question_type
-            });
-            
-            if (response.success && response.data && response.data.questions) {
-              const questions = response.data.questions.map(q => ({
-                id: q.id,
-                question_code: q.question_code || `Q${q.id}`
-              }));
-              
-              // 保存到localStorage供导航使用
-              localStorage.setItem('filteredQuestionsList', JSON.stringify({
-                questions: questions,
-                filters: filters,
-                actualTotal: questions.length,
-                timestamp: Date.now()
-              }));
-              console.log(`恢复了${questions.length}道筛选题目到localStorage`);
-            }
+            console.log('将AI关键词转换为搜索查询:', filters.aiKeywords);
+            searchFilters.search = filters.aiKeywords.join(' ');
+            // 移除aiKeywords属性，因为getQuestions API不需要它
+            delete searchFilters.aiKeywords;
           }
+          
+          console.log('使用统一的getQuestions API重新获取题目列表，筛选条件:', searchFilters);
+          
+          // 统一使用getQuestions API
+          const response = await questionApi.getQuestions({
+            ...searchFilters,
+            page: 1,
+            limit: 1000
+          });
+          
+          if (response.success && response.data && response.data.questions) {
+              const questions = response.data.questions.map(q => ({
+                id: q.id,
+                question_code: q.question_code || `Q${q.id}`
+              }));
+              
+              // 保存到localStorage供导航使用
+              localStorage.setItem('filteredQuestionsList', JSON.stringify({
+                questions: questions,
+                filters: filters,
+                actualTotal: questions.length,
+                timestamp: Date.now()
+              }));
+              console.log(`恢复了${questions.length}道筛选题目到localStorage`);
+            }
           
           // 如果有sessionId，设置当前会话
           if (sessionIdParam) {

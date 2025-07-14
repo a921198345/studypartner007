@@ -115,4 +115,23 @@ export async function searchByKeywords(keywords, subject = '', limit = 10, stric
   }
 }
 
+// 缺失的向量搜索函数 - 简化实现，避免编译错误
+export async function searchVectorChunks(subject, queryVector, limit = 5) {
+  try {
+    console.log(`searchVectorChunks被调用: 学科=${subject}, 限制=${limit}`);
+    
+    // 暂时返回空结果，避免API编译错误
+    // 在有真正的向量数据库之前，这只是占位符实现
+    return [];
+    
+    // TODO: 实现真正的向量搜索逻辑
+    // 1. 连接到向量数据库
+    // 2. 执行向量相似度搜索
+    // 3. 返回格式化结果
+  } catch (error) {
+    console.error('向量搜索失败:', error);
+    return [];
+  }
+}
+
 export default VectorSearchService;

@@ -7,7 +7,7 @@ import { Badge } from "../ui/badge"
 import { Calendar, Clock, Plus, Edit2, BookOpen, FileText, Brain } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/components/ui/use-toast"
 import { EditPlanForm } from "./edit-plan-form"
 import { DailyTaskList } from "./daily-task-list"
 
