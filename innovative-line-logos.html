@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学习搭子 - 国际级线条风格Logo创新设计</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 50px;
+        }
+        
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 200;
+            margin-bottom: 10px;
+            letter-spacing: -1px;
+        }
+        
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .logo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+        
+        .logo-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.1);
+            transition: all 0.4s ease;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .logo-card:hover {
+            transform: translateY(-10px) scale(1.02);
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.2);
+        }
+        
+        .logo-container {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 25px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .logo-svg {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .logo-title {
+            font-size: 1.3rem;
+            color: #2d3748;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+        
+        .logo-desc {
+            font-size: 0.95rem;
+            color: #718096;
+            line-height: 1.5;
+        }
+        
+        .demo-nav {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 16px;
+            padding: 16px 30px;
+            margin-bottom: 40px;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .nav-logo-icon {
+            width: 36px;
+            height: 36px;
+        }
+        
+        .nav-logo-text {
+            font-size: 20px;
+            font-weight: 600;
+            color: #2d3748;
+        }
+        
+        .nav-right {
+            margin-left: auto;
+            color: #718096;
+            font-size: 14px;
+        }
+        
+        /* 动画效果 */
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .logo-card:nth-child(odd) {
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        .logo-card:nth-child(even) {
+            animation: float 6s ease-in-out infinite reverse;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>学习搭子</h1>
+            <p>国际级线条风格Logo创新设计 - 20款前沿方案</p>
+        </div>
+        
+        <!-- 导航栏演示 -->
+        <div class="demo-nav">
+            <div class="nav-logo">
+                <svg class="nav-logo-icon" viewBox="0 0 100 100" fill="none">
+                    <path d="M20 30L50 10L80 30L50 50L20 30Z" stroke="#4F46E5" stroke-width="3" fill="none"/>
+                    <path d="M20 50L50 30L80 50L50 70L20 50Z" stroke="#4F46E5" stroke-width="3" fill="none"/>
+                    <path d="M20 70L50 50L80 70L50 90L20 70Z" stroke="#4F46E5" stroke-width="3" fill="none"/>
+                </svg>
+                <div class="nav-logo-text">学习搭子</div>
+            </div>
+            <div class="nav-right">法考问答 | 知识导图 | 真题库 | 学习计划</div>
+        </div>
+        
+        <div class="logo-grid">
+            <!-- Logo 1: 几何钻石 -->
+            <div class="logo-card">
+                <div class="logo-container">
+                    <svg class="logo-svg" viewBox="0 0 100 100" fill="none">
+                        <path d="M20 30L50 10L80 30L50 50L20 30Z" stroke="#4F46E5" stroke-width="3" fill="none"/>
+                        <path d="M20 50L50 30L80 50L50 70L20 50Z" stroke="#4F46E5" stroke-width="3" fill="none"/>
+                        <path d="M20 70L50 50L80 70L50 90L20 70Z" stroke="#4F46E5" stroke-width="3" fill="none"/>
+                    </svg>
+                </div>
+                <h3 class="logo-title">多层钻石</h3>
+                <p class="logo-desc">三层菱形叠加，象征知识层次递进，线条简洁现代</p>
+            </div>
+            
+            <!-- Logo 2: 无限符号变形 -->
+            <div class="logo-card">
+                <div class="logo-container">
+                    <svg class="logo-svg" viewBox="0 0 100 100" fill="none">
+                        <path d="M20 50C20 30, 30 20, 50 20C70 20, 80 30, 80 50C80 70, 70 80, 50 80C30 80, 20 70, 20 50Z" stroke="#4F46E5" stroke-width="3" fill="none"/>
+                        <path d="M25 50C35 40, 45 40, 55 50C65 60, 75 60, 85 50" stroke="#4F46E5" stroke-width="3" fill="none"/>
+                        <circle cx="35" cy="50" r="3" fill="#4F46E5"/>
+                        <circle cx="65" cy="50" r="3" fill="#4F46E5"/>
+                    </svg>
+                </div>
+                <h3 class="logo-title">无限学习</h3>
+                <p class="logo-desc">无限符号与圆形结合，代表持续学习的理念</p>
+            </div>
+            
+            <!-- Logo 3: 分子结构 -->
+            <div class="logo-card">
+                <div class="logo-container">
+                    <svg class="logo-svg" viewBox="0 0 100 100" fill="none">
+                        <circle cx="50" cy="20" r="6" fill="none" stroke="#4F46E5" stroke-width="2.5"/>
+                        <circle cx="25" cy="50" r="6" fill="none" stroke="#4F46E5" stroke-width="2.5"/>
+                        <circle cx="75" cy="50" r="6" fill="none" stroke="#4F46E5" stroke-width="2.5"/>
+                        <circle cx="50" cy="80" r="6" fill="none" stroke="#4F46E5" stroke-width="2.5"/>
+                        <line x1="50" y1="26" x2="31" y2="44" stroke="#4F46E5" stroke-width="2"/>
+                        <line x1="50" y1="26" x2="69" y2="44" stroke="#4F46E5" stroke-width="2"/>
+                        <line x1="31" y1="56" x2="50" y2="74" stroke="#4F46E5" stroke-width="2"/>
+                        <line x1="69" y1="56" x2="50" y2="74" stroke="#4F46E5" stroke-width="2"/>
+                        <line x1="31" y1="50" x2="69" y2="50" stroke="#4F46E5" stroke-width="2"/>
+                    </svg>
+                </div>
+                <h3 class="logo-title">知识网络</h3>
+                <p class="logo-desc">分子结构象征知识点互联，体现系统性学习</p>
+            </div>
+            
+            <!-- Logo 4: 螺旋上升 -->
+            <div class="logo-card">
+                <div class="logo-container">
+                    <svg class="logo-svg" viewBox="0 0 100 100" fill="none">
+                        <path d="M50 90C30 90, 15 75, 15 55C15 35, 30 20, 50 20C70 20, 85 35, 85 55C85 75, 70 90, 50 90" stroke="#4F46E5" stroke-width="3" fill="none"/>
+                        <path d="M50 70C40 70, 30 60, 30 50C30 40, 40 30, 50 30C60 30, 70 40, 70 50" stroke="#4F46E5" stroke-width="3" fill="none"/>
+                        <circle cx="50" cy="20" r="3" fill="#4F46E5"/>
+                        <circle cx="70" cy="50" r="3" fill="#4F46E5"/>
+                    </svg>
+                </div>
+                <h3 class="logo-title">螺旋进步</h3>
+                <p class="logo-desc">螺旋线条象征知识螺旋上升的学习过程</p>
+            </div>
+            
+            <!-- Logo 5: 折纸风格 -->
+            <div class="logo-card">
+                <div class="logo-container">
+                    <svg class="logo-svg" viewBox="0 0 100 100" fill="none">
+                        <path d="M50 15L75 35L75 65L50 85L25 65L25 35L50 15Z" stroke="#4F46E5" stroke-width="3" fill="none"/>
+                        <path d="M25 35L50 50L75 35" stroke="#4F46E5" stroke-width="2"/>
+                        <path d="M25 65L50 50L75 65" stroke="#4F46E5" stroke-width="2"/>
+                        <path d="M50 15L50 85" stroke="#4F46E5" stroke-width="2"/>
+                    </svg>
+                </div>
+                <h3 class="logo-title">立体几何</h3>
+                <p class="logo-desc">3D折纸效果，展现多维度学习空间</p>
+            </div>
+            
+            <!-- Logo 6: 电路板风格 -->
+            <div class="logo-card">
+                <div class="logo-container">
+                    <svg class="logo-svg" viewBox="0 0 100 100" fill="none">
+                        <rect x="20" y="20" width="60" height="60" rx="5" stroke="#4F46E5" stroke-width="2.5" fill="none"/>
+                        <path d="M30 30L70 30L70 50L50 50L50 70L30 70L30 50L40 50L40 40L30 40L30 30" stroke="#4F46E5" stroke-width="2.5" fill="none"/>
+                        <circle cx="35" cy="35" r="2.5" fill="#4F46E5"/>
+                        <circle cx="65" cy="35" r="2.5" fill="#4F46E5"/>
+                        <circle cx="35" cy="65" r="2.5" fill="#4F46E5"/>
+                        <circle cx="55" cy="55" r="2.5" fill="#4F46E5"/>
+                    </svg>
+                </div>
+                <h3 class="logo-title">智能电路</h3>
+                <p class="logo-desc">电路板设计风格，体现AI智能学习概念</p>
+            </div>
+            
+            <!-- Logo 7: 波浪频谱 -->
+            <div class="logo-card">
+                <div class="logo-container">
+                    <svg class="logo-svg" viewBox="0 0 100 100" fill="none">
+                        <path d="M15 50Q25 30, 35 50T55 50T75 50T95 50" stroke="#4F46E5" stroke-width="3" fill="none"/>
+                        <path d="M15 40Q25 25, 35 40T55 40T75 40T95 40" stroke="#4F46E5" stroke-width="2.5" fill="none"/>
+                        <path d="M15 60Q25 75, 35 60T55 60T75 60T95 60" stroke="#4F46E5" stroke-width="2.5" fill="none"/>
+                        <circle cx="25" cy="30" r="2" fill="#4F46E5"/>
+                        <circle cx="45" cy="50" r="2" fill="#4F46E5"/>
+                        <circle cx="65" cy="40" r="2" fill="#4F46E5"/>
+                        <circle cx="85" cy="60" r="2" fill="#4F46E5"/>
+                    </svg>
+                </div>
+                <h3 class="logo-title">学习频率</h3>
+                <p class="logo-desc">音频波形设计，象征知识传播与共鸣</p>
+            </div>
+            
+            <!-- Logo 8: 六边形蜂窝 -->
+            <div class="logo-card">
+                <div class="logo-container">
+                    <svg class="logo-svg" viewBox="0 0 100 100" fill="none">
+                        <polygon points="50,15 70,27.5 70,52.5 50,65 30,52.5 30,27.5" stroke="#4F46E5" stroke-width="3" fill="none"/>
+                        <polygon points="50,30 60,35 60,45 50,50 40,45 40,35" stroke="#4F46E5" stroke-width="2.5" fill="none"/>
+                        <line x1="35" y1="30" x2="40" y2="35" stroke="#4F46E5" stroke-width="2"/>
+                        <line x1="65" y1="30" x2="60" y2="35" stroke="#4F46E5" stroke-width="2"/>
+                        <line x1="35" y1="50" x2="40" y2="45" stroke="#4F46E5" stroke-width="2"/>
+                        <line x1="65" y1="50" x2="60" y2="45" stroke="#4F46E5" stroke-width="2"/>
+                    </svg>
+                </div>
+                <h3 class="logo-title">蜂窝智慧</h3>
+                <p class="logo-desc">六边形蜂窝结构，象征高效有序的学习系统</p>
+            </div>
+            
+            <!-- Logo 9: 量子轨道 -->
+            <div class="logo-card">
+                <div class="logo-container">
+                    <svg class="logo-svg" viewBox="0 0 100 100" fill="none">
+                        <ellipse cx="50" cy="50" rx="35" ry="15" stroke="#4F46E5" stroke-width="2.5" fill="none" transform="rotate(0 50 50)"/>
+                        <ellipse cx="50" cy="50" rx="35" ry="15" stroke="#4F46E5" stroke-width="2.5" fill="none" transform="rotate(60 50 50)"/>
+                        <ellipse cx="50" cy="50" rx="35" ry="15" stroke="#4F46E5" stroke-width="2.5" fill="none" transform="rotate(120 50 50)"/>
+                        <circle cx="50" cy="50" r="4" fill="#4F46E5"/>
+                    </svg>
+                </div>
+                <h3 class="logo-title">量子学习</h3>
+                <p class="logo-desc">原子轨道模型，代表科学系统的学习方法</p>
+            </div>
+            
+            <!-- Logo 10: 几何变换 -->
+            <div class="logo-card">
+                <div class="logo-container">
+                    <svg class="logo-svg" viewBox="0 0 100 100" fill="none">
+                        <path d="M20 50L35 25L65 25L80 50L65 75L35 75L20 50Z" stroke="#4F46E5" stroke-width="3" fill="none"/>
+                        <path d="M35 40L50 25L65 40L50 55L35 40Z" stroke="#4F46E5" stroke-width="2.5" fill="none"/>
+                        <path d="M35 60L50 75L65 60L50 45L35 60Z" stroke="#4F46E5" stroke-width="2.5" fill="none"/>
+                    </svg>
+                </div>
+                <h3 class="logo-title">几何变换</h3>
+                <p class="logo-desc">多重几何形状组合，体现思维多元化</p>
+            </div>
+            
+            <!-- Logo 11: 树状分叉 -->
+            <div class="logo-card">
+                <div class="logo-container">
+                    <svg class="logo-svg" viewBox="0 0 100 100" fill="none">
+                        <path d="M50 85L50 60" stroke="#4F46E5" stroke-width="3"/>
+                        <path d="M50 60L35 45" stroke="#4F46E5" stroke-width="2.5"/>
+                        <path d="M50 60L65 45" stroke="#4F46E5" stroke-width="2.5"/>
+                        <path d="M35 45L25 30" stroke="#4F46E5" stroke-width="2"/>
+                        <path d="M35 45L45 30" stroke="#4F46E5" stroke-width="2"/>
+                        <path d="M65 45L55 30" stroke="#4F46E5" stroke-width="2"/>
+                        <path d="M65 45L75 30" stroke="#4F46E5" stroke-width="2"/>
+                        <circle cx="25" cy="30" r="2.5" fill="#4F46E5"/>
+                        <circle cx="45" cy="30" r="2.5" fill="#4F46E5"/>
+                        <circle cx="55" cy="30" r="2.5" fill="#4F46E5"/>
+                        <circle cx="75" cy="30" r="2.5" fill="#4F46E5"/>
+                        <circle cx="50" cy="85" r="3" fill="#4F46E5"/>
+                    </svg>
+                </div>
+                <h3 class="logo-title">知识树</h3>
+                <p class="logo-desc">树状分支结构，象征知识体系的扩展</p>
+            </div>
+            
+            <!-- Logo 12: DNA双螺旋 -->
+            <div class="logo-card">
+                <div class="logo-container">
+                    <svg class="logo-svg" viewBox="0 0 100 100" fill="none">
+                        <path d="M30 20Q50 30, 70 20Q50 40, 30 50Q50 60, 70 50Q50 70, 30 80" stroke="#4F46E5" stroke-width="2.5" fill="none"/>
+                        <path d="M70 20Q50 30, 30 20Q50 40, 70 50Q50 60, 30 50Q50 70, 70 80" stroke="#4F46E5" stroke-width="2.5" fill="none"/>
+                        <line x1="35" y1="25" x2="65" y2="25" stroke="#4F46E5" stroke-width="1.5"/>
+                        <line x1="40" y1="35" x2="60" y2="35" stroke="#4F46E5" stroke-width="1.5"/>
+                        <line x1="40" y1="65" x2="60" y2="65" stroke="#4F46E5" stroke-width="1.5"/>
+                        <line x1="35" y1="75" x2="65" y2="75" stroke="#4F46E5" stroke-width="1.5"/>
+                    </svg>
+                </div>
+                <h3 class="logo-title">基因学习</h3>
+                <p class="logo-desc">DNA双螺旋结构，代表学习的遗传与进化</p>
+            </div>
+            
+            <!-- Logo 13: 流体动态 -->
+            <div class="logo-card">
+                <div class="logo-container">
+                    <svg class="logo-svg" viewBox="0 0 100 100" fill="none">
+                        <path d="M20 50C20 50, 30 30, 50 30C70 30, 80 50, 80 50C80 50, 70 70, 50 70C30 70, 20 50, 20 50Z" stroke="#4F46E5" stroke-width="3" fill="none"/>
+                        <path d="M30 50C30 50, 35 40, 50 40C65 40, 70 50, 70 50C70 50, 65 60, 50 60C35 60, 30 50, 30 50Z" stroke="#4F46E5" stroke-width="2"/>
+                        <circle cx="50" cy="50" r="3" fill="#4F46E5"/>
+                    </svg>
+                </div>
+                <h3 class="logo-title">流体智慧</h3>
+                <p class="logo-desc">流体形状设计，体现知识的流动性和适应性</p>
+            </div>
+            
+            <!-- Logo 14: 折线图形 -->
+            <div class="logo-card">
+                <div class="logo-container">
+                    <svg class="logo-svg" viewBox="0 0 100 100" fill="none">
+                        <path d="M15 75L25 65L35 70L45 55L55 50L65 40L75 35L85 25" stroke="#4F46E5" stroke-width="3" fill="none"/>
+                        <circle cx="25" cy="65" r="3" fill="#4F46E5"/>
+                        <circle cx="45" cy="55" r="3" fill="#4F46E5"/>
+                        <circle cx="65" cy="40" r="3" fill="#4F46E5"/>
+                        <circle cx="85" cy="25" r="3" fill="#4F46E5"/>
+                        <line x1="15" y1="85" x2="85" y2="85" stroke="#4F46E5" stroke-width="2"/>
+                        <line x1="15" y1="85" x2="15" y2="15" stroke="#4F46E5" stroke-width="2"/>
+                    </svg>
+                </div>
+                <h3 class="logo-title">进步曲线</h3>
+                <p class="logo-desc">上升曲线图表，直观展示学习成长轨迹</p>
+            </div>
+            
+            <!-- Logo 15: 星座连线 -->
+            <div class="logo-card">
+                <div class="logo-container">
+                    <svg class="logo-svg" viewBox="0 0 100 100" fill="none">
+                        <circle cx="30" cy="30" r="2.5" fill="#4F46E5"/>
+                        <circle cx="70" cy="25" r="2.5" fill="#4F46E5"/>
+                        <circle cx="60" cy="55" r="2.5" fill="#4F46E5"/>
+                        <circle cx="25" cy="70" r="2.5" fill="#4F46E5"/>
+                        <circle cx="75" cy="75" r="2.5" fill="#4F46E5"/>
+                        <circle cx="50" cy="45" r="2.5" fill="#4F46E5"/>
+                        <line x1="30" y1="30" x2="50" y2="45" stroke="#4F46E5" stroke-width="2"/>
+                        <line x1="50" y1="45" x2="70" y2="25" stroke="#4F46E5" stroke-width="2"/>
+                        <line x1="50" y1="45" x2="60" y2="55" stroke="#4F46E5" stroke-width="2"/>
+                        <line x1="60" y1="55" x2="75" y2="75" stroke="#4F46E5" stroke-width="2"/>
+                        <line x1="25" y1="70" x2="50" y2="45" stroke="#4F46E5" stroke-width="2"/>
+                    </svg>
+                </div>
+                <h3 class="logo-title">知识星座</h3>
+                <p class="logo-desc">星座连线模式，象征知识点的神秘连接</p>
+            </div>
+            
+            <!-- Logo 16: 迷宫路径 -->
+            <div class="logo-card">
+                <div class="logo-container">
+                    <svg class="logo-svg" viewBox="0 0 100 100" fill="none">
+                        <rect x="15" y="15" width="70" height="70" stroke="#4F46E5" stroke-width="3" fill="none"/>
+                        <path d="M15 25L65 25L65 35L35 35L35 55L55 55L55 45L75 45L75 65L25 65L25 75L85 75" stroke="#4F46E5" stroke-width="2.5" fill="none"/>
+                        <circle cx="20" cy="20" r="2.5" fill="#4F46E5"/>
+                        <circle cx="80" cy="80" r="2.5" fill="#4F46E5"/>
+                    </svg>
+                </div>
+                <h3 class="logo-title">学习迷宫</h3>
+                <p class="logo-desc">迷宫路径设计，体现学习过程的探索性</p>
+            </div>
+            
+            <!-- Logo 17: 齿轮机械 -->
+            <div class="logo-card">
+                <div class="logo-container">
+                    <svg class="logo-svg" viewBox="0 0 100 100" fill="none">
+                        <circle cx="40" cy="40" r="20" stroke="#4F46E5" stroke-width="2.5" fill="none"/>
+                        <circle cx="60" cy="60" r="15" stroke="#4F46E5" stroke-width="2.5" fill="none"/>
+                        <path d="M35 25L45 25L45 15L35 15Z" stroke="#4F46E5" stroke-width="2" fill="none"/>
+                        <path d="M55 40L55 30L65 30L65 40Z" stroke="#4F46E5" stroke-width="2" fill="none"/>
+                        <path d="M35 55L45 55L45 65L35 65Z" stroke="#4F46E5" stroke-width="2" fill="none"/>
+                        <path d="M25 35L25 45L15 45L15 35Z" stroke="#4F46E5" stroke-width="2" fill="none"/>
+                        <circle cx="40" cy="40" r="4" fill="#4F46E5"/>
+                        <circle cx="60" cy="60" r="3" fill="#4F46E5"/>
+                    </svg>
+                </div>
+                <h3 class="logo-title">知识齿轮</h3>
+                <p class="logo-desc">齿轮互锁机制，象征知识体系的精密运作</p>
+            </div>
+            
+            <!-- Logo 18: 像素点阵 -->
+            <div class="logo-card">
+                <div class="logo-container">
+                    <svg class="logo-svg" viewBox="0 0 100 100" fill="none">
+                        <rect x="30" y="20" width="8" height="8" stroke="#4F46E5" stroke-width="1.5" fill="none"/>
+                        <rect x="42" y="20" width="8" height="8" stroke="#4F46E5" stroke-width="1.5" fill="none"/>
+                        <rect x="54" y="20" width="8" height="8" stroke="#4F46E5" stroke-width="1.5" fill="none"/>
+                        <rect x="24" y="32" width="8" height="8" stroke="#4F46E5" stroke-width="1.5" fill="none"/>
+                        <rect x="36" y="32" width="8" height="8" fill="#4F46E5"/>
+                        <rect x="48" y="32" width="8" height="8" stroke="#4F46E5" stroke-width="1.5" fill="none"/>
+                        <rect x="60" y="32" width="8" height="8" stroke="#4F46E5" stroke-width="1.5" fill="none"/>
+                        <rect x="30" y="44" width="8" height="8" stroke="#4F46E5" stroke-width="1.5" fill="none"/>
+                        <rect x="42" y="44" width="8" height="8" fill="#4F46E5"/>
+                        <rect x="54" y="44" width="8" height="8" fill="#4F46E5"/>
+                        <rect x="36" y="56" width="8" height="8" stroke="#4F46E5" stroke-width="1.5" fill="none"/>
+                        <rect x="48" y="56" width="8" height="8" stroke="#4F46E5" stroke-width="1.5" fill="none"/>
+                        <rect x="42" y="68" width="8" height="8" stroke="#4F46E5" stroke-width="1.5" fill="none"/>
+                    </svg>
+                </div>
+                <h3 class="logo-title">数字化学习</h3>
+                <p class="logo-desc">像素点阵风格，体现数字化时代的学习特色</p>
+            </div>
+            
+            <!-- Logo 19: 流线型箭头 -->
+            <div class="logo-card">
+                <div class="logo-container">
+                    <svg class="logo-svg" viewBox="0 0 100 100" fill="none">
+                        <path d="M20 60C20 60, 30 40, 50 45C70 50, 80 40, 80 40" stroke="#4F46E5" stroke-width="3" fill="none"/>
+                        <path d="M75 35L80 40L75 45" stroke="#4F46E5" stroke-width="3" fill="none"/>
+                        <path d="M20 50C20 50, 35 35, 50 35C65 35, 80 50, 80 50" stroke="#4F46E5" stroke-width="2.5" fill="none"/>
+                        <path d="M20 70C20 70, 35 65, 50 65C65 65, 80 60, 80 60" stroke="#4F46E5" stroke-width="2.5" fill="none"/>
+                        <circle cx="20" cy="55" r="3" fill="#4F46E5"/>
+                    </svg>
+                </div>
+                <h3 class="logo-title">流线前进</h3>
+                <p class="logo-desc">动态流线箭头，象征学习的方向性和流畅性</p>
+            </div>
+            
+            <!-- Logo 20: 抽象书页 -->
+            <div class="logo-card">
+                <div class="logo-container">
+                    <svg class="logo-svg" viewBox="0 0 100 100" fill="none">
+                        <path d="M25 20L75 20Q80 20, 80 25L80 70Q80 75, 75 75L30 75Q25 75, 25 70L25 20Z" stroke="#4F46E5" stroke-width="3" fill="none"/>
+                        <path d="M65 20Q75 25, 75 35L75 75" stroke="#4F46E5" stroke-width="2" fill="none"/>
+                        <path d="M65 20L65 30Q70 35, 75 35" stroke="#4F46E5" stroke-width="2" fill="none"/>
+                        <line x1="35" y1="35" x2="60" y2="35" stroke="#4F46E5" stroke-width="1.5"/>
+                        <line x1="35" y1="45" x2="55" y2="45" stroke="#4F46E5" stroke-width="1.5"/>
+                        <line x1="35" y1="55" x2="60" y2="55" stroke="#4F46E5" stroke-width="1.5"/>
+                        <line x1="35" y1="65" x2="50" y2="65" stroke="#4F46E5" stroke-width="1.5"/>
+                    </svg>
+                </div>
+                <h3 class="logo-title">智慧书页</h3>
+                <p class="logo-desc">翻页效果的书本设计，现代简约的学习符号</p>
+            </div>
+        </div>
+        
+        <div style="margin-top: 50px; text-align: center; color: rgba(255,255,255,0.9);">
+            <p style="font-size: 1.1rem; margin-bottom: 10px;">✨ 国际级创新线条设计 ✨</p>
+            <p style="font-size: 0.95rem; opacity: 0.8;">融合前沿设计趋势，打造独特品牌形象</p>
+        </div>
+    </div>
+</body>
+</html>
