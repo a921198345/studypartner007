@@ -1131,33 +1131,25 @@ export default function QuestionPage() {
         
         // 同时更新 answeredQuestions 和 correctAnswers 状态（与全部题目模式保持一致）
         setAnsweredQuestions(prev => {
-          const isNewAnswer = !prev[questionId];
           const newState = {
             ...prev,
             [questionId]: true
           };
           
-          // 如果是新答题，更新统计
-          if (isNewAnswer) {
-            setTotalAnswered(total => total + 1);
-          }
+          // 重新计算已答题数（避免增量更新导致的重复计数）
+          setTotalAnswered(Object.keys(newState).length);
           
           return newState;
         });
         
         setCorrectAnswers(prev => {
-          const wasCorrect = prev[questionId];
           const newState = {
             ...prev,
             [questionId]: result.data.is_correct
           };
           
-          // 更新正确题数统计
-          if (result.data.is_correct && !wasCorrect) {
-            setTotalCorrect(total => total + 1);
-          } else if (!result.data.is_correct && wasCorrect) {
-            setTotalCorrect(total => Math.max(0, total - 1));
-          }
+          // 重新计算正确题数（避免增量更新导致的重复计数）
+          setTotalCorrect(Object.keys(newState).filter(qId => newState[qId]).length);
           
           return newState;
         });
@@ -2215,15 +2207,21 @@ export default function QuestionPage() {
                             </div>
                           </div>
                           <div className="flex justify-between text-sm mb-1">
+                            <span>答题进度</span>
+                            <span className="font-medium">
+                              {totalAllQuestions > 0 ? Math.round((totalAnswered / totalAllQuestions) * 100) : 0}%
+                            </span>
+                          </div>
+                          <Progress
+                            value={totalAllQuestions > 0 ? Math.round((totalAnswered / totalAllQuestions) * 100) : 0}
+                            className="h-2"
+                          />
+                          <div className="flex justify-between text-sm mb-1 mt-2">
                             <span>正确率</span>
                             <span className="font-medium">
                               {totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0}%
                             </span>
                           </div>
-                          <Progress
-                            value={totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0}
-                            className="h-2"
-                          />
                         </CardContent>
                       </Card>
                     </div>

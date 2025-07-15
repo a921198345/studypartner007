@@ -165,8 +165,8 @@ export async function POST(request) {
       source = 'all'
     } = body;
     
-    // 生成会话ID
-    const sessionId = Date.now().toString();
+    // 生成会话ID（确保唯一性）
+    const sessionId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     // 准备数据
     const userId = session?.user?.id || null;
