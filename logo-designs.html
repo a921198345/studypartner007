@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学习搭子 - Logo设计方案</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #2d3748;
+            font-size: 2.5rem;
+            font-weight: 300;
+            margin-bottom: 20px;
+            letter-spacing: -0.5px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #718096;
+            font-size: 1.1rem;
+            margin-bottom: 50px;
+        }
+        
+        .logo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            margin-bottom: 50px;
+        }
+        
+        .logo-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .logo-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        }
+        
+        .logo {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 20px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            font-weight: 300;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .logo-title {
+            font-size: 1.2rem;
+            color: #2d3748;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+        
+        .logo-desc {
+            font-size: 0.9rem;
+            color: #718096;
+            line-height: 1.4;
+        }
+        
+        /* Logo样式 */
+        .logo-1 { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .logo-2 { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .logo-3 { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .logo-4 { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #2d3748; }
+        .logo-5 { background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); color: #2d3748; }
+        .logo-6 { background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); color: #2d3748; }
+        .logo-7 { background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%); }
+        .logo-8 { background: linear-gradient(135deg, #fad0c4 0%, #ffd1ff 100%); color: #2d3748; }
+        .logo-9 { background: linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%); }
+        .logo-10 { background: linear-gradient(135deg, #fdcbf1 0%, #e6dee9 100%); color: #2d3748; }
+        .logo-11 { background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%); color: #2d3748; }
+        .logo-12 { background: linear-gradient(135deg, #d299c2 0%, #fef9d7 100%); color: #2d3748; }
+        .logo-13 { background: linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%); }
+        .logo-14 { background: linear-gradient(135deg, #fdbb2d 0%, #22c1c3 100%); }
+        .logo-15 { background: linear-gradient(135deg, #e0c3fc 0%, #9bb5ff 100%); }
+        .logo-16 { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .logo-17 { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .logo-18 { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+        .logo-19 { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+        .logo-20 { background: linear-gradient(135deg, #30cfd0 0%, #91a7ff 100%); }
+        
+        .symbol {
+            font-size: 3rem;
+            line-height: 1;
+        }
+        
+        .text-logo {
+            font-size: 1.8rem;
+            font-weight: 600;
+            letter-spacing: -1px;
+        }
+        
+        .combined-logo {
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .combined-logo .symbol {
+            font-size: 2.2rem;
+        }
+        
+        .combined-logo .text {
+            font-size: 1rem;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>学习搭子</h1>
+        <p class="subtitle">面向证书考生的品牌Logo设计方案 - 苹果风格简约设计</p>
+        
+        <div class="logo-grid">
+            <!-- Logo 1: 盾牌书本 -->
+            <div class="logo-card">
+                <div class="logo logo-1">
+                    <div class="symbol">🛡️</div>
+                </div>
+                <h3 class="logo-title">盾牌护航</h3>
+                <p class="logo-desc">盾牌象征证书保护，体现专业可靠的学习伙伴形象</p>
+            </div>
+            
+            <!-- Logo 2: 渐变文字 -->
+            <div class="logo-card">
+                <div class="logo logo-2">
+                    <div class="text-logo">学</div>
+                </div>
+                <h3 class="logo-title">学字精粹</h3>
+                <p class="logo-desc">单字设计突出学习本质，现代渐变彰显科技感</p>
+            </div>
+            
+            <!-- Logo 3: 书本图标 -->
+            <div class="logo-card">
+                <div class="logo logo-3">
+                    <div class="symbol">📚</div>
+                </div>
+                <h3 class="logo-title">智慧书卷</h3>
+                <p class="logo-desc">经典书本元素，蓝色渐变传递知识与信任</p>
+            </div>
+            
+            <!-- Logo 4: 证书图标 -->
+            <div class="logo-card">
+                <div class="logo logo-4">
+                    <div class="symbol">🏆</div>
+                </div>
+                <h3 class="logo-title">成就之冠</h3>
+                <p class="logo-desc">奖杯象征考试成功，温暖色调营造正面激励</p>
+            </div>
+            
+            <!-- Logo 5: 毕业帽 -->
+            <div class="logo-card">
+                <div class="logo logo-5">
+                    <div class="symbol">🎓</div>
+                </div>
+                <h3 class="logo-title">学位荣光</h3>
+                <p class="logo-desc">毕业帽代表学术成就，橘粉渐变温暖亲和</p>
+            </div>
+            
+            <!-- Logo 6: 灯泡创意 -->
+            <div class="logo-card">
+                <div class="logo logo-6">
+                    <div class="symbol">💡</div>
+                </div>
+                <h3 class="logo-title">智慧之光</h3>
+                <p class="logo-desc">灯泡象征启发思考，粉色系体现创新活力</p>
+            </div>
+            
+            <!-- Logo 7: 目标靶心 -->
+            <div class="logo-card">
+                <div class="logo logo-7">
+                    <div class="symbol">🎯</div>
+                </div>
+                <h3 class="logo-title">精准目标</h3>
+                <p class="logo-desc">靶心代表考试目标，紫色渐变显示专业性</p>
+            </div>
+            
+            <!-- Logo 8: 火箭上升 -->
+            <div class="logo-card">
+                <div class="logo logo-8">
+                    <div class="symbol">🚀</div>
+                </div>
+                <h3 class="logo-title">进步火箭</h3>
+                <p class="logo-desc">火箭象征快速提升，粉色调传递积极能量</p>
+            </div>
+            
+            <!-- Logo 9: 文字组合 -->
+            <div class="logo-card">
+                <div class="logo logo-9 combined-logo">
+                    <div class="symbol">📖</div>
+                    <div class="text">搭子</div>
+                </div>
+                <h3 class="logo-title">学习伙伴</h3>
+                <p class="logo-desc">书本配文字，强调陪伴学习的品牌理念</p>
+            </div>
+            
+            <!-- Logo 10: 钻石品质 -->
+            <div class="logo-card">
+                <div class="logo logo-10">
+                    <div class="symbol">💎</div>
+                </div>
+                <h3 class="logo-title">钻石品质</h3>
+                <p class="logo-desc">钻石象征高端品质，体现优质学习服务</p>
+            </div>
+            
+            <!-- Logo 11: 星星评级 -->
+            <div class="logo-card">
+                <div class="logo logo-11">
+                    <div class="symbol">⭐</div>
+                </div>
+                <h3 class="logo-title">五星品质</h3>
+                <p class="logo-desc">星星代表优秀评价，蓝色系传递专业可信</p>
+            </div>
+            
+            <!-- Logo 12: 齿轮效率 -->
+            <div class="logo-card">
+                <div class="logo logo-12">
+                    <div class="symbol">⚙️</div>
+                </div>
+                <h3 class="logo-title">高效学习</h3>
+                <p class="logo-desc">齿轮象征学习效率，暖色调营造舒适感</p>
+            </div>
+            
+            <!-- Logo 13: 完整文字 -->
+            <div class="logo-card">
+                <div class="logo logo-13 combined-logo">
+                    <div class="text" style="font-size: 1.3rem;">学习</div>
+                    <div class="text" style="font-size: 1.3rem;">搭子</div>
+                </div>
+                <h3 class="logo-title">品牌全称</h3>
+                <p class="logo-desc">完整品牌名称设计，蓝色渐变现代简约</p>
+            </div>
+            
+            <!-- Logo 14: 山峰征服 -->
+            <div class="logo-card">
+                <div class="logo logo-14">
+                    <div class="symbol">🏔️</div>
+                </div>
+                <h3 class="logo-title">征服高峰</h3>
+                <p class="logo-desc">山峰代表挑战克服，金蓝渐变显示成就感</p>
+            </div>
+            
+            <!-- Logo 15: 钥匙解锁 -->
+            <div class="logo-card">
+                <div class="logo logo-15">
+                    <div class="symbol">🔑</div>
+                </div>
+                <h3 class="logo-title">知识钥匙</h3>
+                <p class="logo-desc">钥匙象征解锁知识，紫色系体现智慧深度</p>
+            </div>
+            
+            <!-- Logo 16: 城堡稳固 -->
+            <div class="logo-card">
+                <div class="logo logo-16">
+                    <div class="symbol">🏰</div>
+                </div>
+                <h3 class="logo-title">知识城堡</h3>
+                <p class="logo-desc">城堡代表坚实基础，粉红色调友好温暖</p>
+            </div>
+            
+            <!-- Logo 17: 指南针方向 -->
+            <div class="logo-card">
+                <div class="logo logo-17">
+                    <div class="symbol">🧭</div>
+                </div>
+                <h3 class="logo-title">学习指南</h3>
+                <p class="logo-desc">指南针象征正确方向，蓝色渐变专业可靠</p>
+            </div>
+            
+            <!-- Logo 18: 树木成长 -->
+            <div class="logo-card">
+                <div class="logo logo-18">
+                    <div class="symbol">🌳</div>
+                </div>
+                <h3 class="logo-title">成长之树</h3>
+                <p class="logo-desc">大树象征持续成长，绿色系传递生机活力</p>
+            </div>
+            
+            <!-- Logo 19: 彩虹桥梁 -->
+            <div class="logo-card">
+                <div class="logo logo-19">
+                    <div class="symbol">🌈</div>
+                </div>
+                <h3 class="logo-title">彩虹桥梁</h3>
+                <p class="logo-desc">彩虹象征希望桥梁，暖色调传递正面能量</p>
+            </div>
+            
+            <!-- Logo 20: 王冠荣耀 -->
+            <div class="logo-card">
+                <div class="logo logo-20">
+                    <div class="symbol">👑</div>
+                </div>
+                <h3 class="logo-title">王者荣耀</h3>
+                <p class="logo-desc">王冠象征考试王者，蓝紫渐变高端大气</p>
+            </div>
+        </div>
+        
+        <div style="text-align: center; color: #718096; font-size: 0.9rem;">
+            <p>设计理念：结合苹果简约美学与教育元素，为证书考生打造专业可信的品牌形象</p>
+        </div>
+    </div>
+</body>
+</html>
