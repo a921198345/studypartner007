@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学习搭子 - 导航栏Logo设计</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8fafc;
+            padding: 40px 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            color: #1e293b;
+            font-size: 2rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            color: #64748b;
+            font-size: 1.1rem;
+        }
+        
+        .demo-nav {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 12px 24px;
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .logo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+        
+        .logo-option {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .logo-preview {
+            background: white;
+            padding: 16px 24px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            min-height: 60px;
+        }
+        
+        .logo-info {
+            padding: 20px;
+        }
+        
+        .logo-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+        
+        .logo-desc {
+            font-size: 0.9rem;
+            color: #64748b;
+            line-height: 1.4;
+        }
+        
+        /* Logo设计 */
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .logo:hover {
+            opacity: 0.8;
+        }
+        
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: white;
+            font-weight: 600;
+        }
+        
+        .logo-text {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1e293b;
+        }
+        
+        /* 主品牌色 */
+        .brand-blue { background: #4F46E5; }
+        .brand-blue-light { background: #6366F1; }
+        .brand-blue-dark { background: #3730A3; }
+        .brand-gradient { background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); }
+        .brand-gradient-2 { background: linear-gradient(135deg, #3B82F6 0%, #4F46E5 100%); }
+        
+        /* 特殊样式 */
+        .text-only .logo-text {
+            color: #4F46E5;
+            font-size: 20px;
+        }
+        
+        .minimal .logo-icon {
+            background: transparent;
+            color: #4F46E5;
+            border: 2px solid #4F46E5;
+        }
+        
+        .rounded .logo-icon {
+            border-radius: 50%;
+        }
+        
+        .badge .logo-icon {
+            position: relative;
+        }
+        
+        .badge .logo-icon::after {
+            content: '';
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            width: 8px;
+            height: 8px;
+            background: #10B981;
+            border-radius: 50%;
+            border: 2px solid white;
+        }
+        
+        .compact {
+            gap: 6px;
+        }
+        
+        .compact .logo-icon {
+            width: 28px;
+            height: 28px;
+            font-size: 16px;
+        }
+        
+        .compact .logo-text {
+            font-size: 16px;
+        }
+        
+        .large .logo-icon {
+            width: 36px;
+            height: 36px;
+            font-size: 20px;
+        }
+        
+        .large .logo-text {
+            font-size: 20px;
+        }
+        
+        /* 导航栏右侧模拟 */
+        .nav-right {
+            margin-left: auto;
+            color: #64748b;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>学习搭子 - 导航栏Logo设计</h1>
+            <p>专为你的网站风格定制，完美融入蓝色主题</p>
+        </div>
+        
+        <div class="logo-grid">
+            <!-- Logo 1: 经典盾牌组合 -->
+            <div class="logo-option">
+                <div class="logo-preview">
+                    <div class="logo">
+                        <div class="logo-icon brand-blue">🛡</div>
+                        <div class="logo-text">学习搭子</div>
+                    </div>
+                    <div class="nav-right">导航菜单...</div>
+                </div>
+                <div class="logo-info">
+                    <h3 class="logo-title">经典盾牌版</h3>
+                    <p class="logo-desc">保持原有盾牌元素，优化尺寸和配色，与网站主题完美融合</p>
+                </div>
+            </div>
+            
+            <!-- Logo 2: 书本图标 -->
+            <div class="logo-option">
+                <div class="logo-preview">
+                    <div class="logo">
+                        <div class="logo-icon brand-blue">📚</div>
+                        <div class="logo-text">学习搭子</div>
+                    </div>
+                    <div class="nav-right">导航菜单...</div>
+                </div>
+                <div class="logo-info">
+                    <h3 class="logo-title">智慧书本版</h3>
+                    <p class="logo-desc">书本图标直观表达学习概念，教育属性更强</p>
+                </div>
+            </div>
+            
+            <!-- Logo 3: 毕业帽 -->
+            <div class="logo-option">
+                <div class="logo-preview">
+                    <div class="logo">
+                        <div class="logo-icon brand-blue-light">🎓</div>
+                        <div class="logo-text">学习搭子</div>
+                    </div>
+                    <div class="nav-right">导航菜单...</div>
+                </div>
+                <div class="logo-info">
+                    <h3 class="logo-title">学位成就版</h3>
+                    <p class="logo-desc">毕业帽象征考试成功，激励用户达成目标</p>
+                </div>
+            </div>
+            
+            <!-- Logo 4: 简约文字 -->
+            <div class="logo-option">
+                <div class="logo-preview">
+                    <div class="logo text-only">
+                        <div class="logo-text">学习搭子</div>
+                    </div>
+                    <div class="nav-right">导航菜单...</div>
+                </div>
+                <div class="logo-info">
+                    <h3 class="logo-title">极简文字版</h3>
+                    <p class="logo-desc">纯文字设计，简洁现代，突出品牌名称</p>
+                </div>
+            </div>
+            
+            <!-- Logo 5: 渐变圆角 -->
+            <div class="logo-option">
+                <div class="logo-preview">
+                    <div class="logo">
+                        <div class="logo-icon brand-gradient">学</div>
+                        <div class="logo-text">学习搭子</div>
+                    </div>
+                    <div class="nav-right">导航菜单...</div>
+                </div>
+                <div class="logo-info">
+                    <h3 class="logo-title">渐变文字版</h3>
+                    <p class="logo-desc">用"学"字作为图标，渐变色增加现代感</p>
+                </div>
+            </div>
+            
+            <!-- Logo 6: 紧凑版 -->
+            <div class="logo-option">
+                <div class="logo-preview">
+                    <div class="logo compact">
+                        <div class="logo-icon brand-blue">🎯</div>
+                        <div class="logo-text">学习搭子</div>
+                    </div>
+                    <div class="nav-right">导航菜单...</div>
+                </div>
+                <div class="logo-info">
+                    <h3 class="logo-title">紧凑目标版</h3>
+                    <p class="logo-desc">更小尺寸，节省空间，靶心象征精准学习</p>
+                </div>
+            </div>
+            
+            <!-- Logo 7: 圆形图标 -->
+            <div class="logo-option">
+                <div class="logo-preview">
+                    <div class="logo">
+                        <div class="logo-icon brand-blue rounded">💡</div>
+                        <div class="logo-text">学习搭子</div>
+                    </div>
+                    <div class="nav-right">导航菜单...</div>
+                </div>
+                <div class="logo-info">
+                    <h3 class="logo-title">圆形智慧版</h3>
+                    <p class="logo-desc">圆形图标更柔和，灯泡代表启发思考</p>
+                </div>
+            </div>
+            
+            <!-- Logo 8: 边框样式 -->
+            <div class="logo-option">
+                <div class="logo-preview">
+                    <div class="logo">
+                        <div class="logo-icon minimal">🏆</div>
+                        <div class="logo-text">学习搭子</div>
+                    </div>
+                    <div class="nav-right">导航菜单...</div>
+                </div>
+                <div class="logo-info">
+                    <h3 class="logo-title">边框奖杯版</h3>
+                    <p class="logo-desc">线性图标风格，奖杯象征考试胜利</p>
+                </div>
+            </div>
+            
+            <!-- Logo 9: 大尺寸版 -->
+            <div class="logo-option">
+                <div class="logo-preview">
+                    <div class="logo large">
+                        <div class="logo-icon brand-gradient-2">📖</div>
+                        <div class="logo-text">学习搭子</div>
+                    </div>
+                    <div class="nav-right">导航菜单...</div>
+                </div>
+                <div class="logo-info">
+                    <h3 class="logo-title">大尺寸版</h3>
+                    <p class="logo-desc">更大的图标和文字，增强品牌识别度</p>
+                </div>
+            </div>
+            
+            <!-- Logo 10: 状态徽章 -->
+            <div class="logo-option">
+                <div class="logo-preview">
+                    <div class="logo">
+                        <div class="logo-icon brand-blue badge">🚀</div>
+                        <div class="logo-text">学习搭子</div>
+                    </div>
+                    <div class="nav-right">导航菜单...</div>
+                </div>
+                <div class="logo-info">
+                    <h3 class="logo-title">进步徽章版</h3>
+                    <p class="logo-desc">带状态点的火箭图标，象征快速提升</p>
+                </div>
+            </div>
+        </div>
+        
+        <div style="margin-top: 40px; padding: 24px; background: white; border-radius: 12px; border: 1px solid #e2e8f0;">
+            <h3 style="color: #1e293b; margin-bottom: 16px;">设计建议</h3>
+            <div style="color: #64748b; line-height: 1.6;">
+                <p><strong>推荐方案：</strong>经典盾牌版、智慧书本版、学位成就版</p>
+                <p><strong>色彩匹配：</strong>完美适配你的 #4F46E5 蓝色主题</p>
+                <p><strong>尺寸优化：</strong>32px图标 + 18px文字，适合导航栏</p>
+                <p><strong>响应式：</strong>在移动端可以只保留图标部分</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
