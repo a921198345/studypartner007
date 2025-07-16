@@ -10,17 +10,29 @@ import { Footer } from "@/components/footer"
 import { UserInfoCard } from "@/components/profile/user-info-card"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/hooks/useAuth"
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { isAuthenticated, user: authUser, loading: authLoading } = useAuth();
   const [user, setUser] = useState(null);
   const [membershipData, setMembershipData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // 检查认证状态，未登录时重定向
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+  }, [authLoading, isAuthenticated, router]);
+
   // 获取用户会员信息
   useEffect(() => {
     const fetchMembershipStatus = async () => {
+      if (!isAuthenticated) return;
+      
       try {
         const authToken = localStorage.getItem('auth_token');
         if (!authToken) {
@@ -62,7 +74,7 @@ export default function ProfilePage() {
     };
 
     fetchMembershipStatus();
-  }, []);
+  }, [isAuthenticated]);
 
   // 处理升级/续费会员
   const handleUpgrade = (planId = null) => {
@@ -75,8 +87,8 @@ export default function ProfilePage() {
     }
   };
 
-  // 如果正在加载
-  if (loading) {
+  // 如果正在加载认证状态或用户信息
+  if (authLoading || loading) {
     return (
       <div className="flex min-h-screen flex-col">
         <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -94,6 +106,11 @@ export default function ProfilePage() {
     );
   }
 
+  // 如果未登录，会自动重定向到登录页面，这里不需要显示错误状态
+  if (!isAuthenticated) {
+    return null;
+  }
+
   // 如果有错误
   if (error) {
     return (
@@ -106,7 +123,7 @@ export default function ProfilePage() {
         <main className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <p className="text-red-500 mb-4">{error}</p>
-            <Button onClick={() => window.location.href = '/login'}>去登录</Button>
+            <Button onClick={() => window.location.reload()}>刷新页面</Button>
           </div>
         </main>
       </div>
@@ -136,7 +153,7 @@ export default function ProfilePage() {
                 <TabsList className="mb-4">
                   <TabsTrigger value="study" className="flex items-center">
                     <BookOpen className="h-4 w-4 mr-2" />
-                    学习记录
+                    会员信息
                   </TabsTrigger>
                   <TabsTrigger value="settings" className="flex items-center">
                     <Settings className="h-4 w-4 mr-2" />
@@ -148,7 +165,6 @@ export default function ProfilePage() {
                   <Card>
                     <CardHeader>
                       <CardTitle>会员信息</CardTitle>
-                      <CardDescription>查看您的会员状态和权益</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
@@ -178,7 +194,7 @@ export default function ProfilePage() {
                         </Badge>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-1 gap-4 max-w-md">
                         <Card>
                           <CardHeader className="pb-2">
                             <CardTitle className="text-lg">月度会员</CardTitle>
@@ -270,117 +286,6 @@ export default function ProfilePage() {
                           </CardFooter>
                         </Card>
 
-                        <Card className="border-primary">
-                          <CardHeader className="pb-2">
-                            <div className="flex justify-between items-center">
-                              <CardTitle className="text-lg">季度会员</CardTitle>
-                              <Badge>推荐</Badge>
-                            </div>
-                            <CardDescription>
-                              <span className="text-2xl font-bold">¥99</span> / 3个月
-                            </CardDescription>
-                          </CardHeader>
-                          <CardContent className="space-y-2 text-sm">
-                            <div className="flex items-start">
-                              <div className="rounded-full bg-primary/10 p-1 mr-2">
-                                <svg
-                                  className="h-3 w-3 text-primary"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M5 13l4 4L19 7"
-                                  />
-                                </svg>
-                              </div>
-                              <span>无限制AI问答</span>
-                            </div>
-                            <div className="flex items-start">
-                              <div className="rounded-full bg-primary/10 p-1 mr-2">
-                                <svg
-                                  className="h-3 w-3 text-primary"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M5 13l4 4L19 7"
-                                  />
-                                </svg>
-                              </div>
-                              <span>所有年份真题库</span>
-                            </div>
-                            <div className="flex items-start">
-                              <div className="rounded-full bg-primary/10 p-1 mr-2">
-                                <svg
-                                  className="h-3 w-3 text-primary"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M5 13l4 4L19 7"
-                                  />
-                                </svg>
-                              </div>
-                              <span>所有学科知识导图</span>
-                            </div>
-                            <div className="flex items-start">
-                              <div className="rounded-full bg-primary/10 p-1 mr-2">
-                                <svg
-                                  className="h-3 w-3 text-primary"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M5 13l4 4L19 7"
-                                  />
-                                </svg>
-                              </div>
-                              <span>个性化学习计划</span>
-                            </div>
-                            <div className="flex items-start">
-                              <div className="rounded-full bg-primary/10 p-1 mr-2">
-                                <svg
-                                  className="h-3 w-3 text-primary"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M5 13l4 4L19 7"
-                                  />
-                                </svg>
-                              </div>
-                              <span className="font-medium">每月仅33元，比月度会员更划算</span>
-                            </div>
-                          </CardContent>
-                          <CardFooter>
-                            <Button 
-                              className="w-full" 
-                              onClick={() => handleUpgrade('3month')}
-                            >
-                              {user?.membershipStatus === 'paid' && user?.isActive ? '续费会员' : '立即开通'}
-                            </Button>
-                          </CardFooter>
-                        </Card>
                       </div>
                     </CardContent>
                   </Card>
