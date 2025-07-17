@@ -587,38 +587,48 @@ export default function QuestionBankPage() {
           if (historyString) {
             try {
               const history = JSON.parse(historyString);
-              // 如果本地有答题历史且不超过1天
-              if (history && history.timestamp && Date.now() - history.timestamp < 86400000) {
+              console.log("本地答题历史数据:", history);
+              
+              // 放宽时间限制，如果本地有答题历史就使用（不限制1天内）
+              if (history && history.answered && Object.keys(history.answered).length > 0) {
                 // 找出最近回答的题目ID（最大ID）
-                const answeredIds = Object.keys(history.answered || {}).map(Number);
+                const answeredIds = Object.keys(history.answered).map(Number);
                 if (answeredIds.length > 0) {
                   lastQuestionFromLocal = Math.max(...answeredIds);
                   hasLocalProgress = true;
+                  console.log(`从本地存储获取到最后答题ID: ${lastQuestionFromLocal}, 共有 ${answeredIds.length} 个答题记录`);
                 }
+              } else {
+                console.log("本地答题历史为空或格式不正确");
               }
             } catch (e) {
               console.error("解析本地答题历史失败:", e);
             }
+          } else {
+            console.log("localStorage中没有找到answerHistory");
           }
           
-          // 尝试从服务器获取最近答题进度
-          const progressResponse = await questionApi.getLastPracticeProgress({
-            year: selectedYears.includes('all') ? undefined : selectedYears.length === 1 ? selectedYears[0] : undefined,
-            question_type: !selectedQuestionTypes.includes('全部题型') ? selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题' : undefined
-          });
-          
-          if (progressResponse.success) {
-            setHasLastProgress(true);
-            setLastQuestionId(progressResponse.data.last_question_id);
-            console.log("成功获取最近练习进度:", progressResponse.data);
-          } else if (hasLocalProgress && lastQuestionFromLocal) {
-            // 如果服务器请求失败但本地有记录，使用本地记录
-            console.log("使用本地存储的最近答题记录:", lastQuestionFromLocal);
+          // 优先使用本地存储的进度，提高响应速度
+          if (hasLocalProgress && lastQuestionFromLocal) {
+            console.log("优先使用本地存储的最近答题记录:", lastQuestionFromLocal);
             setHasLastProgress(true);
             setLastQuestionId(lastQuestionFromLocal);
           } else {
-            setHasLastProgress(false);
-            setLastQuestionId(null);
+            // 尝试从服务器获取最近答题进度
+            const progressResponse = await questionApi.getLastPracticeProgress({
+              year: selectedYears.includes('all') ? undefined : selectedYears.length === 1 ? selectedYears[0] : undefined,
+              question_type: !selectedQuestionTypes.includes('全部题型') ? selectedQuestionTypes.includes('单选题') ? '单选题' : '多选题' : undefined
+            });
+            
+            if (progressResponse.success && progressResponse.data && progressResponse.data.last_question_id) {
+              setHasLastProgress(true);
+              setLastQuestionId(progressResponse.data.last_question_id);
+              console.log("成功获取最近练习进度:", progressResponse.data);
+            } else {
+              console.log("服务器没有找到练习记录，检查本地备用数据");
+              setHasLastProgress(false);
+              setLastQuestionId(null);
+            }
           }
         } catch (progressError) {
           console.error("获取练习进度失败:", progressError);
@@ -1502,7 +1512,37 @@ export default function QuestionBankPage() {
                   {activeTab === "all" && (
                     <div className="flex space-x-4">
                       <Button 
-                        onClick={() => lastQuestionId && router.push(`/question-bank/${lastQuestionId}`)}
+                        onClick={() => {
+                          console.log('继续练习按钮被点击', { hasLastProgress, lastQuestionId });
+                          if (hasLastProgress && lastQuestionId) {
+                            console.log(`准备跳转到题目 #${lastQuestionId}`);
+                            router.push(`/question-bank/${lastQuestionId}`);
+                          } else {
+                            console.warn('无法继续练习：', { hasLastProgress, lastQuestionId });
+                            
+                            // 尝试从本地存储直接获取最后答题记录作为备用
+                            try {
+                              const historyString = localStorage.getItem('answerHistory');
+                              if (historyString) {
+                                const history = JSON.parse(historyString);
+                                if (history && history.answered) {
+                                  const answeredIds = Object.keys(history.answered).map(Number);
+                                  if (answeredIds.length > 0) {
+                                    const fallbackQuestionId = Math.max(...answeredIds);
+                                    console.log(`使用备用方案，跳转到题目 #${fallbackQuestionId}`);
+                                    router.push(`/question-bank/${fallbackQuestionId}`);
+                                    return;
+                                  }
+                                }
+                              }
+                              // 如果没有任何记录，提示用户
+                              alert('没有找到练习记录，请先开始练习');
+                            } catch (e) {
+                              console.error('备用方案失败:', e);
+                              alert('获取练习进度失败，请刷新页面后重试');
+                            }
+                          }
+                        }}
                         className={`${hasLastProgress ? "bg-green-600 hover:bg-green-700" : "bg-gray-400 opacity-70 cursor-not-allowed"}`}
                         disabled={!hasLastProgress}
                       >
